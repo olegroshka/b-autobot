@@ -3,6 +3,7 @@ package utils;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
+import java.io.File;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -101,11 +102,12 @@ public final class MockBlotterServer {
         return "http://localhost:" + server.port() + "/blotter/";
     }
 
+    private static final String WIREMOCK_ROOT = "src/test/resources/wiremock";
+
     private static void registerStubs() {
-        // ── PT-Blotter SPA ─────────────────────────────────────────────────────
-        // Serve the pre-built index.html (in __files/blotter/) at the root path.
-        // Vite build will replace this file; all paths under /blotter/ return it
-        // so client-side routing works without a real web server.
+        // ── PT-Blotter SPA: HTML ──────────────────────────────────────────────
+        // Serve the pre-built (or Vite-built) index.html at the blotter root.
+        // All sub-paths return the same HTML so client-side routing works.
         server.stubFor(get(urlEqualTo("/blotter/"))
                 .willReturn(aResponse()
                         .withStatus(200)
@@ -116,6 +118,15 @@ public final class MockBlotterServer {
                         .withStatus(200)
                         .withHeader("Content-Type", "text/html; charset=utf-8")
                         .withBodyFile("blotter/index.html")));
+
+        // ── PT-Blotter SPA: JS/CSS assets (Vite build output, fixed names) ──
+        // Vite is configured with fixed entryFileNames/assetFileNames so the
+        // paths are always assets/index.js and assets/index.css regardless of
+        // content hash.  Only register stubs when the Vite build has actually run.
+        registerAssetStubIfBuilt("blotter/assets/index.js",  "/blotter/assets/.*\\.js",
+                "application/javascript; charset=utf-8");
+        registerAssetStubIfBuilt("blotter/assets/index.css", "/blotter/assets/.*\\.css",
+                "text/css; charset=utf-8");
 
         // ── 404: unknown trader (higher priority = checked first) ─────────────
         server.stubFor(post(urlEqualTo("/submit"))
@@ -135,6 +146,26 @@ public final class MockBlotterServer {
                         .withStatus(201)
                         .withHeader("Content-Type", "application/json")
                         .withBody(successBody())));
+    }
+
+    /**
+     * Registers a WireMock stub that serves {@code bodyFile} (relative to
+     * {@code __files/}) for any URL matching {@code urlPattern}, but only
+     * when the Vite build artifact actually exists on disk.
+     *
+     * <p>This prevents WireMock from throwing a {@code FileNotFoundException}
+     * when the blotter webapp has not been built yet ({@code blotter.build.skip=true}).
+     */
+    private static void registerAssetStubIfBuilt(
+            String bodyFile, String urlPattern, String contentType) {
+        File asset = new File(WIREMOCK_ROOT + "/__files/" + bodyFile);
+        if (asset.exists()) {
+            server.stubFor(get(urlPathMatching(urlPattern))
+                    .willReturn(aResponse()
+                            .withStatus(200)
+                            .withHeader("Content-Type", contentType)
+                            .withBodyFile(bodyFile)));
+        }
     }
 
     /**

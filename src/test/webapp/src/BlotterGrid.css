@@ -1,0 +1,15 @@
+/* Grid container — fills whatever space App.tsx assigns */
+.blotter-grid {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Status badge colours ──────────────────────────────────────────────────── */
+.ag-theme-balham-dark .status-pending { color: #fbbf24; font-weight: 600; }
+.ag-theme-balham-dark .status-quoted  { color: #34d399; font-weight: 600; }
+.ag-theme-balham-dark .status-done    { color: #60a5fa; font-weight: 600; }
+.ag-theme-balham-dark .status-missed  { color: #f87171; font-weight: 600; }
+
+/* ── Side colours ──────────────────────────────────────────────────────────── */
+.ag-theme-balham-dark .side-buy  { color: #34d399; }
+.ag-theme-balham-dark .side-sell { color: #f87171; }

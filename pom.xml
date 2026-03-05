@@ -219,28 +219,6 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.4.1</version>
         <executions>
-          <!--
-            PT-Blotter webapp build.
-            Skipped by default (blotter.build.skip=true).
-            Enable with: mvn verify -Dblotter.build.skip=false
-            Requires Node.js 18+ and npm on PATH.
-          -->
-          <execution>
-            <id>build-blotter-webapp</id>
-            <phase>test-compile</phase>
-            <goals>
-              <goal>exec</goal>
-            </goals>
-            <configuration>
-              <skip>${blotter.build.skip}</skip>
-              <executable>npm</executable>
-              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
-              <arguments>
-                <argument>run</argument>
-                <argument>build</argument>
-              </arguments>
-            </configuration>
-          </execution>
           <execution>
             <id>install-playwright-browsers</id>
             <phase>test-compile</phase>
@@ -258,6 +236,55 @@
                 <argument>--with-deps</argument>
                 <argument>${BROWSER}</argument>
               </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        PT-Blotter webapp build using frontend-maven-plugin.
+        Downloads Node.js automatically into ${project.basedir}/.node — no
+        system Node.js installation required.
+
+        Skipped by default (blotter.build.skip=true).
+        To install Node, run npm install, and build the Vite app in one shot:
+          mvn test-compile -Dblotter.build.skip=false
+
+        After the first build the Vite output lands in:
+          src/test/resources/wiremock/__files/blotter/
+        and is served by WireMock at http://localhost:PORT/blotter/.
+      -->
+      <plugin>
+        <groupId>com.github.eirslett</groupId>
+        <artifactId>frontend-maven-plugin</artifactId>
+        <version>1.15.1</version>
+        <configuration>
+          <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+          <!-- Node binaries land here — gitignored, not system-wide -->
+          <installDirectory>${project.basedir}/.node</installDirectory>
+          <nodeVersion>v20.18.1</nodeVersion>
+          <skip>${blotter.build.skip}</skip>
+        </configuration>
+        <executions>
+          <execution>
+            <id>install-node-and-npm</id>
+            <goals><goal>install-node-and-npm</goal></goals>
+            <phase>generate-test-resources</phase>
+          </execution>
+          <execution>
+            <id>npm-install-blotter</id>
+            <goals><goal>npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <arguments>install</arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-build-blotter</id>
+            <goals><goal>npm</goal></goals>
+            <phase>test-compile</phase>
+            <configuration>
+              <arguments>run build</arguments>
             </configuration>
           </execution>
         </executions>

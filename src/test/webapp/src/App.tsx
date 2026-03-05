@@ -1,10 +1,13 @@
+import BlotterGrid from './BlotterGrid'
 import './App.css'
 
 /**
  * PT-Blotter root component.
  *
- * M0: minimal shell — page title and header only.
- * M1: BlotterGrid with AG Grid column definitions and seeded data.
+ * M0: minimal shell (page title + header).
+ * M1: BlotterGrid renders AG Grid with all design-contract columns + seeded data.
+ * M2: PriceSimulator will tick ref price cells.
+ * M3: toolbar buttons (APPLY / SEND) + REST inquiry ingestion.
  */
 export default function App() {
   return (
@@ -14,10 +17,7 @@ export default function App() {
         <span className="blotter-subtitle">Fixed Income Bond Trading</span>
       </header>
       <main className="blotter-main">
-        <div id="grid-container" className="blotter-grid-placeholder">
-          {/* BlotterGrid will render here from M1 onwards */}
-          AG Grid will render here
-        </div>
+        <BlotterGrid />
       </main>
     </div>
   )
