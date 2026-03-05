@@ -373,14 +373,538 @@ open http://localhost:5173
 mvn verify
 ```
 
-### Next steps
+---
 
-1. **Scaffold React app** — `npm create vite@latest webapp -- --template react-ts`
-2. **Define column schema** — TypeScript interfaces for `Inquiry`, `RefPrice`, `SkewParams`
-3. **BlotterGrid component** — AG Grid React with column groups, cell flash, row selection
-4. **PriceSimulator** — setInterval with Gaussian noise, updates AG Grid via `applyTransactionAsync`
-5. **SkewControls** — toolbar + per-row dropdowns wired to APPLY button logic
-6. **WireMock stubs** — `/api/inquiry` POST, `/api/inquiry/{id}/quote` POST, GET
-7. **BondBlotter.feature** — Gherkin scenarios for the full workflow
-8. **BondBlotterSteps.java** — step definitions reusing `GridHarness`, new DSL helpers
-9. **DSL layer** — abstract common patterns (select row, apply skew, assert status) into reusable step vocabulary
+## Milestone plan
+
+### Guiding principles
+
+1. **Vertical slices, not horizontal layers.** Every milestone delivers a runnable,
+   testable increment — never "all the React components but no tests".
+2. **Unhit test first.** Each milestone opens by writing the Cucumber scenario(s).
+   Run them — they must fail (red).  Implement until they pass (green).  Do not advance
+   until green.
+3. **Regression guard is non-negotiable.** Every quality gate re-runs the full suite
+   (`mvn verify`).  A new passing scenario that breaks an old one is a failed gate.
+4. **Design contracts lock before code starts.** Column `col-id` names, REST URL shapes,
+   and status string values are agreed in this document and treated as frozen during
+   implementation.  Changing them is a major refactor, not a quick edit.
+5. **One milestone at a time.** Do not start M+1 while M quality gate is not green.
+
+---
+
+### Design contracts (frozen — agree before writing a line of code)
+
+These values appear in Gherkin features, Java step definitions, TypeScript types, and
+WireMock stubs simultaneously.  Changing one requires changing all four.
+
+#### AG Grid `col-id` names (stable identifiers used in probes + step defs)
+
+| Column | `col-id` |
+|---|---|
+| Select checkbox | `select` |
+| ISIN | `isin` |
+| Description | `description` |
+| Maturity | `maturity` |
+| Coupon | `coupon` |
+| Notional | `notional` |
+| Side | `side` |
+| Client | `client` |
+| Status | `status` |
+| TW Bid | `twBid` |
+| TW Ask | `twAsk` |
+| CP+ Bid | `cpBid` |
+| CP+ Ask | `cpAsk` |
+| CBBT Bid | `cbbBid` |
+| CBBT Ask | `cbbAsk` |
+| Ref Source (control) | `refSource` |
+| Convention (control) | `convention` |
+| Ref Side (control) | `refSide` |
+| Skew Δ (control) | `skewDelta` |
+| Applied Bid | `appliedBid` |
+| Applied Ask | `appliedAsk` |
+
+#### Status values (string literals in feature files and TypeScript enums)
+
+`PENDING` · `QUOTED` · `DONE` · `MISSED`
+
+#### REST endpoints
+
+| Method | Path | Success |
+|---|---|---|
+| POST | `/api/inquiry` | 201 |
+| GET | `/api/inquiries` | 200 |
+| POST | `/api/inquiry/{id}/quote` | 200 |
+| POST | `/api/inquiry` with unknown ISIN | 404 |
+
+#### Price format
+- Reference prices: decimal with 3dp (e.g. `99.375`)
+- Skew in **Price** convention: decimal cents (e.g. `-0.25` = minus ¼ point)
+- Skew in **Spread** convention: integer basis points (e.g. `+5` = +5 bp)
+- Applied prices: same 3dp format as reference prices
+
+#### Seed data (deterministic — same ISINs used in all feature files)
+
+| # | ISIN | Description | Coupon | Maturity | Notional | Side | Client |
+|---|---|---|---|---|---|---|---|
+| 1 | US912828YJ02 | UST 4.25% 2034 | 4.250 | 2034-11-15 | 10,000,000 | BUY | BLACKROCK |
+| 2 | XS2346573523 | EUR IG Corp 3.5% 2029 | 3.500 | 2029-03-20 | 5,000,000 | SELL | PIMCO |
+| 3 | US38141GXZ20 | Goldman Sachs 5.15% 2026 | 5.150 | 2026-05-22 | 8,000,000 | BUY | VANGUARD |
+| 4 | GB0031348658 | UK Gilt 1.25% 2027 | 1.250 | 2027-07-22 | 15,000,000 | SELL | FIDELITY |
+| 5 | FR0014004L86 | OAT 0.75% 2028 | 0.750 | 2028-05-25 | 7,500,000 | BUY | AMUNDI |
+
+---
+
+### M0 — Build pipeline spine
+
+**Goal:** `mvn verify` compiles the React app, WireMock serves it, Playwright can navigate
+to the blotter URL, and all 12 existing scenarios still pass.  This is the highest-risk
+milestone — get it right before writing any blotter UI.
+
+**Deliverables:**
+- `src/test/webapp/` scaffolded (Vite + React-TS, minimal `index.html` saying "PT-Blotter")
+- `vite.config.ts` with `outDir: ../../test/resources/wiremock/__files/blotter`
+- `pom.xml` exec-maven-plugin execution: `npm run build` in `test-compile` phase
+- WireMock `mappings/blotter-static.json` stub: `GET /blotter/**` → serve from `__files/blotter/`
+- New Cucumber step: `Given the PT-Blotter is open` → navigates to `{wiremockUrl}/blotter/`
+
+**Unhit test (write first — must fail before M0 implementation):**
+```gherkin
+@blotter @smoke
+Scenario: PT-Blotter page loads
+  Given the PT-Blotter is open
+  Then the page title should contain "PT-Blotter"
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @smoke"   # 1/1 NEW passing
+mvn verify                                                 # 13/13 total (12 old + 1 new)
+```
+
+**Known risks:**
+- WireMock SPA fallback: React Router needs all unknown sub-paths to return `index.html`.
+  Mitigation: do NOT use React Router — single-page app, no client-side routing.
+- `npm run build` path resolution on Windows (forward vs back slashes in `outDir`).
+  Mitigation: use `path.resolve(__dirname, ...)` in `vite.config.ts`.
+- Maven exec plugin `npm` command not found on CI.
+  Mitigation: use full path or ensure Node.js is on `PATH`; document in README.
+
+**Exit criteria:** Quality gate green. No WireMock port conflicts. Vite build artifact
+visible in `src/test/resources/wiremock/__files/blotter/`.
+
+---
+
+### M1 — Grid structure visible
+
+**Goal:** AG Grid renders with all expected column groups and at least one seeded row.
+No ticking, no controls, no REST — just the grid skeleton and static data.
+
+**Deliverables:**
+- `BlotterGrid.tsx` with full column definition (all `col-id` values from design contracts)
+- Column groups: Identity, Status, TradeWeb, CP+, CBBT, Skew Controls, Applied Prices
+- 5 seeded rows (design-contract seed data, hardcoded in component state for now)
+- Row checkbox selection enabled
+- All reference price cells display a static placeholder (e.g. `99.000`)
+
+**Unhit tests:**
+```gherkin
+@blotter @smoke
+Scenario: Blotter renders expected column groups
+  Given the PT-Blotter is open
+  Then the grid should display column "isin"
+  And the grid should display column "twBid"
+  And the grid should display column "cpBid"
+  And the grid should display column "cbbBid"
+  And the grid should display column "appliedBid"
+  And the grid should display column "status"
+
+Scenario: Blotter loads with seeded inquiries
+  Given the PT-Blotter is open
+  Then the grid should have at least 5 rows
+  And the row with ISIN "US912828YJ02" should have status "PENDING"
+  And the row with ISIN "XS2346573523" should have status "PENDING"
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @smoke"   # 3/3 passing
+mvn verify                                                 # 15/15 total
+```
+
+**Known risks:**
+- AG Grid React `col-id` attribute only renders when `field` or `colId` is set in
+  `ColDef`.  Mitigation: always set `colId` explicitly in column definitions — never
+  rely on `field` name derivation.
+- Column group headers have a different DOM structure (`.ag-column-header`) than data
+  column headers — ensure `getHeaderCell(colId)` in `FinanceDemoPage` still works.
+
+**Exit criteria:** All column `col-id` attributes visible in DOM, confirmed by
+`assertColumnVisible(colId)` in the step def for each col in the design contract table.
+
+---
+
+### M2 — Ticking reference prices
+
+**Goal:** TW, CP+, and CBBT bid/ask cells update at ~400 ms intervals with Gaussian
+noise.  The AG Grid flash animation fires on each update.  Prices stay within a
+realistic range for each seeded bond.
+
+**Deliverables:**
+- `PriceSimulator.ts`: `setInterval`-based update engine, one mid-price per bond,
+  Gaussian noise (σ = 0.03 points), separate bid/ask spread (0.125 pts)
+- Price updates applied via `gridRef.current.api.applyTransactionAsync()`
+- `enableCellChangeFlash: true` on all six reference price columns
+- Prices formatted to 3dp in cell renderer
+
+**Unhit tests:**
+```gherkin
+@blotter @ticking
+Scenario: Reference price cells update within the live feed window
+  Given the PT-Blotter is open
+  When I wait up to 3 seconds for the "twBid" cell in row 0 to change value
+  Then the "twBid" cell in row 0 should have a numeric value
+
+Scenario: TW Bid cell flashes on a live update
+  Given the PT-Blotter is open
+  When I wait for the "twBid" cell in row 0 to flash
+  Then the "twBid" cell in row 0 should have received at least one tick update
+
+Scenario: All three reference sources are ticking
+  Given the PT-Blotter is open
+  Then within 3 seconds the "cpBid" cell in row 0 should change value
+  And within 3 seconds the "cbbBid" cell in row 0 should change value
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @ticking"  # 3/3 passing
+mvn verify                                                  # 18/18 total
+```
+
+**Known risks:**
+- Price simulation timing: `setInterval` at 400 ms means each scenario waits up to
+  ~800 ms (one missed tick plus jitter).  Use 3 s timeout budget — generous but not
+  flaky.  Never hard-code tick count expectations.
+- `applyTransactionAsync` batches updates — AG Grid may coalesce ticks.  Use
+  `waitForCellFlash` from existing `TickingCellHelper` as-is; it already handles both
+  flash mechanisms.
+- Seed mid-prices must be realistic for the instrument type (UST ~99, IG Corp ~101,
+  Gilts ~95 etc.) so assertions on "value in range" are stable.
+
+**Exit criteria:** `TickingCellHelper.waitForCellFlash` and `waitForCellUpdate`
+work against blotter cells without any changes to the existing helper class.
+
+---
+
+### M3 — REST inquiry ingestion
+
+**Goal:** A new inquiry submitted via `POST /api/inquiry` appears as a new PENDING row
+in the blotter.  Unknown ISINs return 404.  `GET /api/inquiries` returns seeded data.
+
+**Deliverables:**
+- WireMock stubs: `inquiry-post.json`, `inquiry-unknown-isin.json` (priority 1 → 404),
+  `inquiries-get.json`
+- React: `useEffect` on mount calls `GET /api/inquiries` and merges with seed data
+- React: a "Simulate ION RFQ" button calls `POST /api/inquiry` and appends the new row
+- `api.ts` fetch wrapper; error surfaces in UI for 4xx responses
+
+**Unhit tests:**
+```gherkin
+@blotter @api
+Scenario: Inquiry submitted via API appears in blotter as PENDING
+  Given the PT-Blotter is open
+  When a new inquiry is submitted for ISIN "US38141GXZ20" notional "3000000" side "BUY" client "SCHRODERS"
+  Then the blotter should contain a row with ISIN "US38141GXZ20"
+  And that row should have status "PENDING"
+
+Scenario: Submission returns 201 with a non-blank inquiry ID
+  When a new inquiry is submitted for ISIN "GB0031348658" notional "2000000" side "SELL" client "INVESCO"
+  Then the API response status should be 201
+  And the response should contain a non-blank "inquiry_id"
+
+Scenario: Unknown ISIN is rejected with 404
+  When a new inquiry is submitted for ISIN "UNKNOWN-ISIN-XYZ"
+  Then the API response status should be 404
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @api"  # 3/3 passing
+mvn verify                                              # 21/21 total
+```
+
+**Known risks:**
+- WireMock stub matching: the unknown-ISIN stub must use priority 1 and match on the
+  request body `isin` field.  Same pattern as the existing `UNKNOWN_TRADER` stub in
+  `MockBlotterServer` — copy that pattern.
+- React `fetch` to WireMock uses a relative URL (`/api/inquiry`).  WireMock must serve
+  the React app AND handle the API call on the same port — which it does since both come
+  from the same `MockBlotterServer` instance.
+- `GET /api/inquiries` response must be valid JSON array; WireMock stub body must not
+  be empty.
+
+**Exit criteria:** `PortfolioSteps` patterns reused wholesale in `BondBlotterSteps`
+for the REST assertions — no new REST infrastructure invented.
+
+---
+
+### M4 — Skew controls and APPLY
+
+**Goal:** Trader selects a row, sets ref source / convention / ref side / skew amount
+in the toolbar, presses APPLY, and the Applied Bid or Applied Ask column updates with
+the mathematically correct skewed price.
+
+**Deliverables:**
+- Toolbar components: Ref Source select (`TW` / `CP+` / `CBBT`), Convention select
+  (`Price` / `Spread`), Ref Side select (`Bid` / `Ask`), Skew Δ number input, APPLY button
+- APPLY logic:
+  - Price convention: `applied = refPrice ± skewDelta` (decimal points)
+  - Spread convention: `applied = refPrice` at `refSpread ± skewDeltaBp` (basis points)
+- Applied Bid and Applied Ask columns populated on row after APPLY
+
+**Unhit tests:**
+```gherkin
+@blotter @workflow
+Scenario: Applying a price skew to a single row updates applied prices
+  Given the PT-Blotter is open
+  When I select the row with ISIN "US912828YJ02"
+  And I set the ref source to "TW", convention "Price", ref side "Bid", skew "-0.25"
+  And I press APPLY
+  Then the applied bid for ISIN "US912828YJ02" should equal the TW Bid minus 0.25
+
+Scenario: Applying a spread skew uses basis points
+  Given the PT-Blotter is open
+  When I select the row with ISIN "XS2346573523"
+  And I set the ref source to "CP+", convention "Spread", ref side "Ask", skew "+5"
+  And I press APPLY
+  Then the applied ask spread for ISIN "XS2346573523" should equal the CP+ Ask spread plus 5bp
+
+Scenario: APPLY button is disabled when no row is selected
+  Given the PT-Blotter is open
+  Then the APPLY button should be disabled
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @workflow"  # 3/3 passing
+mvn verify                                                   # 24/24 total
+```
+
+**Known risks:**
+- Floating-point precision in `applied = refPrice - skewDelta`.  Mitigation: use
+  `NumericComparator.assertEquivalent()` (already exists) rather than exact string
+  equality; assert `Math.abs(actual - expected) < 0.001`.
+- Reference price is ticking while trader is setting skew controls — race condition in
+  the assertion.  Mitigation: step def reads the reference price at the moment APPLY is
+  pressed (from the DOM via probe), then computes expected applied price from that snapshot.
+- Toolbar state resets on deselect — ensure controls persist their values during the test.
+
+**Exit criteria:** `NumericComparator` validates applied prices.  No `Thread.sleep` in
+step defs.  `TickingCellHelper` or `GridHarness` reused unmodified.
+
+---
+
+### M5 — SEND and status machine
+
+**Goal:** SEND fires `POST /api/inquiry/{id}/quote`, row moves to QUOTED status,
+skew controls and SEND button are disabled for that row.  A QUOTED row cannot be
+re-sent.
+
+**Deliverables:**
+- SEND button in toolbar (enabled only when ≥1 selected row has applied prices)
+- On click: calls `POST /api/inquiry/{id}/quote` for each selected row
+- On 200 response: row `status` field set to `QUOTED` in grid state
+- QUOTED rows: skew control cells render as read-only/disabled; checkbox still selectable
+  (for future DONE/MISSED transitions)
+- WireMock stub: `inquiry-quote-post.json` → `200 { inquiry_id, status: "QUOTED" }`
+
+**Unhit tests:**
+```gherkin
+@blotter @workflow
+Scenario: After SEND the row status becomes QUOTED
+  Given the PT-Blotter is open
+  And I have applied a skew to the row with ISIN "US912828YJ02"
+  When I select the row with ISIN "US912828YJ02"
+  And I press SEND
+  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
+
+Scenario: Skew controls are disabled for a QUOTED row
+  Given the row with ISIN "US912828YJ02" has been sent and is QUOTED
+  Then the skew controls for that row should be read-only
+  And the SEND button should be disabled when only QUOTED rows are selected
+
+Scenario: SEND calls the quote API with applied prices
+  Given I have applied "TW Bid -0.25" to the row with ISIN "US912828YJ02"
+  When I press SEND
+  Then the API should have received a quote request for "US912828YJ02"
+  And the request body should contain the applied bid price
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @workflow"  # 6/6 passing
+mvn verify                                                   # 27/27 total
+```
+
+**Known risks:**
+- WireMock stub for `/api/inquiry/{id}/quote` must match any `{id}` path parameter.
+  Use WireMock URL regex pattern: `urlPathMatching("/api/inquiry/.*/quote")`.
+- Disabling AG Grid cell components (dropdowns, inputs) in QUOTED rows: use
+  `cellStyle` / `cellClassRules` to add a `disabled` class, and `suppressKeyboardEvent`
+  / `editable: false` per-cell based on row data.  Test via `aria-disabled` attribute
+  assertion in step def.
+
+**Exit criteria:** WireMock verifies the `/quote` stub was called with correct body.
+`GridHarness.getSiblingCellText` reused to read applied price from the SEND request body.
+
+---
+
+### M6 — Multi-row APPLY and SEND
+
+**Goal:** Trader selects 2+ rows and applies the same skew parameters to all selected
+rows in one APPLY press.  SEND sends all selected rows simultaneously.
+
+**Deliverables:**
+- APPLY iterates over all selected rows, computing applied price from each row's own
+  reference price at the time of the APPLY press
+- SEND iterates, calling `POST /api/inquiry/{id}/quote` for each selected PENDING row
+  (skips already-QUOTED rows)
+- Selection counter badge in toolbar ("2 rows selected")
+
+**Unhit tests:**
+```gherkin
+@blotter @workflow @multi
+Scenario: Applying skew to two selected rows updates both applied prices
+  Given the PT-Blotter is open
+  When I select rows with ISINs "US912828YJ02" and "XS2346573523"
+  And I set the ref source to "TW", convention "Price", ref side "Bid", skew "-0.125"
+  And I press APPLY
+  Then the applied bid for "US912828YJ02" should equal its TW Bid minus 0.125
+  And the applied bid for "XS2346573523" should equal its TW Bid minus 0.125
+
+Scenario: Sending two rows at once quotes both
+  Given I have applied a skew to rows "US912828YJ02" and "XS2346573523"
+  When I select both rows and press SEND
+  Then the row "US912828YJ02" should have status "QUOTED"
+  And the row "XS2346573523" should have status "QUOTED"
+
+Scenario: SEND skips already-QUOTED rows in a mixed selection
+  Given row "US912828YJ02" is already QUOTED
+  And row "XS2346573523" is PENDING with applied prices
+  When I select both rows and press SEND
+  Then row "XS2346573523" should become QUOTED
+  And the API should have been called exactly once for the quote endpoint
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter"  # all blotter scenarios passing
+mvn verify                                     # 30/30 total
+```
+
+**Known risks:**
+- AG Grid `getSelectedRows()` returns a snapshot; reference prices may tick between
+  the APPLY call and the assertion.  Mitigation: step def stores the reference price
+  read from the DOM before pressing APPLY, uses that as the expected value basis.
+- WireMock call count verification: use `WireMock.verify(1, postRequestedFor(urlPathMatching(...)))`
+  in the step def for the "called exactly once" assertion.
+
+**Exit criteria:** WireMock call count assertions pass.  All three multi-row scenarios
+pass reliably over 5 consecutive `mvn verify` runs (no flakiness from ticking prices).
+
+---
+
+### M7 — DSL crystallisation
+
+**Goal:** The step definition layer reads like a domain language, not like test
+automation plumbing.  A new scenario can be written using only existing step phrases —
+no Java code needed.  `BondBlotterSteps.java` contains zero direct Playwright calls.
+
+**Deliverables:**
+- `BlotterDsl.java` — encapsulates all Playwright interaction with the blotter:
+  - `openBlotter()`, `selectRowByIsin(String)`, `selectRowsByIsins(String...)`
+  - `setSkewParameters(refSource, convention, refSide, skewDelta)`
+  - `pressApply()`, `pressSend()`
+  - `getRowStatus(isin)`, `getAppliedBid(isin)`, `isSkewControlDisabled(isin)`
+  - `submitInquiryViaApi(isin, notional, side, client)` → uses `page.request()`
+- `BondBlotterSteps.java` delegates 100% to `BlotterDsl`
+- `BondBlotterSteps.java` has no `import com.microsoft.playwright.Locator` or `Page` usages
+
+**Unhit test (a new scenario using only pre-existing step phrases — no new Java needed):**
+```gherkin
+@blotter @dsl
+Scenario: Full inquiry-to-quote workflow in DSL steps
+  Given the PT-Blotter is open
+  And a new inquiry is submitted for ISIN "FR0014004L86" notional "4000000" side "BUY" client "AXA IM"
+  When I select the row with ISIN "FR0014004L86"
+  And I set the ref source to "CBBT", convention "Price", ref side "Ask", skew "+0.125"
+  And I press APPLY
+  And I press SEND
+  Then the row with ISIN "FR0014004L86" should have status "QUOTED"
+  And the skew controls for that row should be read-only
+```
+
+**Quality gate:**
+```bash
+mvn verify -Dcucumber.filter.tags="@blotter and @dsl"   # 1/1 new scenario, no new Java
+mvn verify                                               # 31/31 total
+```
+
+Code review gate (manual, before declaring M7 done):
+- `BondBlotterSteps.java`: zero `page.locator()`, zero `page.evaluate()`, zero `Page` imports
+- `BlotterDsl.java`: all probes called through `window.agGridProbes.*` (no inline JS)
+- Any new blotter scenario expressible using existing step phrases alone
+
+**Exit criteria:** Pair-review the feature file with someone unfamiliar with the codebase.
+If they can understand what the test does without reading any Java, the DSL is working.
+
+---
+
+### M8 — Full regression suite and evidence
+
+**Goal:** All 31+ scenarios run in CI under a single `mvn verify`.  Blotter scenarios
+are correctly tagged for selective execution.  HTML regression report includes the
+blotter feature.
+
+**Deliverables:**
+- Tag taxonomy finalised: `@blotter`, `@blotter-smoke`, `@ticking`, `@api`,
+  `@workflow`, `@multi`, `@dsl`
+- `cucumber.properties` updated if needed
+- CI instructions updated in README (Node.js prerequisite, `npm install` step)
+- `mvn verify` report includes blotter scenarios with pass/fail charts
+
+**Quality gate:**
+```bash
+# Full suite — the only gate that matters for CI
+mvn verify   # all scenarios passing, HTML report generated
+
+# Selective tag examples that must all work
+mvn verify -Dcucumber.filter.tags="@blotter and not @ticking"   # fast, no live prices
+mvn verify -Dcucumber.filter.tags="@blotter and @smoke"         # smoke only
+mvn verify -Dcucumber.filter.tags="@ticking"                    # all ticking (finance + blotter)
+mvn verify -Dcucumber.filter.tags="@blotter and @api"           # API-only, no browser needed
+```
+
+**Exit criteria:**
+- 5 consecutive clean `mvn verify` runs on a fresh checkout (validates no environment
+  bleed between scenarios)
+- README documents Node.js prerequisite and blotter build step
+- HTML report at `target/cucumber-html-reports/overview-features.html` shows blotter
+  feature with correct scenario count and pass indicators
+
+---
+
+### Milestone summary
+
+| Milestone | Core deliverable | New scenarios | Cumulative total | Key risk |
+|---|---|---|---|---|
+| M0 | Build pipeline + WireMock serving | 1 smoke | 13 | Vite outDir + WireMock SPA routing |
+| M1 | Grid columns + static seed data | 2 smoke/data | 15 | AG Grid `col-id` not rendering |
+| M2 | Ticking reference prices | 3 ticking | 18 | Flash timing / test flakiness |
+| M3 | REST inquiry ingestion | 3 api | 21 | WireMock stub matching + ISIN 404 |
+| M4 | Skew controls + APPLY | 3 workflow | 24 | Float precision in applied price |
+| M5 | SEND + status machine | 3 workflow | 27 | Row locking + WireMock call verify |
+| M6 | Multi-row APPLY/SEND | 3 multi | 30 | Ticking race + WireMock call count |
+| M7 | DSL crystallisation | 1 dsl | 31 | Zero raw Playwright in step defs |
+| M8 | Full regression + evidence | — | 31 | Tag taxonomy + CI Node.js prereq |
