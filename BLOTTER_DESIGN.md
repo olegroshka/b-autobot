@@ -220,37 +220,54 @@ Maven `generate-test-resources` phase runs `npm run build`, output lands in
 
 ---
 
-## Recommendation
+## Recommendation (revised)
 
-### Phase 1 (now): Approach 1 — Vanilla AG Grid + WireMock
+### Why Approach 1 (vanilla HTML) was initially attractive but is the wrong call
 
-Build `blotter.html` served from WireMock static files.  The goal at this stage is
-a **working test target**, not a beautiful UI.  Approach 1 delivers:
+The original argument for Approach 1 rested on "zero new infrastructure — no Node.js needed."
+That argument is **already invalid**: the project added `src/test/js/` with `package.json`
+and Jest in the previous session, making Node.js a first-class prerequisite.  The main
+pillar of Approach 1 is gone.
 
-- Running in one `mvn verify` with no new prerequisites
-- Identical AG Grid DOM structure → every existing probe, locator, and harness works today
-- Deterministic mock data → reliable CI
-- Full bond trading workflow (Inquiry → Skew → Apply → Send → Quoted)
+What you actually get with a monolithic `blotter.html`:
 
-The page is ~600–800 lines of vanilla JS/HTML which is entirely manageable for a mock.
+- **AG Grid vanilla cell renderers** for ticking cells, status badges, dropdowns — these
+  exist in AG Grid CE vanilla JS but are significantly more boilerplate than their React
+  equivalents.  AG Grid's docs and examples are 90% React/Angular biased.
+- **Complex per-row state** (dropdown for ref source + convention + side, number input for
+  skew, derived applied prices) spread across `<script>` tags with no component boundaries —
+  a spaghetti attractor.
+- **Re-inventing React patterns badly** — because what the blotter needs (component state,
+  controlled inputs, derived computed values, row-level status machine) is exactly what
+  React was designed for.
 
-### Phase 2 (later): Migrate to Approach 2 — React + Vite
+### Chosen approach: Approach 2 — React + AG Grid CE + Vite, from day 1
 
-Once the workflow and test DSL are stable, extract the blotter into a proper React app.
-The migration is low-risk because:
-- AG Grid DOM structure is identical — no Playwright/probe changes needed
-- Cucumber features remain unchanged
-- Only the page source changes (from vanilla JS to React components)
+| Prerequisite already met | Why |
+|---|---|
+| Node.js | Required by `src/test/js/` Jest probe tests |
+| npm exec in Maven | `exec-maven-plugin` already in pom.xml |
+| AG Grid DOM patterns | React AG Grid renders identical `[row-index]`/`[col-id]` DOM |
+| WireMock static file serving | `__files/` folder already used — serves Vite `dist/` with no extra server |
 
-Approach 2 is the right long-term home because complex UI state (dropdown-driven skew
-controls, row-level status badges, multi-select APPLY/SEND logic) is genuinely simpler
-to build and maintain in React than vanilla JS.
+The serving architecture requires **no new Java server**:
+
+```
+mvn test-compile
+  └── exec-maven-plugin: npm run build  (Vite)
+        └── dist/ → src/test/resources/wiremock/__files/blotter/
+
+mvn verify
+  └── @BeforeAll: MockBlotterServer.start()  (WireMock, already exists)
+        └── Playwright navigates to http://localhost:{wiremockPort}/blotter/index.html
+        └── REST stubs at /api/inquiry, /api/inquiry/{id}/quote
+```
 
 ### Approach 3: Do not use
 
-VUU is excellent engineering, but it is a full trading platform, not a test target.
-The grid is not AG Grid (breaking all our probe work) and the Scala backend is a
-disproportionate infrastructure commitment for a mock.
+VUU is excellent engineering but it is a full trading platform, not a test target.
+The grid is not AG Grid (all probe work would need rewriting) and the Scala backend
+is a disproportionate infrastructure commitment for a mock. Not the right tool.
 
 ---
 
@@ -286,11 +303,84 @@ POST /api/inquiry/unknown-isin  (WireMock priority stub)
   Response: 404 { error: "ISIN not found" }
 ```
 
-## Next steps (once approach agreed)
+## Implementation plan (Approach 2 selected)
 
-1. Create `src/test/resources/wiremock/__files/blotter.html` (vanilla AG Grid, ~700 lines)
-2. Add WireMock stub JSON mappings for `/api/inquiry` endpoints
-3. Extend `MockBlotterServer` to serve the static HTML
-4. Write `BondBlotter.feature` with the core workflow scenarios
-5. Implement `BondBlotterSteps.java` using existing `GridHarness` + new DSL helpers
-6. Evolve probe bundle with any blotter-specific probes needed
+### Directory layout
+
+```
+src/
+├── test/
+│   ├── webapp/                          ← Vite + React blotter app
+│   │   ├── src/
+│   │   │   ├── App.tsx                  ← root layout + toolbar (APPLY / SEND / CLEAR)
+│   │   │   ├── BlotterGrid.tsx          ← AG Grid component + column definitions
+│   │   │   ├── PriceSimulator.ts        ← setInterval Gaussian price feed
+│   │   │   ├── SkewControls.tsx         ← per-row ref source / convention / skew input
+│   │   │   ├── api.ts                   ← fetch wrappers for /api/inquiry endpoints
+│   │   │   └── types.ts                 ← Inquiry, RefSource, Convention, Status enums
+│   │   ├── index.html
+│   │   ├── package.json
+│   │   └── vite.config.ts               ← proxy /api → WireMock port in dev mode
+│   ├── resources/
+│   │   └── wiremock/
+│   │       ├── __files/
+│   │       │   └── blotter/             ← Vite build output (dist/)
+│   │       └── mappings/
+│   │           ├── inquiry-post.json
+│   │           ├── inquiry-quote-post.json
+│   │           ├── inquiry-unknown-isin.json  (priority stub → 404)
+│   │           └── inquiries-get.json
+│   └── java/
+│       └── stepdefs/
+│           └── BondBlotterSteps.java
+└── resources/
+    └── features/
+        └── BondBlotter.feature
+```
+
+### Maven wiring
+
+Add to `pom.xml` exec-maven-plugin (new execution, same plugin already present):
+```xml
+<execution>
+  <id>build-blotter-webapp</id>
+  <phase>test-compile</phase>
+  <goals><goal>exec</goal></goals>
+  <configuration>
+    <skip>${blotter.build.skip}</skip>   <!-- default false; set true for probe-only runs -->
+    <executable>npm</executable>
+    <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+    <arguments><argument>run</argument><argument>build</argument></arguments>
+  </configuration>
+</execution>
+```
+
+Vite `outDir` set to `../../test/resources/wiremock/__files/blotter` so the build
+lands directly in WireMock's static file directory.
+
+### Development workflow
+
+```bash
+# Build once for Maven test runs
+cd src/test/webapp && npm install && npm run build
+
+# Live iteration with HMR (Vite proxies /api to WireMock)
+mvn test-compile -Dblotter.build.skip=true   # start WireMock only
+cd src/test/webapp && npm run dev             # Vite on :5173, /api → WireMock
+open http://localhost:5173
+
+# Full regression run
+mvn verify
+```
+
+### Next steps
+
+1. **Scaffold React app** — `npm create vite@latest webapp -- --template react-ts`
+2. **Define column schema** — TypeScript interfaces for `Inquiry`, `RefPrice`, `SkewParams`
+3. **BlotterGrid component** — AG Grid React with column groups, cell flash, row selection
+4. **PriceSimulator** — setInterval with Gaussian noise, updates AG Grid via `applyTransactionAsync`
+5. **SkewControls** — toolbar + per-row dropdowns wired to APPLY button logic
+6. **WireMock stubs** — `/api/inquiry` POST, `/api/inquiry/{id}/quote` POST, GET
+7. **BondBlotter.feature** — Gherkin scenarios for the full workflow
+8. **BondBlotterSteps.java** — step definitions reusing `GridHarness`, new DSL helpers
+9. **DSL layer** — abstract common patterns (select row, apply skew, assert status) into reusable step vocabulary
