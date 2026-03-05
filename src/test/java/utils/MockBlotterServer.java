@@ -48,7 +48,13 @@ public final class MockBlotterServer {
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
     public static void start() {
-        server = new WireMockServer(WireMockConfiguration.options().dynamicPort());
+        // withRootDirectory tells WireMock where to find __files/ and mappings/.
+        // Path is relative to the Maven working directory (project root).
+        String wireMockRoot = "src/test/resources/wiremock";
+        server = new WireMockServer(
+                WireMockConfiguration.options()
+                        .dynamicPort()
+                        .withRootDirectory(wireMockRoot));
         server.start();
         registerStubs();
     }
@@ -86,7 +92,31 @@ public final class MockBlotterServer {
 
     // ── Stubs ─────────────────────────────────────────────────────────────────
 
+    /**
+     * Returns the URL for the PT-Blotter SPA, e.g. {@code http://localhost:PORT/blotter/}.
+     * Requires the WireMock server to be running.
+     */
+    public static String getBlotterUrl() {
+        assertStarted();
+        return "http://localhost:" + server.port() + "/blotter/";
+    }
+
     private static void registerStubs() {
+        // ── PT-Blotter SPA ─────────────────────────────────────────────────────
+        // Serve the pre-built index.html (in __files/blotter/) at the root path.
+        // Vite build will replace this file; all paths under /blotter/ return it
+        // so client-side routing works without a real web server.
+        server.stubFor(get(urlEqualTo("/blotter/"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/html; charset=utf-8")
+                        .withBodyFile("blotter/index.html")));
+        server.stubFor(get(urlEqualTo("/blotter/index.html"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "text/html; charset=utf-8")
+                        .withBodyFile("blotter/index.html")));
+
         // ── 404: unknown trader (higher priority = checked first) ─────────────
         server.stubFor(post(urlEqualTo("/submit"))
                 .withRequestBody(containing("\"trader_id\":\"UNKNOWN_TRADER\""))

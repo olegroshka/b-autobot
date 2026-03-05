@@ -37,6 +37,14 @@
     <BASE_URL>https://www.ag-grid.com/example-finance/</BASE_URL>
 
     <!--
+      blotter.build.skip — set to 'false' to run 'npm run build' for the PT-Blotter
+      React webapp during test-compile.  Requires Node.js on PATH.
+      Defaults to true so normal 'mvn verify' runs work without Node.js installed.
+      Use 'mvn verify -Dblotter.build.skip=false' to rebuild and test.
+    -->
+    <blotter.build.skip>true</blotter.build.skip>
+
+    <!--
       playwright.install.skip — set to 'false' ONCE to download browsers:
         mvn test-compile -Dplaywright.install.skip=false
       Defaults to true so normal 'mvn test' runs are not killed by System.exit()
@@ -211,6 +219,28 @@
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.4.1</version>
         <executions>
+          <!--
+            PT-Blotter webapp build.
+            Skipped by default (blotter.build.skip=true).
+            Enable with: mvn verify -Dblotter.build.skip=false
+            Requires Node.js 18+ and npm on PATH.
+          -->
+          <execution>
+            <id>build-blotter-webapp</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <skip>${blotter.build.skip}</skip>
+              <executable>npm</executable>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+              <arguments>
+                <argument>run</argument>
+                <argument>build</argument>
+              </arguments>
+            </configuration>
+          </execution>
           <execution>
             <id>install-playwright-browsers</id>
             <phase>test-compile</phase>

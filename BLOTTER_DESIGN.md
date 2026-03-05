@@ -25,10 +25,14 @@ ION channel / REST API
   Enters skew       (+N cents  or  +N bp)
         │
         ▼
-  Presses APPLY  ──►  Applied Bid / Applied Offer recalculated on row
+  Presses APPLY  ──►  Price / Spread columns recalculated on row
         │
         ▼
-  Presses SEND   ──►  Row status → QUOTED,  row locked (no further edits)
+  Presses SEND   ──►  Row status → QUOTED,  Sent Price / Sent Spread snapshot taken
+        │
+        │  Row stays fully editable — trader can re-APPLY a new skew,
+        │  see the updated Price / Spread, then press SEND again.
+        │  Each SEND refreshes Sent Price / Sent Spread.
 ```
 
 ### Column layout
@@ -37,11 +41,12 @@ ION channel / REST API
 |---|---|
 | Identity | Checkbox, ISIN, Description, Maturity, Coupon, Notional, Side, Client |
 | Status | Status (PENDING / QUOTED / DONE / MISSED) |
-| TradeWeb (TW) | TW Bid *(ticking)*, TW Ask *(ticking)* |
-| Bloomberg CP+ | CP+ Bid *(ticking)*, CP+ Ask *(ticking)* |
-| Bloomberg CBBT | CBBT Bid *(ticking)*, CBBT Ask *(ticking)* |
-| Skew controls | Ref Source (dropdown), Convention (Price/Spread), Ref Side (Bid/Ask), Skew Δ |
-| Applied prices | Applied Bid, Applied Ask |
+| TradeWeb (TW) | TW Price *(ticking, "bid / ask")*, TW Spread *(ticking, "bid / ask")* |
+| Bloomberg CP+ | CP+ Price *(ticking, "bid / ask")*, CP+ Spread *(ticking, "bid / ask")* |
+| Bloomberg CBBT | CBBT Price *(ticking, "bid / ask")*, CBBT Spread *(ticking, "bid / ask")* |
+| Skew controls | Ref Source (dropdown), Convention (Price/Spread), Skew Δ |
+| Applied values | Price, Spread |
+| Sent snapshot | Sent Price, Sent Spread |
 
 ### Mock data sources
 - Price simulation: `setInterval` with Gaussian noise around mid — no external feed needed.
@@ -276,13 +281,14 @@ is a disproportionate infrastructure commitment for a mock. Not the right tool.
 ```
 Checkbox | ISIN | Description | Maturity | Coupon | Notional | Side | Client
 Status: PENDING / QUOTED / DONE / MISSED
-TW Bid* | TW Ask*
-CP+ Bid* | CP+ Ask*
-CBBT Bid* | CBBT Ask*
-Ref Source (dropdown: TW/CP+/CBBT) | Convention (Price/Spread) | Ref Side (Bid/Ask) | Skew Δ
-Applied Bid | Applied Ask
+TW Price*  ("bid / ask") | TW Spread*  ("bid_spread / ask_spread")
+CP+ Price* ("bid / ask") | CP+ Spread* ("bid_spread / ask_spread")
+CBBT Price*("bid / ask") | CBBT Spread*("bid_spread / ask_spread")
+Ref Source (dropdown: TW/CP+/CBBT) | Convention (Price/Spread) | Skew Δ
+Price | Spread
+Sent Price | Sent Spread
 
-* ticking cells — ag-cell-data-changed flash enabled
+* ticking cells — ag-cell-data-changed flash enabled; single cell shows "bid / ask" combined
 ```
 
 ## Proposed REST contract (WireMock stubs)
@@ -293,8 +299,8 @@ POST /api/inquiry
   Response: 201 { inquiry_id, status: "PENDING", ... }
 
 POST /api/inquiry/{id}/quote
-  Request:  { applied_bid, applied_ask, ref_source, convention, skew }
-  Response: 200 { inquiry_id, status: "QUOTED", timestamp }
+  Request:  { price, spread, sent_price, sent_spread, ref_source, convention, skew }
+  Response: 200 { inquiry_id, status: "QUOTED", sent_price, sent_spread, timestamp }
 
 GET  /api/inquiries
   Response: 200 [ ...all current inquiries ]
@@ -400,29 +406,30 @@ WireMock stubs simultaneously.  Changing one requires changing all four.
 
 #### AG Grid `col-id` names (stable identifiers used in probes + step defs)
 
-| Column | `col-id` |
-|---|---|
-| Select checkbox | `select` |
-| ISIN | `isin` |
-| Description | `description` |
-| Maturity | `maturity` |
-| Coupon | `coupon` |
-| Notional | `notional` |
-| Side | `side` |
-| Client | `client` |
-| Status | `status` |
-| TW Bid | `twBid` |
-| TW Ask | `twAsk` |
-| CP+ Bid | `cpBid` |
-| CP+ Ask | `cpAsk` |
-| CBBT Bid | `cbbBid` |
-| CBBT Ask | `cbbAsk` |
-| Ref Source (control) | `refSource` |
-| Convention (control) | `convention` |
-| Ref Side (control) | `refSide` |
-| Skew Δ (control) | `skewDelta` |
-| Applied Bid | `appliedBid` |
-| Applied Ask | `appliedAsk` |
+| Column | `col-id` | Notes |
+|---|---|---|
+| Select checkbox | `select` | |
+| ISIN | `isin` | |
+| Description | `description` | |
+| Maturity | `maturity` | |
+| Coupon | `coupon` | |
+| Notional | `notional` | |
+| Side | `side` | |
+| Client | `client` | |
+| Status | `status` | `PENDING` / `QUOTED` / `DONE` / `MISSED` |
+| TW Price | `twPrice` | Ticking; cell text = `"bid / ask"` e.g. `"99.0945 / 101.112"` |
+| TW Spread | `twSpread` | Ticking; cell text = `"bid_spread / ask_spread"` |
+| CP+ Price | `cpPrice` | Ticking; same combined format |
+| CP+ Spread | `cpSpread` | Ticking; same combined format |
+| CBBT Price | `cbbPrice` | Ticking; same combined format |
+| CBBT Spread | `cbbSpread` | Ticking; same combined format |
+| Ref Source (control) | `refSource` | Dropdown: `TW` / `CP+` / `CBBT` |
+| Convention (control) | `convention` | Dropdown: `Price` / `Spread` |
+| Skew Δ (control) | `skewDelta` | Number input; cents (Price) or bp (Spread) |
+| Price | `price` | Trader's applied price; updates on APPLY |
+| Spread | `spread` | Trader's applied spread; updates on APPLY |
+| Sent Price | `sentPrice` | Snapshot at last SEND; blank until first SEND |
+| Sent Spread | `sentSpread` | Snapshot at last SEND; blank until first SEND |
 
 #### Status values (string literals in feature files and TypeScript enums)
 
@@ -438,10 +445,12 @@ WireMock stubs simultaneously.  Changing one requires changing all four.
 | POST | `/api/inquiry` with unknown ISIN | 404 |
 
 #### Price format
-- Reference prices: decimal with 3dp (e.g. `99.375`)
+- Reference prices: decimal with 4dp per side, combined cell `"bid / ask"` (e.g. `"99.0945 / 101.1120"`)
+- Reference spreads: same combined format for spread values (e.g. `"1.25 / 1.50"` in bp or decimal)
 - Skew in **Price** convention: decimal cents (e.g. `-0.25` = minus ¼ point)
 - Skew in **Spread** convention: integer basis points (e.g. `+5` = +5 bp)
-- Applied prices: same 3dp format as reference prices
+- `price` / `spread`: trader's current applied value, 4dp, updates on every APPLY
+- `sentPrice` / `sentSpread`: snapshot frozen at each SEND; blank until first SEND; updated on re-SEND
 
 #### Seed data (deterministic — same ISINs used in all feature files)
 
@@ -513,10 +522,14 @@ No ticking, no controls, no REST — just the grid skeleton and static data.
 Scenario: Blotter renders expected column groups
   Given the PT-Blotter is open
   Then the grid should display column "isin"
-  And the grid should display column "twBid"
-  And the grid should display column "cpBid"
-  And the grid should display column "cbbBid"
-  And the grid should display column "appliedBid"
+  And the grid should display column "twPrice"
+  And the grid should display column "twSpread"
+  And the grid should display column "cpPrice"
+  And the grid should display column "cbbPrice"
+  And the grid should display column "price"
+  And the grid should display column "spread"
+  And the grid should display column "sentPrice"
+  And the grid should display column "sentSpread"
   And the grid should display column "status"
 
 Scenario: Blotter loads with seeded inquiries
@@ -546,34 +559,38 @@ mvn verify                                                 # 15/15 total
 
 ### M2 — Ticking reference prices
 
-**Goal:** TW, CP+, and CBBT bid/ask cells update at ~400 ms intervals with Gaussian
-noise.  The AG Grid flash animation fires on each update.  Prices stay within a
-realistic range for each seeded bond.
+**Goal:** TW, CP+, and CBBT combined price/spread cells update at ~400 ms intervals
+with Gaussian noise.  Each cell displays `"bid / ask"` as a single string.  The AG
+Grid flash animation fires on each update.  Values stay within a realistic range for
+each seeded bond.
 
 **Deliverables:**
 - `PriceSimulator.ts`: `setInterval`-based update engine, one mid-price per bond,
-  Gaussian noise (σ = 0.03 points), separate bid/ask spread (0.125 pts)
+  Gaussian noise (σ = 0.03 points), bid/ask spread of 0.125 pts
+- Cell values stored as combined strings: `"99.0945 / 101.1120"` — formatted in a
+  `valueFormatter` (not a custom cell renderer, so `getVisibleCellTexts` still works)
 - Price updates applied via `gridRef.current.api.applyTransactionAsync()`
-- `enableCellChangeFlash: true` on all six reference price columns
-- Prices formatted to 3dp in cell renderer
+- `enableCellChangeFlash: true` on all six ref columns (`twPrice`, `twSpread`,
+  `cpPrice`, `cpSpread`, `cbbPrice`, `cbbSpread`)
+- Separate mid-spread simulation for spread columns; formatted as `"bp_bid / bp_ask"`
 
 **Unhit tests:**
 ```gherkin
 @blotter @ticking
 Scenario: Reference price cells update within the live feed window
   Given the PT-Blotter is open
-  When I wait up to 3 seconds for the "twBid" cell in row 0 to change value
-  Then the "twBid" cell in row 0 should have a numeric value
+  When I wait up to 3 seconds for the "twPrice" cell in row 0 to change value
+  Then the "twPrice" cell in row 0 should match the pattern "NNN.NNNN / NNN.NNNN"
 
-Scenario: TW Bid cell flashes on a live update
+Scenario: TW Price cell flashes on a live update
   Given the PT-Blotter is open
-  When I wait for the "twBid" cell in row 0 to flash
-  Then the "twBid" cell in row 0 should have received at least one tick update
+  When I wait for the "twPrice" cell in row 0 to flash
+  Then the "twPrice" cell in row 0 should have received at least one tick update
 
 Scenario: All three reference sources are ticking
   Given the PT-Blotter is open
-  Then within 3 seconds the "cpBid" cell in row 0 should change value
-  And within 3 seconds the "cbbBid" cell in row 0 should change value
+  Then within 3 seconds the "cpPrice" cell in row 0 should change value
+  And within 3 seconds the "cbbPrice" cell in row 0 should change value
 ```
 
 **Quality gate:**
@@ -651,34 +668,38 @@ for the REST assertions — no new REST infrastructure invented.
 
 ### M4 — Skew controls and APPLY
 
-**Goal:** Trader selects a row, sets ref source / convention / ref side / skew amount
-in the toolbar, presses APPLY, and the Applied Bid or Applied Ask column updates with
-the mathematically correct skewed price.
+**Goal:** Trader selects a row, sets ref source / convention / skew amount in the
+toolbar, presses APPLY, and the `price` and `spread` columns update with the
+mathematically correct skewed values derived from the selected ref source's bid/ask.
 
 **Deliverables:**
 - Toolbar components: Ref Source select (`TW` / `CP+` / `CBBT`), Convention select
-  (`Price` / `Spread`), Ref Side select (`Bid` / `Ask`), Skew Δ number input, APPLY button
-- APPLY logic:
-  - Price convention: `applied = refPrice ± skewDelta` (decimal points)
-  - Spread convention: `applied = refPrice` at `refSpread ± skewDeltaBp` (basis points)
-- Applied Bid and Applied Ask columns populated on row after APPLY
+  (`Price` / `Spread`), Skew Δ number input, APPLY button
+- APPLY logic reads the selected ref source's **bid** and **ask** from the combined
+  cell (parsed from the `"bid / ask"` string) at the moment APPLY is pressed:
+  - Price convention: `price = bid_price - skewDelta`, `spread = ask_price + skewDelta`
+  - Spread convention: `price` derived from `bid_spread - skewDeltaBp`, same for spread
+- `price` and `spread` columns populated/updated on row after APPLY
+- `sentPrice` and `sentSpread` remain unchanged until SEND is pressed
 
 **Unhit tests:**
 ```gherkin
 @blotter @workflow
-Scenario: Applying a price skew to a single row updates applied prices
+Scenario: Applying a price skew to a single row updates price and spread
   Given the PT-Blotter is open
   When I select the row with ISIN "US912828YJ02"
-  And I set the ref source to "TW", convention "Price", ref side "Bid", skew "-0.25"
+  And I set the ref source to "TW", convention "Price", skew "-0.25"
   And I press APPLY
-  Then the applied bid for ISIN "US912828YJ02" should equal the TW Bid minus 0.25
+  Then the "price" for ISIN "US912828YJ02" should equal the TW bid minus 0.25
+  And the "spread" for ISIN "US912828YJ02" should equal the TW ask plus 0.25
+  And the "sentPrice" for ISIN "US912828YJ02" should be blank
 
 Scenario: Applying a spread skew uses basis points
   Given the PT-Blotter is open
   When I select the row with ISIN "XS2346573523"
-  And I set the ref source to "CP+", convention "Spread", ref side "Ask", skew "+5"
+  And I set the ref source to "CP+", convention "Spread", skew "+5"
   And I press APPLY
-  Then the applied ask spread for ISIN "XS2346573523" should equal the CP+ Ask spread plus 5bp
+  Then the "spread" for ISIN "XS2346573523" should reflect CP+ spread plus 5bp
 
 Scenario: APPLY button is disabled when no row is selected
   Given the PT-Blotter is open
@@ -692,12 +713,14 @@ mvn verify                                                   # 24/24 total
 ```
 
 **Known risks:**
-- Floating-point precision in `applied = refPrice - skewDelta`.  Mitigation: use
+- Floating-point precision in `price = bidPrice - skewDelta`.  Mitigation: use
   `NumericComparator.assertEquivalent()` (already exists) rather than exact string
   equality; assert `Math.abs(actual - expected) < 0.001`.
-- Reference price is ticking while trader is setting skew controls — race condition in
-  the assertion.  Mitigation: step def reads the reference price at the moment APPLY is
-  pressed (from the DOM via probe), then computes expected applied price from that snapshot.
+- Reference price is ticking while trader sets skew controls — race condition.
+  Mitigation: step def parses the `"bid / ask"` cell text at the moment APPLY is
+  pressed (snapshot), computes expected from that; does not re-read ref after APPLY.
+- Parsing combined `"bid / ask"` cell text: step def splits on `" / "` and takes the
+  relevant side.  Test for this in a unit test / probe test before relying on it in E2E.
 - Toolbar state resets on deselect — ensure controls persist their values during the test.
 
 **Exit criteria:** `NumericComparator` validates applied prices.  No `Thread.sleep` in
@@ -708,37 +731,47 @@ step defs.  `TickingCellHelper` or `GridHarness` reused unmodified.
 ### M5 — SEND and status machine
 
 **Goal:** SEND fires `POST /api/inquiry/{id}/quote`, row moves to QUOTED status,
-skew controls and SEND button are disabled for that row.  A QUOTED row cannot be
-re-sent.
+and the `sentPrice` / `sentSpread` columns are populated with the values from
+`price` / `spread` at that moment.  **The row stays fully editable** — trader can
+re-APPLY a new skew and press SEND again to update the sent values.
 
 **Deliverables:**
-- SEND button in toolbar (enabled only when ≥1 selected row has applied prices)
-- On click: calls `POST /api/inquiry/{id}/quote` for each selected row
-- On 200 response: row `status` field set to `QUOTED` in grid state
-- QUOTED rows: skew control cells render as read-only/disabled; checkbox still selectable
-  (for future DONE/MISSED transitions)
-- WireMock stub: `inquiry-quote-post.json` → `200 { inquiry_id, status: "QUOTED" }`
+- SEND button in toolbar (enabled only when ≥1 selected row has `price` / `spread` values)
+- On click: calls `POST /api/inquiry/{id}/quote` for each selected row with
+  `{ price, spread, sent_price: price, sent_spread: spread, ref_source, convention, skew }`
+- On 200 response:
+  - Row `status` → `QUOTED`
+  - Row `sentPrice` ← current `price`, `sentSpread` ← current `spread`
+- Row remains fully editable after SEND — all skew controls stay active, APPLY/SEND
+  still enabled; re-quoting is the expected workflow, not an error state
+- WireMock stub: `inquiry-quote-post.json` → `200 { inquiry_id, status: "QUOTED", sent_price, sent_spread, timestamp }`
 
 **Unhit tests:**
 ```gherkin
 @blotter @workflow
-Scenario: After SEND the row status becomes QUOTED
+Scenario: After SEND the row status becomes QUOTED and sent values are captured
   Given the PT-Blotter is open
   And I have applied a skew to the row with ISIN "US912828YJ02"
   When I select the row with ISIN "US912828YJ02"
   And I press SEND
   Then the row with ISIN "US912828YJ02" should have status "QUOTED"
+  And the "sentPrice" for ISIN "US912828YJ02" should equal its "price"
+  And the "sentSpread" for ISIN "US912828YJ02" should equal its "spread"
 
-Scenario: Skew controls are disabled for a QUOTED row
+Scenario: QUOTED row remains editable and trader can re-quote
   Given the row with ISIN "US912828YJ02" has been sent and is QUOTED
-  Then the skew controls for that row should be read-only
-  And the SEND button should be disabled when only QUOTED rows are selected
+  When I select the row with ISIN "US912828YJ02"
+  And I set the ref source to "TW", convention "Price", skew "-0.50"
+  And I press APPLY
+  And I press SEND
+  Then the row with ISIN "US912828YJ02" should still have status "QUOTED"
+  And the "sentPrice" should reflect the new applied price
 
-Scenario: SEND calls the quote API with applied prices
-  Given I have applied "TW Bid -0.25" to the row with ISIN "US912828YJ02"
+Scenario: SEND calls the quote API with price and spread
+  Given I have applied "TW Price -0.25" to the row with ISIN "US912828YJ02"
   When I press SEND
   Then the API should have received a quote request for "US912828YJ02"
-  And the request body should contain the applied bid price
+  And the request body should contain "price" and "spread" fields
 ```
 
 **Quality gate:**
@@ -750,13 +783,14 @@ mvn verify                                                   # 27/27 total
 **Known risks:**
 - WireMock stub for `/api/inquiry/{id}/quote` must match any `{id}` path parameter.
   Use WireMock URL regex pattern: `urlPathMatching("/api/inquiry/.*/quote")`.
-- Disabling AG Grid cell components (dropdowns, inputs) in QUOTED rows: use
-  `cellStyle` / `cellClassRules` to add a `disabled` class, and `suppressKeyboardEvent`
-  / `editable: false` per-cell based on row data.  Test via `aria-disabled` attribute
-  assertion in step def.
+- Re-quote workflow changes `sentPrice`/`sentSpread` but not `price`/`spread` (those
+  only change on APPLY).  Assertion order matters: read `price` first, press SEND, then
+  assert `sentPrice` equals the previously read `price` value.
+- WireMock call count: in re-quote scenario, verify exactly 2 POST calls to `/quote`.
 
-**Exit criteria:** WireMock verifies the `/quote` stub was called with correct body.
-`GridHarness.getSiblingCellText` reused to read applied price from the SEND request body.
+**Exit criteria:** WireMock verifies the `/quote` stub was called with `price` and
+`spread` in the body.  Re-quote test passes: second SEND updates `sentPrice` while row
+stays QUOTED and editable.
 
 ---
 
@@ -789,12 +823,13 @@ Scenario: Sending two rows at once quotes both
   Then the row "US912828YJ02" should have status "QUOTED"
   And the row "XS2346573523" should have status "QUOTED"
 
-Scenario: SEND skips already-QUOTED rows in a mixed selection
-  Given row "US912828YJ02" is already QUOTED
+Scenario: SEND re-quotes an already-QUOTED row alongside a PENDING row
+  Given row "US912828YJ02" is already QUOTED with a sent price
   And row "XS2346573523" is PENDING with applied prices
   When I select both rows and press SEND
   Then row "XS2346573523" should become QUOTED
-  And the API should have been called exactly once for the quote endpoint
+  And row "US912828YJ02" should still be QUOTED with updated sent values
+  And the API should have been called exactly twice for the quote endpoint
 ```
 
 **Quality gate:**
@@ -824,9 +859,11 @@ no Java code needed.  `BondBlotterSteps.java` contains zero direct Playwright ca
 **Deliverables:**
 - `BlotterDsl.java` — encapsulates all Playwright interaction with the blotter:
   - `openBlotter()`, `selectRowByIsin(String)`, `selectRowsByIsins(String...)`
-  - `setSkewParameters(refSource, convention, refSide, skewDelta)`
+  - `setSkewParameters(refSource, convention, skewDelta)`
   - `pressApply()`, `pressSend()`
-  - `getRowStatus(isin)`, `getAppliedBid(isin)`, `isSkewControlDisabled(isin)`
+  - `getRowStatus(isin)`, `getPrice(isin)`, `getSpread(isin)`
+  - `getSentPrice(isin)`, `getSentSpread(isin)`
+  - `getRefCellText(isin, colId)` — returns raw `"bid / ask"` string for ref price/spread
   - `submitInquiryViaApi(isin, notional, side, client)` → uses `page.request()`
 - `BondBlotterSteps.java` delegates 100% to `BlotterDsl`
 - `BondBlotterSteps.java` has no `import com.microsoft.playwright.Locator` or `Page` usages
@@ -834,15 +871,20 @@ no Java code needed.  `BondBlotterSteps.java` contains zero direct Playwright ca
 **Unhit test (a new scenario using only pre-existing step phrases — no new Java needed):**
 ```gherkin
 @blotter @dsl
-Scenario: Full inquiry-to-quote workflow in DSL steps
+Scenario: Full inquiry-to-quote and re-quote workflow in DSL steps
   Given the PT-Blotter is open
   And a new inquiry is submitted for ISIN "FR0014004L86" notional "4000000" side "BUY" client "AXA IM"
   When I select the row with ISIN "FR0014004L86"
-  And I set the ref source to "CBBT", convention "Price", ref side "Ask", skew "+0.125"
+  And I set the ref source to "CBBT", convention "Price", skew "+0.125"
   And I press APPLY
   And I press SEND
   Then the row with ISIN "FR0014004L86" should have status "QUOTED"
-  And the skew controls for that row should be read-only
+  And the "sentPrice" for ISIN "FR0014004L86" should equal its "price"
+  When I set the ref source to "TW", convention "Price", skew "-0.25"
+  And I press APPLY
+  And I press SEND
+  Then the row with ISIN "FR0014004L86" should still have status "QUOTED"
+  And the "sentPrice" should reflect the updated applied price
 ```
 
 **Quality gate:**
@@ -854,6 +896,7 @@ mvn verify                                               # 31/31 total
 Code review gate (manual, before declaring M7 done):
 - `BondBlotterSteps.java`: zero `page.locator()`, zero `page.evaluate()`, zero `Page` imports
 - `BlotterDsl.java`: all probes called through `window.agGridProbes.*` (no inline JS)
+- `BlotterDsl` has no knowledge of bid/ask parsing logic — that lives in a step def helper or probe
 - Any new blotter scenario expressible using existing step phrases alone
 
 **Exit criteria:** Pair-review the feature file with someone unfamiliar with the codebase.
@@ -903,8 +946,8 @@ mvn verify -Dcucumber.filter.tags="@blotter and @api"           # API-only, no b
 | M1 | Grid columns + static seed data | 2 smoke/data | 15 | AG Grid `col-id` not rendering |
 | M2 | Ticking reference prices | 3 ticking | 18 | Flash timing / test flakiness |
 | M3 | REST inquiry ingestion | 3 api | 21 | WireMock stub matching + ISIN 404 |
-| M4 | Skew controls + APPLY | 3 workflow | 24 | Float precision in applied price |
-| M5 | SEND + status machine | 3 workflow | 27 | Row locking + WireMock call verify |
+| M4 | Skew controls + APPLY (price/spread) | 3 workflow | 24 | Float precision + bid/ask parsing |
+| M5 | SEND + sentPrice/sentSpread (non-locking) | 3 workflow | 27 | Re-quote workflow + WireMock verify |
 | M6 | Multi-row APPLY/SEND | 3 multi | 30 | Ticking race + WireMock call count |
 | M7 | DSL crystallisation | 1 dsl | 31 | Zero raw Playwright in step defs |
 | M8 | Full regression + evidence | — | 31 | Tag taxonomy + CI Node.js prereq |
