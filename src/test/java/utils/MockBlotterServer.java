@@ -128,6 +128,39 @@ public final class MockBlotterServer {
         registerAssetStubIfBuilt("blotter/assets/index.css", "/blotter/assets/.*\\.css",
                 "text/css; charset=utf-8");
 
+        // ── PT-Blotter inquiry REST API ────────────────────────────────────────
+
+        // POST /api/inquiry — unknown ISIN → 404 (priority 1 = checked first)
+        server.stubFor(post(urlEqualTo("/api/inquiry"))
+                .withRequestBody(containing("\"UNKNOWN-ISIN-XYZ\""))
+                .atPriority(1)
+                .willReturn(aResponse()
+                        .withStatus(404)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"error\":\"ISIN not found\"}")));
+
+        // POST /api/inquiry — all other ISINs → 201 with generated inquiry_id
+        server.stubFor(post(urlEqualTo("/api/inquiry"))
+                .atPriority(5)
+                .willReturn(aResponse()
+                        .withStatus(201)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(inquiryBody())));
+
+        // GET /api/inquiries → 200 with seeded list
+        server.stubFor(get(urlEqualTo("/api/inquiries"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(seedInquiriesBody())));
+
+        // POST /api/inquiry/{id}/quote → 200 QUOTED
+        server.stubFor(post(urlPathMatching("/api/inquiry/.*/quote"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody(quoteBody())));
+
         // ── 404: unknown trader (higher priority = checked first) ─────────────
         server.stubFor(post(urlEqualTo("/submit"))
                 .withRequestBody(containing("\"trader_id\":\"UNKNOWN_TRADER\""))
@@ -146,6 +179,33 @@ public final class MockBlotterServer {
                         .withStatus(201)
                         .withHeader("Content-Type", "application/json")
                         .withBody(successBody())));
+    }
+
+    /** Deterministic inquiry ID used in test assertions (M3). */
+    public static final String INQUIRY_ID =
+            "INQ-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+    private static String inquiryBody() {
+        return String.format(
+                "{\"inquiry_id\":\"%s\",\"status\":\"PENDING\"}", INQUIRY_ID);
+    }
+
+    private static String quoteBody() {
+        return String.format(
+                "{\"inquiry_id\":\"%s\",\"status\":\"QUOTED\"," +
+                "\"sent_price\":0.0,\"sent_spread\":0.0," +
+                "\"timestamp\":\"2026-03-05T00:00:00Z\"}", INQUIRY_ID);
+    }
+
+    private static String seedInquiriesBody() {
+        // Minimal seed list — matches the five design-contract ISINs.
+        return "[" +
+                "{\"inquiry_id\":\"INQ-001\",\"isin\":\"US912828YJ02\",\"status\":\"PENDING\"}," +
+                "{\"inquiry_id\":\"INQ-002\",\"isin\":\"XS2346573523\",\"status\":\"PENDING\"}," +
+                "{\"inquiry_id\":\"INQ-003\",\"isin\":\"US38141GXZ20\",\"status\":\"PENDING\"}," +
+                "{\"inquiry_id\":\"INQ-004\",\"isin\":\"GB0031348658\",\"status\":\"PENDING\"}," +
+                "{\"inquiry_id\":\"INQ-005\",\"isin\":\"FR0014004L86\",\"status\":\"PENDING\"}" +
+                "]";
     }
 
     /**

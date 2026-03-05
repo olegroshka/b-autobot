@@ -59,3 +59,21 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     Given the PT-Blotter is open
     Then within 3 seconds the "cpPrice" cell in row 0 should change value
     And within 3 seconds the "cbbPrice" cell in row 0 should change value
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # M3 — REST inquiry ingestion  [UNHIT — fails until M3 is built]
+  # Goal: POST /api/inquiry adds a new PENDING row; unknown ISINs return 404.
+  # ──────────────────────────────────────────────────────────────────────────────
+
+  @m3 @api
+  Scenario: Inquiry submitted via API appears in blotter as PENDING
+    Given the PT-Blotter is open
+    When a new inquiry is submitted for ISIN "US38141GXZ20" notional "3000000" side "BUY" client "SCHRODERS"
+    Then the blotter API response status should be 201
+    And the response should contain a non-blank "inquiry_id"
+
+  @m3 @api
+  Scenario: Unknown ISIN is rejected with 404
+    Given the PT-Blotter is open
+    When a new inquiry is submitted for ISIN "UNKNOWN-ISIN-XYZ"
+    Then the blotter API response status should be 404

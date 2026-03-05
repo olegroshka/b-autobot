@@ -1,6 +1,9 @@
 package stepdefs;
 
+import com.microsoft.playwright.APIRequestContext;
+import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Page;
+import com.microsoft.playwright.options.RequestOptions;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
@@ -9,6 +12,7 @@ import utils.PlaywrightManager;
 import utils.TickingCellHelper;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.regex.Pattern;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
@@ -25,7 +29,8 @@ public class BondBlotterSteps {
     private final Page page = PlaywrightManager.getPage();
 
     // Shared state between When/Then steps within a scenario
-    private String lastCellValue;
+    private String      lastCellValue;
+    private APIResponse lastApiResponse;
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -93,6 +98,55 @@ public class BondBlotterSteps {
     @Then("within {int} seconds the {string} cell in row {int} should change value")
     public void withinSecondsTheCellShouldChangeValue(int seconds, String colId, int rowIndex) {
         TickingCellHelper.waitForCellUpdate(page, colId, rowIndex, Duration.ofSeconds(seconds));
+    }
+
+    // ── M3: REST inquiry API assertions ──────────────────────────────────────
+
+    /**
+     * Submits an inquiry directly via REST using Playwright's APIRequestContext.
+     * The request goes to the WireMock server — same port as the blotter SPA.
+     */
+    @When("a new inquiry is submitted for ISIN {string} notional {string} side {string} client {string}")
+    public void aNewInquiryIsSubmitted(String isin, String notional, String side, String client) {
+        APIRequestContext request = page.context().request();
+        lastApiResponse = request.post(
+                MockBlotterServer.getBaseUrl() + "/api/inquiry",
+                RequestOptions.create().setData(Map.of(
+                        "isin",     isin,
+                        "notional", Long.parseLong(notional),
+                        "side",     side,
+                        "client",   client)));
+    }
+
+    /** Overload for the unknown-ISIN scenario that doesn't specify side/client. */
+    @When("a new inquiry is submitted for ISIN {string}")
+    public void aNewInquiryIsSubmittedForIsin(String isin) {
+        APIRequestContext request = page.context().request();
+        lastApiResponse = request.post(
+                MockBlotterServer.getBaseUrl() + "/api/inquiry",
+                RequestOptions.create().setData(Map.of("isin", isin)));
+    }
+
+    // NOTE: "the API response status should be {int}" is defined in PortfolioSteps
+    // and shared across all step def classes — do not re-declare here.
+    // The blotter steps store their response in lastApiResponse; blotter-specific
+    // assertions read from that field via the steps below.
+
+    @Then("the blotter API response status should be {int}")
+    public void theBlotterApiResponseStatusShouldBe(int expectedStatus) {
+        assertThat(lastApiResponse.status())
+                .as("Blotter API response HTTP status")
+                .isEqualTo(expectedStatus);
+    }
+
+    @Then("the response should contain a non-blank {string}")
+    public void theResponseShouldContainANonBlank(String fieldName) {
+        String body = lastApiResponse.text();
+        assertThat(body)
+                .as("Response body should contain non-blank field '%s'", fieldName)
+                .contains("\"" + fieldName + "\"")
+                .doesNotContain("\"" + fieldName + "\":\"\"")
+                .doesNotContain("\"" + fieldName + "\":null");
     }
 
     @Then("the row with ISIN {string} should have status {string}")
