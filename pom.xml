@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.autobot</groupId>
+  <artifactId>b-autobot</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <name>b-autobot — AG Grid Finance Demo BDD Suite</name>
+
+  <properties>
+    <!-- Java -->
+    <java.version>21</java.version>
+    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.target>${java.version}</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- Core library versions -->
+    <playwright.version>1.49.0</playwright.version>
+    <cucumber.version>7.18.1</cucumber.version>
+    <jackson.version>2.17.2</jackson.version>
+
+    <!-- JUnit 5 -->
+    <junit.jupiter.version>5.10.3</junit.jupiter.version>
+    <junit.platform.version>1.10.3</junit.platform.version>
+
+    <!-- Plugins -->
+    <maven.surefire.version>3.5.0</maven.surefire.version>
+
+    <!-- Runtime flags (override on CLI) -->
+    <HEADLESS>true</HEADLESS>
+    <BROWSER>chromium</BROWSER>
+    <BASE_URL>https://www.ag-grid.com/example-finance/</BASE_URL>
+
+    <!--
+      playwright.install.skip — set to 'false' ONCE to download browsers:
+        mvn test-compile -Dplaywright.install.skip=false
+      Defaults to true so normal 'mvn test' runs are not killed by System.exit()
+      inside the Playwright CLI (exec:java terminates the Maven JVM on exit).
+    -->
+    <playwright.install.skip>true</playwright.install.skip>
+  </properties>
+
+  <dependencies>
+
+    <!-- ═══════════════════════════════════════
+         Playwright for Java
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>com.microsoft.playwright</groupId>
+      <artifactId>playwright</artifactId>
+      <version>${playwright.version}</version>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         Cucumber 7
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+      <version>${cucumber.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit-platform-engine</artifactId>
+      <version>${cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         JUnit 5 (platform suite for Cucumber runner)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.jupiter.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         Jackson (JSON parsing for API responses / data tables)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+      <version>${jackson.version}</version>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         Assertions (AssertJ — used by Playwright assertThat)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>3.26.3</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         SLF4J logging (simple backend for tests)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.13</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         WireMock — REST API mock server
+         Handles POST /submit for portfolio hybrid tests.
+         Excludes logback-classic to avoid SLF4J binding clash
+         with the slf4j-simple backend above.
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.wiremock</groupId>
+      <artifactId>wiremock</artifactId>
+      <version>3.5.4</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <!-- Maven Compiler: Java 21 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${java.version}</release>
+        </configuration>
+      </plugin>
+
+      <!-- Maven Surefire: JUnit Platform (required for JUnit 5 + Cucumber) -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.version}</version>
+        <configuration>
+          <!-- Surefire discovers the @Suite runner class -->
+          <includes>
+            <include>**/runners/TestRunner.java</include>
+          </includes>
+          <systemPropertyVariables>
+            <HEADLESS>${HEADLESS}</HEADLESS>
+            <BROWSER>${BROWSER}</BROWSER>
+            <BASE_URL>${BASE_URL}</BASE_URL>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+
+      <!--
+        Playwright browser installer.
+        Runs as an EXTERNAL process (exec:exec, not exec:java) to avoid the
+        Playwright CLI's System.exit() call killing the Maven JVM before Surefire runs.
+
+        Skipped by default (playwright.install.skip=true).
+        To install or update browsers run once:
+          mvn test-compile -Dplaywright.install.skip=false
+      -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.4.1</version>
+        <executions>
+          <execution>
+            <id>install-playwright-browsers</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <skip>${playwright.install.skip}</skip>
+              <executable>java</executable>
+              <arguments>
+                <argument>-classpath</argument>
+                <classpath/>
+                <argument>com.microsoft.playwright.CLI</argument>
+                <argument>install</argument>
+                <argument>--with-deps</argument>
+                <argument>${BROWSER}</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        maven-cucumber-reporting: generates a rich HTML report from the
+        Cucumber JSON output. Run with 'mvn verify' (or 'mvn test verify').
+        Report lands in target/cucumber-html-reports/overview-features.html
+      -->
+      <plugin>
+        <groupId>net.masterthought</groupId>
+        <artifactId>maven-cucumber-reporting</artifactId>
+        <version>5.8.1</version>
+        <executions>
+          <execution>
+            <id>cucumber-reporting</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <projectName>b-autobot — AG Grid Finance Demo</projectName>
+              <outputDirectory>${project.build.directory}/cucumber-html-reports</outputDirectory>
+              <inputDirectory>${project.build.directory}/cucumber-reports</inputDirectory>
+              <jsonFiles>
+                <param>**/*.json</param>
+              </jsonFiles>
+              <checkBuildResult>false</checkBuildResult>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

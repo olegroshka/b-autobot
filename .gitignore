@@ -1,0 +1,22 @@
+# Maven build output
+target/
+
+# IDE files
+.idea/
+*.iml
+*.iws
+*.ipr
+.vscode/
+
+# Claude Code internal state
+.claude/
+
+# OS artefacts
+.DS_Store
+Thumbs.db
+
+# Playwright browser cache (downloaded separately with mvn test-compile -Dplaywright.install.skip=false)
+playwright/
+
+# Test evidence generated at runtime — not source-controlled
+test-evidence/
