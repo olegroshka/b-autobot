@@ -3,8 +3,13 @@ package stepdefs;
 import com.microsoft.playwright.Page;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
+import io.cucumber.java.en.When;
 import utils.MockBlotterServer;
 import utils.PlaywrightManager;
+import utils.TickingCellHelper;
+
+import java.time.Duration;
+import java.util.regex.Pattern;
 
 import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,6 +23,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 public class BondBlotterSteps {
 
     private final Page page = PlaywrightManager.getPage();
+
+    // Shared state between When/Then steps within a scenario
+    private String lastCellValue;
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -48,6 +56,43 @@ public class BondBlotterSteps {
         // Row index is 0-based; checking row (minRows-1) means at least minRows rows exist.
         assertThat(page.locator(
                 ".ag-center-cols-container [row-index='" + (minRows - 1) + "']")).isVisible();
+    }
+
+    // ── M2: Ticking assertions (reuse TickingCellHelper) ─────────────────────
+
+    /** Waits up to {@code seconds} for the blotter cell to change its displayed value. */
+    @When("I wait up to {int} seconds for the {string} cell in row {int} to change value")
+    public void iWaitForCellToChangeValue(int seconds, String colId, int rowIndex) {
+        lastCellValue = TickingCellHelper.waitForCellUpdate(
+                page, colId, rowIndex, Duration.ofSeconds(seconds));
+    }
+
+    @Then("the {string} cell in row {int} should match the pattern {string}")
+    public void theCellShouldMatchPattern(String colId, int rowIndex, String pattern) {
+        String text = page.locator(
+                ".ag-center-cols-container [row-index='" + rowIndex + "'] [col-id='" + colId + "']")
+                .textContent().trim();
+        assertThat(text)
+                .as("Cell [col-id='%s'][row-index=%d] text", colId, rowIndex)
+                .matches(Pattern.compile(pattern));
+    }
+
+    // NOTE: "I wait for the {string} cell in row {int} to flash" is defined in
+    // FinanceDemoSteps and shared across all step def classes — do not re-declare here.
+
+    @Then("the {string} cell in row {int} should have received at least one tick update")
+    public void theCellShouldHaveReceivedAtLeastOneTick(String colId, int rowIndex) {
+        // Reaching this step means waitForCellFlash completed → at least one tick fired.
+        // Optionally assert the cell now shows a numeric bid/ask pattern.
+        String text = page.locator(
+                ".ag-center-cols-container [row-index='" + rowIndex + "'] [col-id='" + colId + "']")
+                .textContent().trim();
+        assertThat(text).as("Cell text after tick").isNotBlank();
+    }
+
+    @Then("within {int} seconds the {string} cell in row {int} should change value")
+    public void withinSecondsTheCellShouldChangeValue(int seconds, String colId, int rowIndex) {
+        TickingCellHelper.waitForCellUpdate(page, colId, rowIndex, Duration.ofSeconds(seconds));
     }
 
     @Then("the row with ISIN {string} should have status {string}")

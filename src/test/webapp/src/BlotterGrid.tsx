@@ -1,14 +1,16 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { AgGridReact } from 'ag-grid-react'
 import {
   type ColDef,
   type ColGroupDef,
   type GridReadyEvent,
+  type GridApi,
   AllCommunityModule,
   ModuleRegistry,
 } from 'ag-grid-community'
 import type { Inquiry } from './types'
 import { buildSeedInquiries } from './seedData'
+import { initSimulator, startSimulator, stopSimulator } from './PriceSimulator'
 import './BlotterGrid.css'
 
 // Register all AG Grid Community modules once at module load.
@@ -153,11 +155,20 @@ const DEFAULT_COL_DEF: ColDef = {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function BlotterGrid() {
-  const gridRef = useRef<AgGridReact<Inquiry>>(null)
+  const gridRef   = useRef<AgGridReact<Inquiry>>(null)
+  const apiRef    = useRef<GridApi<Inquiry> | null>(null)
   const [rowData] = useState<Inquiry[]>(() => buildSeedInquiries())
 
-  const onGridReady = useCallback((_event: GridReadyEvent) => {
+  // Start price simulator when grid is ready; stop on unmount.
+  const onGridReady = useCallback((event: GridReadyEvent<Inquiry>) => {
+    apiRef.current = event.api
+    initSimulator(rowData)
+    startSimulator(event.api)
     // Future: fetch live inquiries from /api/inquiries here (M3)
+  }, [rowData])
+
+  useEffect(() => {
+    return () => stopSimulator()
   }, [])
 
   return (
