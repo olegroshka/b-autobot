@@ -2,7 +2,6 @@ package utils;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
-import com.microsoft.playwright.options.WaitForSelectorState;
 
 import java.time.Duration;
 import java.util.List;
@@ -20,7 +19,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>No {@code Thread.sleep()} — use Playwright's {@code waitForFunction} or
  *       {@code assertThat} auto-retry instead.</li>
  *   <li>All timeouts are explicit parameters so callers control retry budgets.</li>
- *   <li>JavaScript expressions are self-contained strings; no dynamic code injection.</li>
+ *   <li>All JavaScript delegates to {@code window.agGridProbes.ticking.*} which
+ *       is injected via {@link PlaywrightManager#initContext()}.</li>
  * </ul>
  *
  * <h2>AG Grid cell locator convention</h2>
@@ -43,8 +43,6 @@ public final class TickingCellHelper {
      * Blocks until the AG Grid cell at {@code colId / rowIndex} shows a value
      * different from whatever it displays at the moment of calling.
      *
-     * <p>Uses {@code page.waitForFunction()} so no thread is blocked with sleep.
-     *
      * @param page     Playwright {@link Page}
      * @param colId    AG Grid column id attribute value (e.g. {@code "price"})
      * @param rowIndex AG Grid {@code row-index} attribute value (0-based)
@@ -60,14 +58,8 @@ public final class TickingCellHelper {
 
         String initialValue = cell.textContent().trim();
 
-        // waitForFunction polls the given JS predicate until it returns truthy.
-        // Passing [selector, initialValue] as a JSON array avoids string interpolation
-        // inside the expression (prevents accidental injection).
         page.waitForFunction(
-                "args => { " +
-                "  const el = document.querySelector(args[0]); " +
-                "  return el && el.textContent.trim() !== '' && el.textContent.trim() !== args[1]; " +
-                "}",
+                "args => window.agGridProbes.ticking.hasCellValueChanged(args[0], args[1])",
                 List.of(selector, initialValue),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
@@ -99,8 +91,6 @@ public final class TickingCellHelper {
         Locator cell = page.locator(buildCellSelector(colId, rowIndex));
         cell.scrollIntoViewIfNeeded();
 
-        // Wait until cell shows any numeric content (handles empty/loading state).
-        // hasText(Pattern, HasTextOptions) — use LocatorAssertions.HasTextOptions, not Locator.WaitForOptions.
         assertThat(cell)
                 .hasText(Pattern.compile("[\\d.,]+"),
                          new com.microsoft.playwright.assertions.LocatorAssertions
@@ -121,9 +111,6 @@ public final class TickingCellHelper {
      * Waits until AG Grid's tick-flash class {@code ag-cell-data-changed} is
      * applied to the target cell, confirming at least one live update occurred.
      *
-     * <p>This is more reliable than watching for a specific value when you only
-     * need to prove the cell is live, not what value it currently holds.
-     *
      * @param page     Playwright {@link Page}
      * @param colId    AG Grid column id
      * @param rowIndex Row index (0-based)
@@ -133,17 +120,8 @@ public final class TickingCellHelper {
         String selector = buildCellSelector(colId, rowIndex);
         page.locator(selector).scrollIntoViewIfNeeded();
 
-        // Support two AG Grid flash mechanisms:
-        //  • ag-cell-data-changed  — standard enableCellChangeFlash=true
-        //  • ag-value-change-value-highlight — agAnimateShowChangeCellRenderer (the finance demo)
         page.waitForFunction(
-                "args => { " +
-                "  const el = document.querySelector(args[0]); " +
-                "  return el && (" +
-                "    el.classList.contains('ag-cell-data-changed') || " +
-                "    !!el.querySelector('.ag-value-change-value-highlight')" +
-                "  );" +
-                "}",
+                "args => window.agGridProbes.ticking.isCellFlashing(args[0])",
                 List.of(selector),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
@@ -159,9 +137,6 @@ public final class TickingCellHelper {
      * Waits until the {@code ag-cell-data-changed} flash class is gone, meaning
      * the cell's value is stable and the DOM animation has completed.
      *
-     * <p>Useful when you want to read a value without risk of catching a mid-tick
-     * state. Call this <em>after</em> {@link #waitForCellFlash}.
-     *
      * @param page     Playwright {@link Page}
      * @param colId    AG Grid column id
      * @param rowIndex Row index (0-based)
@@ -171,10 +146,7 @@ public final class TickingCellHelper {
         String selector = buildCellSelector(colId, rowIndex);
 
         page.waitForFunction(
-                "args => { " +
-                "  const el = document.querySelector(args[0]); " +
-                "  return el && !el.classList.contains('ag-cell-data-changed'); " +
-                "}",
+                "args => window.agGridProbes.ticking.isCellStable(args[0])",
                 List.of(selector),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())

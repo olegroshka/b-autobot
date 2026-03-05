@@ -27,6 +27,13 @@ Stack: Java 21 · Playwright for Java · Cucumber 7 · Jackson · JUnit 5 · Mav
    - Every scenario must map to a real, observable user behaviour.
    - Tag slow/flaky scenarios with `@ticking` so they can be isolated.
 
+5. **All JavaScript runs through `window.agGridProbes` — never inline JS strings.**
+   - Add new browser-side logic to the appropriate probe module in `src/test/js/probes/`.
+   - Regenerate (or manually update) `bundle.js` so the change is picked up by Playwright.
+   - Write a Jest unit test for the new probe function before wiring it into Java.
+   - Never use `//` single-line comments inside Java string literals that contain JS
+     (concatenated strings have no newlines, so `//` comments out the rest of the function body).
+
 ---
 
 ## AG Grid Specific Knowledge
@@ -40,25 +47,65 @@ Locator cell = page.locator(".ag-center-cols-container [row-index='0'] [col-id='
 Locator header = page.locator(".ag-header-cell[col-id='symbol']");
 ```
 
+### Column identifiers (Finance Demo)
+The live Finance Demo uses these `col-id` values: `ticker`, `instrument`, `totalValue`, `quantity`, `purchasePrice`.
+The `ticker` column uses a custom renderer that appends the company name — `textContent` returns e.g. `"AAPLApple Inc"`.
+Always use `contains()` (not `equals()`) when asserting ticker cell text.
+
 ### Ticking / Live-Price Cells
 AG Grid's Finance Demo updates price cells at ~200–500 ms intervals.
 Key challenges:
 - DOM value is stale by the time you read it.
 - `ag-cell-data-changed` CSS class is applied for ~400 ms on each tick — use it as a signal.
-- The grid exposes `window.agGrid` or a ref; JS evaluation can reach `api.getDisplayedRowAtIndex(n)`.
 
-**Approved strategy — see `TickingCellHelper`:**
+**Approved strategy — see `TickingCellHelper` + `window.agGridProbes.ticking`:**
 | Need | Approach |
 |---|---|
-| Wait for a value to change | `page.waitForFunction()` polling selector + value |
+| Wait for a value to change | `waitForFunction` → `agGridProbes.ticking.hasCellValueChanged(sel, initial)` |
 | Assert value is in a numeric range | Parse text → `assertThat(value).isBetween(min, max)` |
-| Detect that a tick happened | Wait for `ag-cell-data-changed` class to appear on cell |
-| Stabilize before reading | Wait for `ag-cell-data-changed` class to **disappear** (animation done) |
+| Detect that a tick happened | `agGridProbes.ticking.isCellFlashing(sel)` |
+| Stabilize before reading | `agGridProbes.ticking.isCellStable(sel)` |
 
 ### Virtualization
 AG Grid only renders visible rows. If a row scrolls out of view its DOM node is recycled.
 - Always scroll the target row into view before asserting: `cell.scrollIntoViewIfNeeded()`.
-- Use the grid's own filter/sort to bring rows to top rather than relying on absolute row-index.
+- Use `GridHarness.findRowByCellValue()` for virtualization-safe row lookup (3-phase strategy).
+
+### AG Grid API Discovery (React Finance Demo)
+`window.gridApi` is **not** set by the Finance Demo's React app.
+The API is discovered via React fibre traversal — see `src/test/js/probes/api-discovery.js`.
+This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes.gridApi.*`.
+
+### Filter model formats (AG Grid v33)
+- Text columns: `{ filterType: 'text', type: 'contains', filter: value }`
+- Set filter columns (e.g. `instrument`): `{ filterType: 'set', values: [value] }`
+- Java pattern: try `applyTextFilter` first, catch `PlaywrightException`, retry with `applySetFilter`.
+
+---
+
+## Probe Architecture
+
+### How it works
+1. `src/test/js/probes/bundle.js` is an IIFE that registers `window.agGridProbes`.
+2. `ProbesLoader.java` reads `bundle.js` from the classpath (lazy, cached).
+3. `PlaywrightManager.initContext()` injects it via `ctx.addInitScript(ProbesLoader.load())`.
+4. Every page opened in that context has `window.agGridProbes` available before navigation.
+
+### Probe namespaces
+| Namespace | Key functions |
+|---|---|
+| `agGridProbes.dom` | `getVisibleCellTexts`, `findRowIndexByText`, `isRowInDom`, `getLastDomRowIndex`, `areAllVisibleCellsContaining`, `isCellFlashing`, `isCellStable`, `hasCellValueChanged` |
+| `agGridProbes.gridApi` | `findRowIndexByDataValue`, `ensureRowVisible`, `isApiAvailable` |
+| `agGridProbes.filter` | `applyTextFilter`, `applySetFilter`, `clearAllFilters` |
+| `agGridProbes.scroll` | `scrollToTop`, `scrollDown`, `isAtBottom` |
+| `agGridProbes.ticking` | `isCellFlashing`, `isCellStable`, `hasCellValueChanged`, `getCellText` |
+
+### Modifying probes
+1. Edit the relevant module in `src/test/js/probes/` (e.g. `dom-probes.js`).
+2. Mirror the change in `bundle.js` (the IIFE must stay in sync).
+3. Add/update the Jest test in `src/test/js/__tests__/`.
+4. Verify with `cd src/test/js && npm test` (requires Node.js 18+).
+5. No Java changes needed — the new function is immediately available as `window.agGridProbes.*`.
 
 ---
 
@@ -72,7 +119,12 @@ b-autobot/
     │   ├── pages/          # Page Object Model classes
     │   ├── runners/        # Cucumber test runners
     │   ├── stepdefs/       # Step definition classes
-    │   └── utils/          # Helpers (TickingCellHelper, etc.)
+    │   └── utils/          # Helpers (GridHarness, TickingCellHelper, ProbesLoader, …)
+    ├── js/                 # JavaScript probe workspace (npm + Jest)
+    │   ├── package.json
+    │   ├── jest.config.js
+    │   ├── probes/         # Individual probe modules + bundle.js
+    │   └── __tests__/      # Jest unit tests (jsdom)
     └── resources/
         ├── features/       # .feature files (Gherkin)
         └── cucumber.properties
@@ -94,13 +146,26 @@ b-autobot/
 ---
 
 ## Running Tests
+
+### Java / Cucumber (Maven)
 ```bash
-# All tests
-mvn test
+# All 12 scenarios (headless Chromium)
+mvn verify
+
+# Headed browser — opens a real Chromium window
+mvn verify -DHEADLESS=false
 
 # Only ticking scenarios
-mvn test -Dcucumber.filter.tags="@ticking"
+mvn verify -Dcucumber.filter.tags="@ticking"
 
-# Headed browser (debug)
-mvn test -DHEADLESS=false
+# Self-contained WireMock scenarios only (no internet needed)
+mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
+```
+
+### JavaScript probes (Jest)
+```bash
+cd src/test/js
+npm install        # once — requires Node.js 18+
+npm test           # run all probe unit tests
+npm run test:coverage
 ```

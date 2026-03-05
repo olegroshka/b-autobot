@@ -149,6 +149,24 @@
   </dependencies>
 
   <build>
+
+    <!--
+      Add src/test/js/probes/bundle.js to the test classpath as js/probes/bundle.js
+      so ProbesLoader can find it via getResourceAsStream("/js/probes/bundle.js").
+    -->
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+      <testResource>
+        <directory>src/test/js/probes</directory>
+        <targetPath>js/probes</targetPath>
+        <includes>
+          <include>bundle.js</include>
+        </includes>
+      </testResource>
+    </testResources>
+
     <plugins>
 
       <!-- Maven Compiler: Java 21 -->

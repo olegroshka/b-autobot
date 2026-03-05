@@ -20,131 +20,67 @@ import java.util.regex.Pattern;
  * <h2>Three-Phase Strategy</h2>
  * <ol>
  *   <li><b>Fast-path</b> — check the current DOM; free if the row is already visible.</li>
- *   <li><b>Grid API path</b> — evaluate JavaScript to call {@code gridApi.forEachNode}
+ *   <li><b>Grid API path</b> — call {@code window.agGridProbes.gridApi.findRowIndexByDataValue}
  *       (searches the <em>data model</em>, not the DOM), get the row index, then call
- *       {@code gridApi.ensureIndexVisible(rowIndex, 'middle')} to force AG Grid to
+ *       {@code window.agGridProbes.gridApi.ensureRowVisible(rowIndex)} to force AG Grid to
  *       render the row and scroll to it.</li>
- *   <li><b>Scroll-probe fallback</b> — if the grid API is not accessible (e.g. it is
- *       not exposed on {@code window}), reset the viewport to the top and page down
- *       incrementally, checking the DOM at each step.</li>
+ *   <li><b>Scroll-probe fallback</b> — if the grid API is not accessible, reset the
+ *       viewport to the top and page down incrementally, checking the DOM at each step.</li>
  * </ol>
  *
  * <p>No {@code Thread.sleep()} is used anywhere.  Post-scroll waits use
  * {@link Page#waitForFunction} to yield only when new rows are actually rendered.
+ * All JavaScript is delegated to {@code window.agGridProbes} which is injected
+ * into every page via {@link PlaywrightManager#initContext()}.
  */
 public class GridHarness {
 
     // ── Selectors ─────────────────────────────────────────────────────────────
 
-    /** Scrollable viewport that AG Grid virtualises rows within. */
-    private static final String VIEWPORT_SEL   = ".ag-body-viewport";
-
     /** Container that holds the visible row DOM nodes. */
     private static final String ROWS_CONTAINER = ".ag-center-cols-container";
 
     /** How long to wait after a scroll for AG Grid's row recycler to settle. */
-    private static final int    RENDER_POLL_MS  = 100;
+    private static final int RENDER_POLL_MS = 100;
 
     /**
      * Maximum scroll iterations in Phase 3 before giving up (safety cap).
      * Each iteration covers roughly one viewport height.
      */
-    private static final int    MAX_SCROLL_STEPS = 200;
+    private static final int MAX_SCROLL_STEPS = 200;
 
-    // ── JavaScript helpers (static strings — never interpolate user data) ─────
+    // ── Probe-based JavaScript predicates ─────────────────────────────────────
+    // All of these delegate to window.agGridProbes (injected via addInitScript).
+    // Short one-liners — no inline comments that could cause parse errors.
 
-    /**
-     * Inline JS helper that finds the AG Grid API through multiple paths:
-     * <ol>
-     *   <li>{@code window.gridApi} / {@code window.agGridApi} — set by some AG Grid demos.</li>
-     *   <li>React fibre traversal — AG Grid React does not expose the API on {@code window},
-     *       but it is accessible via the React internals property on the grid root element.</li>
-     *   <li>{@code __agComponent.gridOptions.api} — older AG Grid versions.</li>
-     * </ol>
-     *
-     * <p>This snippet is embedded verbatim inside the larger JS strings below.
-     * Variable name: {@code _api}.
-     */
-    private static final String JS_FIND_API_SNIPPET =
-            "  let _api = window.gridApi || window.agGridApi;" +
-            "  if (!_api?.forEachNode) {" +
-            "    const _el = document.querySelector('.ag-root-wrapper');" +
-            "    const _fk = _el && Object.keys(_el).find(k => k.startsWith('__reactFiber') || k.startsWith('__reactInternals'));" +
-            "    if (_fk) {" +
-            "      let _f = _el[_fk], _n = 0;" +
-            "      while (_f && _n++ < 2000) {" +
-            "        if (_f.memoizedProps?.api?.forEachNode) { _api = _f.memoizedProps.api; break; }" +
-            "        const _s = _f.stateNode;" +
-            "        if (_s && typeof _s === 'object' && !_s.nodeType && _s.api?.forEachNode) { _api = _s.api; break; }" +
-            "        let _st = _f.memoizedState;" +
-            "        while (_st) { if (_st.memoizedState?.current?.forEachNode) { _api = _st.memoizedState.current; break; } _st = _st.next; }" +
-            "        if (_api) break;" +
-            "        _f = _f.return;" +
-            "      }" +
-            "    }" +
-            "    if (!_api?.forEachNode) _api = _el?.__agComponent?.gridOptions?.api || null;" +
-            "  }";
-
-    /** JS: returns the AG Grid API (null if not found). */
-    private static final String JS_GET_API =
-            "() => {" + JS_FIND_API_SNIPPET + " return _api; }";
-
-    /**
-     * JS (args = [colId, cellText]): uses the grid API to find the first row
-     * whose {@code data[colId]} matches {@code cellText} exactly.
-     * Returns the integer {@code rowIndex} or {@code null} if not found / no API.
-     */
     private static final String JS_FIND_ROW_INDEX =
-            "([col, val]) => {" +
-            JS_FIND_API_SNIPPET +
-            "  if (!_api?.forEachNode) return null;" +
-            "  let found = null;" +
-            "  _api.forEachNode(node => {" +
-            "    if (found !== null) return;" +
-            "    const raw = node.data?.[col];" +
-            "    if (raw !== undefined && String(raw).trim() === String(val).trim()) {" +
-            "      found = node.rowIndex;" +
-            "    }" +
-            "  });" +
-            "  return found;" +
-            "}";
+            "([col, val]) => window.agGridProbes.gridApi.findRowIndexByDataValue(col, val)";
 
-    /**
-     * JS (arg = rowIndex): calls {@code gridApi.ensureIndexVisible} to scroll the
-     * grid to the given row and trigger DOM rendering.
-     */
     private static final String JS_ENSURE_VISIBLE =
-            "rowIdx => {" +
-            JS_FIND_API_SNIPPET +
-            "  if (_api?.ensureIndexVisible) {" +
-            "    _api.ensureIndexVisible(rowIdx, 'middle');" +
-            "    return true;" +
-            "  }" +
-            "  return false;" +
-            "}";
+            "rowIdx => window.agGridProbes.gridApi.ensureRowVisible(rowIdx)";
 
-    /** JS: returns the highest row-index currently present in the DOM. */
+    private static final String JS_ROW_IN_DOM =
+            "ri => window.agGridProbes.dom.isRowInDom(ri)";
+
+    private static final String JS_HAS_ROWS =
+            "() => window.agGridProbes.dom.hasRowsInViewport()";
+
     private static final String JS_LAST_DOM_ROW_INDEX =
-            "() => {" +
-            "  const rows = document.querySelectorAll('.ag-center-cols-container [row-index]');" +
-            "  return Math.max(-1, ...Array.from(rows)" +
-            "    .map(el => parseInt(el.getAttribute('row-index'), 10)));" +
-            "}";
+            "() => window.agGridProbes.dom.getLastDomRowIndex()";
 
-    /** JS: returns true when the viewport cannot scroll further down. */
     private static final String JS_AT_BOTTOM =
-            "() => { const vp = document.querySelector('.ag-body-viewport');" +
-            "  return !vp || vp.scrollTop + vp.clientHeight >= vp.scrollHeight - 10; }";
+            "() => window.agGridProbes.scroll.isAtBottom()";
 
-    /** JS: scrolls the viewport down by 90 % of its client height. */
     private static final String JS_SCROLL_DOWN =
-            "() => { const vp = document.querySelector('.ag-body-viewport');" +
-            "  if (vp) vp.scrollTop += vp.clientHeight * 0.9; }";
+            "() => window.agGridProbes.scroll.scrollDown()";
 
-    /** JS: resets the viewport to the very top. */
     private static final String JS_SCROLL_TOP =
-            "() => { const vp = document.querySelector('.ag-body-viewport');" +
-            "  if (vp) vp.scrollTop = 0; }";
+            "() => window.agGridProbes.scroll.scrollToTop()";
+
+    /** Wait predicate: new rows rendered OR viewport reached the bottom. */
+    private static final String JS_NEW_ROWS_OR_BOTTOM =
+            "([before]) => window.agGridProbes.scroll.isAtBottom() || " +
+            "window.agGridProbes.dom.getLastDomRowIndex() > before";
 
     // ── Instance fields ───────────────────────────────────────────────────────
 
@@ -181,7 +117,7 @@ public class GridHarness {
             return fastResult;
         }
 
-        // ── Phase 2: Grid API (ensureIndexVisible) ────────────────────────────
+        // ── Phase 2: Grid API (ensureRowVisible) ──────────────────────────────
         Object rowIdxObj = page.evaluate(JS_FIND_ROW_INDEX, List.of(colId, cellText));
         if (rowIdxObj instanceof Number num) {
             int rowIdx = num.intValue();
@@ -207,7 +143,6 @@ public class GridHarness {
      * @param colId      The column to read from the same row
      */
     public String getSiblingCellText(Locator anchorCell, String colId) {
-        // Walk up to the [row-index='N'] ancestor, then down to the sibling col-id.
         return anchorCell
                 .locator("xpath=ancestor::*[@row-index][1]")
                 .locator(String.format("[col-id='%s']", colId))
@@ -251,14 +186,12 @@ public class GridHarness {
     }
 
     /**
-     * After {@code ensureIndexVisible} returns, wait for the row's DOM node to
+     * After {@code ensureRowVisible} returns, wait for the row's DOM node to
      * actually appear (AG Grid rendering is async after the scroll).
      */
     private void waitForRowInDom(int rowIdx, Duration timeout) {
-        // waitForFunction re-evaluates the predicate until it returns truthy.
         page.waitForFunction(
-                "ri => !!document.querySelector(" +
-                "  '.ag-center-cols-container [row-index=\"' + ri + '\"]')",
+                JS_ROW_IN_DOM,
                 rowIdx,
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
@@ -270,62 +203,43 @@ public class GridHarness {
      * Phase 3: scroll the AG Grid viewport from top to bottom, checking the
      * current batch of DOM rows at each step.
      *
-     * <p>After each scroll, the method waits for the {@code row-index} of the
-     * last visible row to increase (proving AG Grid recycled the DOM nodes) before
-     * re-checking, avoiding spin-polling against a stale DOM.
+     * <p>After each scroll, the method waits for the last visible row-index to
+     * increase (proving AG Grid recycled the DOM nodes) before re-checking,
+     * avoiding spin-polling against a stale DOM.
      */
     private Locator scrollProbe(String colId, String cellText, Instant deadline) {
-        // Reset to top so we don't miss rows that precede the current scroll position.
         page.evaluate(JS_SCROLL_TOP);
 
-        // Give AG Grid a moment to render the first set of rows after reset.
-        // Using waitForFunction instead of sleep: wait until at least one row appears.
+        // Wait until at least one row is rendered after the scroll reset.
         page.waitForFunction(
-                "() => document.querySelectorAll('.ag-center-cols-container [row-index]').length > 0",
+                JS_HAS_ROWS,
                 null,
                 new Page.WaitForFunctionOptions().setTimeout(5000).setPollingInterval(RENDER_POLL_MS)
         );
 
         for (int step = 0; step < MAX_SCROLL_STEPS; step++) {
-            // Check current viewport
             Locator found = fastFind(colId, cellText);
             if (found != null) {
                 found.scrollIntoViewIfNeeded();
                 return found;
             }
 
-            // Have we run out of time?
             if (Instant.now().isAfter(deadline)) break;
 
-            // Are we already at the bottom?
-            boolean atBottom = Boolean.TRUE.equals(page.evaluate(JS_AT_BOTTOM));
-            if (atBottom) break;
+            if (Boolean.TRUE.equals(page.evaluate(JS_AT_BOTTOM))) break;
 
-            // Capture the last visible row-index BEFORE scrolling.
             Object lastBefore = page.evaluate(JS_LAST_DOM_ROW_INDEX);
             int lastBeforeIdx = lastBefore instanceof Number n ? n.intValue() : -1;
 
-            // Scroll down one viewport height.
             page.evaluate(JS_SCROLL_DOWN);
 
-            // Wait until AG Grid has recycled/rendered new rows (last row-index increases)
-            // OR until the bottom is reached (last-index won't grow at the end of the data).
-            // We give up waiting for new rows after 2 s; the bottom-check on the next
-            // iteration will then break the loop.
+            // Wait until AG Grid renders new rows OR reaches the bottom of the data.
+            // Give up after 2 s; the bottom-check on the next iteration will then
+            // break the loop.
             try {
-                final int capturedLast = lastBeforeIdx;
                 page.waitForFunction(
-                        "([before, atBottomSel]) => {" +
-                        "  const vp = document.querySelector(atBottomSel);" +
-                        "  if (vp && vp.scrollTop + vp.clientHeight >= vp.scrollHeight - 10)" +
-                        "    return true;" +
-                        "  const rows = document.querySelectorAll(" +
-                        "    '.ag-center-cols-container [row-index]');" +
-                        "  const last = Math.max(-1, ...Array.from(rows)" +
-                        "    .map(el => parseInt(el.getAttribute('row-index'), 10)));" +
-                        "  return last > before;" +
-                        "}",
-                        List.of(capturedLast, VIEWPORT_SEL),
+                        JS_NEW_ROWS_OR_BOTTOM,
+                        List.of(lastBeforeIdx),
                         new Page.WaitForFunctionOptions()
                                 .setTimeout(2000)
                                 .setPollingInterval(RENDER_POLL_MS)

@@ -42,6 +42,9 @@ public final class PlaywrightManager {
         BrowserContext ctx = BROWSER.get().newContext(
                 new Browser.NewContextOptions()
                         .setViewportSize(1920, 1080));
+        // Inject the AG Grid probes bundle so window.agGridProbes is available
+        // on every page opened in this context, before any page script runs.
+        ctx.addInitScript(ProbesLoader.load());
         CONTEXT.set(ctx);
         PAGE.set(ctx.newPage());
     }
