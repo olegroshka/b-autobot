@@ -11,7 +11,7 @@ interface ToolbarProps {
 }
 
 /** Increment steps per unit mode. */
-const STEP: Record<Units, number> = { c: 0.01, bp: 1 }
+const STEP: Record<Units, number> = { c: 1, bp: 1 }
 
 export default function Toolbar({ selectedCount, onApply, onSend, filterText, onFilterChange }: ToolbarProps) {
   const [refSource, setRefSource] = useState<RefSource>('TW')
