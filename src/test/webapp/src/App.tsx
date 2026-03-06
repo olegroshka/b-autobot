@@ -4,38 +4,8 @@ import type { Inquiry, RefSource, RefSide, Units } from './types'
 import BlotterGrid from './BlotterGrid'
 import Toolbar from './Toolbar'
 import { sendQuote } from './api'
+import { getRefValue } from './priceUtils'
 import './App.css'
-
-// ── APPLY helpers ─────────────────────────────────────────────────────────────
-
-/**
- * Extracts bid, ask, and mid from a combined "bid / ask" cell string.
- * Works for both price cells (pts) and spread cells (bp).
- */
-function parseBidAsk(cell: string): { bid: number; ask: number; mid: number } {
-  const [bid, ask] = cell.split(' / ').map(Number)
-  return { bid, ask, mid: (bid + ask) / 2 }
-}
-
-/**
- * Returns the anchor price/spread value from a row given the current toolbar
- * settings.  `units='c'` reads the price cell; `units='bp'` reads the spread cell.
- */
-function getRefValue(
-  row:       Inquiry,
-  refSource: RefSource,
-  refSide:   RefSide,
-  units:     Units,
-): number {
-  let cell: string
-  if (units === 'c') {
-    cell = refSource === 'TW' ? row.twPrice : refSource === 'CP+' ? row.cpPrice : row.cbbPrice
-  } else {
-    cell = refSource === 'TW' ? row.twSpread : refSource === 'CP+' ? row.cpSpread : row.cbbSpread
-  }
-  const { bid, ask, mid } = parseBidAsk(cell)
-  return refSide === 'Bid' ? bid : refSide === 'Ask' ? ask : mid
-}
 
 // ── Root component ────────────────────────────────────────────────────────────
 
@@ -83,6 +53,8 @@ export default function App() {
           ...row,
           price:  units === 'c'  ? computed : row.price,
           spread: units === 'bp' ? computed : row.spread,
+          // Store config so PriceSimulator re-derives price/spread on every tick
+          appliedConfig: { refSource, refSide, markup, units },
         }
       })
 

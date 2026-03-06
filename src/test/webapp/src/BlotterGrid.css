@@ -34,6 +34,11 @@
   text-align: center;
 }
 
+/* ── Selected row: left accent bar via inset box-shadow ──────────────────────── */
+.blotter-grid .ag-row-selected {
+  box-shadow: inset 3px 0 0 #1e90ff;
+}
+
 /* ── Status badge colours ─────────────────────────────────────────────────────── */
 .blotter-grid .status-pending { color: #d4a017; font-weight: 600; }
 .blotter-grid .status-quoted  { color: #00a878; font-weight: 600; }

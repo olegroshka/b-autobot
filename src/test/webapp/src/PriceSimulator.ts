@@ -1,6 +1,7 @@
 import type { GridApi } from 'ag-grid-community'
 import { makePriceCell, makeSpreadCell } from './seedData'
 import type { Inquiry } from './types'
+import { computeApplied } from './priceUtils'
 
 // ── Simulation parameters ────────────────────────────────────────────────────
 
@@ -114,19 +115,28 @@ export function startSimulator(api: GridApi<Inquiry>): void {
   if (intervalId !== null) return   // already running
 
   intervalId = setInterval(() => {
-    const updates: Partial<Inquiry>[] = []
+    const updates: Inquiry[] = []
 
     api.forEachNode((node) => {
-      if (node.data) {
-        const delta = tickBond(node.data.id)
-        if (Object.keys(delta).length > 0) {
-          updates.push({ ...node.data, ...delta })
-        }
+      if (!node.data) return
+      const delta = tickBond(node.data.id)
+      if (Object.keys(delta).length === 0) return
+
+      // Merge fresh ref prices into the row snapshot
+      const updatedRow: Inquiry = { ...node.data, ...delta }
+
+      // Re-derive applied price/spread so it continuously tracks ref + markup
+      if (updatedRow.appliedConfig) {
+        const applied = computeApplied(updatedRow, updatedRow.appliedConfig)
+        if (applied.price  !== undefined) updatedRow.price  = applied.price
+        if (applied.spread !== undefined) updatedRow.spread = applied.spread
       }
+
+      updates.push(updatedRow)
     })
 
     if (updates.length > 0) {
-      api.applyTransactionAsync({ update: updates as Inquiry[] })
+      api.applyTransactionAsync({ update: updates })
     }
   }, TICK_INTERVAL_MS)
 }

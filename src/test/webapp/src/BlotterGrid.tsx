@@ -39,7 +39,7 @@ const darkTheme = themeBalham.withParams({
   headerHeight:               30,
   oddRowBackgroundColor:      '#090d15',
   rowHoverColor:              'rgba(21, 101, 192, 0.13)',
-  selectedRowBackgroundColor: 'rgba(21, 101, 192, 0.20)',
+  selectedRowBackgroundColor: 'rgba(21, 101, 192, 0.30)',
   chromeBackgroundColor:      '#0b0f18',
 })
 
@@ -59,14 +59,6 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
   {
     headerName: 'Identity',
     children: [
-      {
-        colId: 'select',
-        headerName: '',
-        width: 40,
-        resizable: false,
-        suppressHeaderMenuButton: true,
-        pinned: 'left',
-      },
       {
         colId: 'ptId',
         headerName: 'Portfolio',
@@ -221,7 +213,7 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
         columnDefs={COLUMN_DEFS}
         defaultColDef={DEFAULT_COL_DEF}
         getRowId={(params) => params.data.id}
-        rowSelection={{ mode: 'multiRow', checkboxes: true, headerCheckbox: true }}
+        rowSelection={{ mode: 'multiRow', checkboxes: false, headerCheckbox: false, enableClickSelection: true }}
         animateRows={true}
         onGridReady={onGridReady}
         onSelectionChanged={handleSelectionChanged}
