@@ -5,6 +5,7 @@ import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 import utils.MockBlotterServer;
+import utils.MockConfigServer;
 import utils.PlaywrightManager;
 
 /**
@@ -22,6 +23,7 @@ public class Hooks {
 
     @BeforeAll
     public static void launchBrowser() {
+        MockConfigServer.start();
         MockBlotterServer.start();
         PlaywrightManager.initBrowser();
     }
@@ -40,5 +42,6 @@ public class Hooks {
     public static void shutdownBrowser() {
         PlaywrightManager.closeBrowser();
         MockBlotterServer.stop();
+        MockConfigServer.stop();
     }
 }

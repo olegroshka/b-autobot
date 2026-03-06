@@ -8,12 +8,12 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
   # ─────────────────────────────────────────────────────────────────────────────
 
   Scenario: Submitted portfolio ID appears in the blotter grid
-    Given trader 'roshkao' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given trader 'doej' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
     And the blotter is populated with the API response
     Then the AG Grid should display the 'Portfolio ID' from the API response in the first row
 
   Scenario: Submitted portfolio field values match between API response and blotter grid
-    Given trader 'roshkao' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given trader 'doej' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
     And the blotter is populated with the API response
     Then verify cell "portfolioId" in row "0" matches the API field "portfolio_id"
     And verify cell "traderId" in row "0" matches the API field "trader_id"
@@ -25,7 +25,7 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
   # ── REST contract checks ──────────────────────────────────────────────────
 
   Scenario: Submission returns HTTP 201 with a non-blank Portfolio ID
-    Given trader 'roshkao' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given trader 'doej' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
     Then the API response status should be 201
     And the API response should contain a non-blank 'portfolio_id'
 

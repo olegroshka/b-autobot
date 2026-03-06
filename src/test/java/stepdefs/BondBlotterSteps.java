@@ -175,4 +175,26 @@ public class BondBlotterSteps {
     public void iPressSend() {
         dsl.pressSend();
     }
+
+    // ── M8: RELEASE PT access control + workflow ──────────────────────────────
+
+    @Given("the PT-Blotter is open as user {string}")
+    public void openBlotterAsUser(String user) {
+        dsl.openBlotter(user);
+    }
+
+    @Then("the RELEASE PT button should be disabled")
+    public void releasePtDisabled() {
+        dsl.assertReleasePtDisabled();
+    }
+
+    @Then("the RELEASE PT button should be enabled")
+    public void releasePtEnabled() {
+        dsl.assertReleasePtEnabled();
+    }
+
+    @When("I press RELEASE PT")
+    public void pressReleasePt() {
+        dsl.pressReleasePt();
+    }
 }

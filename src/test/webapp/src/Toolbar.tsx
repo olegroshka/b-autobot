@@ -8,12 +8,14 @@ interface ToolbarProps {
   onSend: () => void
   filterText: string
   onFilterChange: (text: string) => void
+  isReleasePtEnabled: boolean
+  onReleasePt: () => void
 }
 
 /** Increment steps per unit mode. */
 const STEP: Record<Units, number> = { c: 1, bp: 1 }
 
-export default function Toolbar({ selectedCount, onApply, onSend, filterText, onFilterChange }: ToolbarProps) {
+export default function Toolbar({ selectedCount, onApply, onSend, filterText, onFilterChange, isReleasePtEnabled, onReleasePt }: ToolbarProps) {
   const [refSource, setRefSource] = useState<RefSource>('TW')
   const [refSide,   setRefSide]   = useState<RefSide>('Mid')
   const [markup,    setMarkup]    = useState(0)
@@ -162,6 +164,14 @@ export default function Toolbar({ selectedCount, onApply, onSend, filterText, on
         disabled={selectedCount === 0}
         className="toolbar-btn send-btn"
       >SEND</button>
+
+      <button
+        aria-label="Release PT"
+        type="button"
+        onClick={onReleasePt}
+        disabled={!isReleasePtEnabled}
+        className={`toolbar-btn release-btn${!isReleasePtEnabled ? ' disabled-access' : ''}`}
+      >RELEASE PT</button>
 
     </div>
   )

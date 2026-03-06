@@ -67,6 +67,18 @@ export async function fetchInquiries(): Promise<InquiryResponse[]> {
   return res.json() as Promise<InquiryResponse[]>
 }
 
+/** POST /api/inquiry/{id}/release — releases a quoted inquiry to RELEASED status. */
+export async function releasePt(inquiryId: string): Promise<void> {
+  const res = await fetch(`/api/inquiry/${inquiryId}/release`, { method: 'POST' })
+  if (!res.ok) {
+    const body = await res.text()
+    throw Object.assign(new Error(`POST /api/inquiry/${inquiryId}/release failed: ${res.status}`), {
+      status: res.status,
+      body,
+    })
+  }
+}
+
 /** POST /api/inquiry/{id}/quote — sends a quote for an existing inquiry. */
 export async function sendQuote(inquiryId: string, req: QuoteRequest): Promise<QuoteResponse> {
   const res = await fetch(`/api/inquiry/${inquiryId}/quote`, {

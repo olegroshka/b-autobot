@@ -51,6 +51,14 @@
       inside the Playwright CLI (exec:java terminates the Maven JVM on exit).
     -->
     <playwright.install.skip>true</playwright.install.skip>
+
+    <!--
+      config.build.skip — set to 'false' to run 'npm run build' for the Config
+      Service React UI during test-compile.
+      Defaults to true so normal 'mvn verify' runs work without Node.js installed.
+      Use 'mvn verify -Dconfig.build.skip=false' to rebuild and test.
+    -->
+    <config.build.skip>true</config.build.skip>
   </properties>
 
   <dependencies>
@@ -254,29 +262,49 @@
           src/test/resources/wiremock/__files/blotter/
         and is served by WireMock at http://localhost:PORT/blotter/.
       -->
+      <!--
+        PT-Blotter webapp + Config Service UI builds using frontend-maven-plugin.
+        Downloads Node.js automatically into ${project.basedir}/.node — no
+        system Node.js installation required.
+
+        Blotter build skipped by default (blotter.build.skip=true).
+        Config UI build skipped by default (config.build.skip=true).
+
+        To rebuild blotter:      mvn test-compile -Dblotter.build.skip=false
+        To rebuild config UI:    mvn test-compile -Dconfig.build.skip=false
+        To rebuild both:         mvn test-compile -Dblotter.build.skip=false -Dconfig.build.skip=false
+      -->
       <plugin>
         <groupId>com.github.eirslett</groupId>
         <artifactId>frontend-maven-plugin</artifactId>
         <version>1.15.1</version>
         <configuration>
+          <!-- Default working directory (overridden per execution below) -->
           <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
           <!-- Node binaries land here — gitignored, not system-wide -->
           <installDirectory>${project.basedir}/.node</installDirectory>
           <nodeVersion>v20.18.1</nodeVersion>
-          <skip>${blotter.build.skip}</skip>
         </configuration>
         <executions>
+
+          <!-- ── PT-Blotter SPA ─────────────────────────────────────────── -->
           <execution>
             <id>install-node-and-npm</id>
             <goals><goal>install-node-and-npm</goal></goals>
             <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+              <skip>${blotter.build.skip}</skip>
+            </configuration>
           </execution>
           <execution>
             <id>npm-install-blotter</id>
             <goals><goal>npm</goal></goals>
             <phase>generate-test-resources</phase>
             <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
               <arguments>install</arguments>
+              <skip>${blotter.build.skip}</skip>
             </configuration>
           </execution>
           <execution>
@@ -284,9 +312,43 @@
             <goals><goal>npm</goal></goals>
             <phase>test-compile</phase>
             <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
               <arguments>run build</arguments>
+              <skip>${blotter.build.skip}</skip>
             </configuration>
           </execution>
+
+          <!-- ── Config Service UI ──────────────────────────────────────── -->
+          <execution>
+            <id>install-node-and-npm-config</id>
+            <goals><goal>install-node-and-npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-config</workingDirectory>
+              <skip>${config.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-install-config</id>
+            <goals><goal>npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-config</workingDirectory>
+              <arguments>install</arguments>
+              <skip>${config.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-build-config</id>
+            <goals><goal>npm</goal></goals>
+            <phase>test-compile</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-config</workingDirectory>
+              <arguments>run build</arguments>
+              <skip>${config.build.skip}</skip>
+            </configuration>
+          </execution>
+
         </executions>
       </plugin>
 

@@ -177,6 +177,13 @@ public final class MockBlotterServer {
                         .withHeader("Content-Type", "application/json")
                         .withBody(quoteBody())));
 
+        // POST /api/inquiry/{id}/release → 200 RELEASED
+        server.stubFor(post(urlPathMatching("/api/inquiry/.*/release"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"status\":\"RELEASED\"}")));
+
         // ── 404: unknown trader (higher priority = checked first) ─────────────
         server.stubFor(post(urlEqualTo("/submit"))
                 .withRequestBody(containing("\"trader_id\":\"UNKNOWN_TRADER\""))
@@ -265,7 +272,7 @@ public final class MockBlotterServer {
         return String.format("""
                 {
                   "portfolio_id":       "%s",
-                  "trader_id":          "roshkao",
+                  "trader_id":          "doej",
                   "status":             "SUBMITTED",
                   "currency":           "USD",
                   "desk":               "FIXED_INCOME",

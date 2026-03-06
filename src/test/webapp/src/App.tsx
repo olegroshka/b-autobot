@@ -4,7 +4,7 @@ import type { Inquiry, RefSource, RefSide, Units } from './types'
 // RefSource/RefSide/Units are used by the Toolbar callback signature below
 import BlotterGrid from './BlotterGrid'
 import Toolbar from './Toolbar'
-import { sendQuote } from './api'
+import { sendQuote, releasePt } from './api'
 import { computeApplied, formatPricingAction } from './priceUtils'
 import { applyGridFilter, formatFilterText } from './filterUtils'
 import './App.css'
@@ -26,6 +26,12 @@ export default function App() {
   const [selectedCount, setSelectedCount] = useState(0)
   const [filterText,    setFilterText]    = useState('')
   const [clock, setClock] = useState('')
+  const [isPTAdmin, setIsPTAdmin] = useState(false)
+
+  // Read user and configUrl from URL params
+  const searchParams = new URLSearchParams(window.location.search)
+  const user      = searchParams.get('user')      ?? 'trader'
+  const configUrl = searchParams.get('configUrl') ?? ''
 
   useEffect(() => {
     const tick = () => setClock(new Date().toLocaleTimeString('en-GB', { hour12: false }))
@@ -33,6 +39,19 @@ export default function App() {
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
   }, [])
+
+  // Fetch isPTAdmin from config service on mount
+  useEffect(() => {
+    const url = `${configUrl}/api/config/credit.pt.access/Permissions/${user}`
+    fetch(url)
+      .then(r => r.ok ? r.json() : null)
+      .then((data: { isPTAdmin?: boolean } | null) => {
+        if (data && typeof data.isPTAdmin === 'boolean') {
+          setIsPTAdmin(data.isPTAdmin)
+        }
+      })
+      .catch(() => { /* config service unavailable — default to non-admin */ })
+  }, [user, configUrl])
 
   const handleGridReady = useCallback((api: GridApi<Inquiry>) => {
     gridApiRef.current = api
@@ -117,6 +136,26 @@ export default function App() {
     }
   }, [])
 
+  // ── RELEASE PT ────────────────────────────────────────────────────────────
+
+  const handleReleasePt = useCallback(async () => {
+    const api = gridApiRef.current
+    if (!api) return
+
+    const selected = api.getSelectedRows()
+
+    for (const row of selected) {
+      try {
+        await releasePt(row.id)
+        api.applyTransaction({
+          update: [{ ...row, status: 'RELEASED' }],
+        })
+      } catch (err) {
+        console.error('RELEASE PT failed for inquiry', row.id, err)
+      }
+    }
+  }, [])
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -138,6 +177,8 @@ export default function App() {
         onSend={handleSend}
         filterText={filterText}
         onFilterChange={handleFilterChange}
+        isReleasePtEnabled={isPTAdmin}
+        onReleasePt={handleReleasePt}
       />
 
       <main className="blotter-main">

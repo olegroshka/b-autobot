@@ -238,3 +238,43 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     And I press SEND
     Then the row with ISIN "GB0031348658" should have status "QUOTED"
     And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
+
+  # ──────────────────────────────────────────────────────────────────────────────
+  # M8 — RELEASE PT access control + workflow  [UNHIT — fails until Vite build runs]
+  # Goal: RELEASE PT button respects isPTAdmin from config service;
+  #       admin can move rows to RELEASED status.
+  # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"
+  # ──────────────────────────────────────────────────────────────────────────────
+
+  @m8 @access
+  Scenario: RELEASE PT button is not accessible when doej isPTAdmin flag is false
+    Given the PT-Blotter is open as user "doej"
+    Then the RELEASE PT button should be disabled
+
+  @m8 @access
+  Scenario: RELEASE PT button is accessible when smithj isPTAdmin flag is true
+    Given the PT-Blotter is open as user "smithj"
+    Then the RELEASE PT button should be enabled
+
+  @m8 @workflow
+  Scenario: smithj releases a row — status becomes RELEASED
+    Given the PT-Blotter is open as user "smithj"
+    When I select the row with ISIN "US912828YJ02"
+    And I press RELEASE PT
+    Then the row with ISIN "US912828YJ02" should have status "RELEASED"
+
+  @m8 @workflow
+  Scenario: Release PT does not affect rows not selected by smithj
+    Given the PT-Blotter is open as user "smithj"
+    When I select the row with ISIN "US912828YJ02"
+    And I press RELEASE PT
+    Then the row with ISIN "XS2346573523" should have status "PENDING"
+
+  @m8 @workflow
+  Scenario: smithj releases multiple rows simultaneously
+    Given the PT-Blotter is open as user "smithj"
+    When I select the row with ISIN "US912828YJ02"
+    And I select the row with ISIN "XS2346573523"
+    And I press RELEASE PT
+    Then the row with ISIN "US912828YJ02" should have status "RELEASED"
+    And the row with ISIN "XS2346573523" should have status "RELEASED"

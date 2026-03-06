@@ -18,7 +18,7 @@ import java.util.List;
  * <pre>{@code
  * {
  *   "portfolio_id": "PF-20250303-001",
- *   "trader_id":    "roshkao",
+ *   "trader_id":    "doej",
  *   "submitted_at": "2025-03-03T22:00:00Z",
  *   "currency":     "USD",
  *   "status":       "PENDING",

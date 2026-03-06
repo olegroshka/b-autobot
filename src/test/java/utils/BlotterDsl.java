@@ -35,8 +35,22 @@ public final class BlotterDsl {
 
     // ── Navigation ─────────────────────────────────────────────────────────────
 
+    /** Opens the blotter as the default 'trader' user (non-admin). */
     public void openBlotter() {
-        page.navigate(MockBlotterServer.getBlotterUrl());
+        openBlotter("trader");
+    }
+
+    /**
+     * Opens the blotter as the given user, passing {@code configUrl} so the app
+     * can fetch {@code isPTAdmin} from {@link MockConfigServer}.
+     *
+     * @param user  e.g. {@code "trader"} or {@code "algo_trader"}
+     */
+    public void openBlotter(String user) {
+        String url = MockBlotterServer.getBlotterUrl()
+                + "?user=" + user
+                + "&configUrl=" + MockConfigServer.getBaseUrl();
+        page.navigate(url);
         // Wait for AG Grid to render the first data row.
         // type="module" scripts are deferred, so DOMCONTENTLOADED fires before React runs;
         // waiting for a rendered row guarantees the grid is fully initialised.
@@ -220,6 +234,18 @@ public final class BlotterDsl {
 
     public void pressMarkupMinus() {
         page.locator("button[aria-label='Decrease Markup']").click();
+    }
+
+    public void pressReleasePt() {
+        page.locator("button[aria-label='Release PT']").click();
+    }
+
+    public void assertReleasePtEnabled() {
+        assertThat(page.locator("button[aria-label='Release PT']")).isEnabled();
+    }
+
+    public void assertReleasePtDisabled() {
+        assertThat(page.locator("button[aria-label='Release PT']")).isDisabled();
     }
 
     // ── M4 — Markup input assertion ────────────────────────────────────────────

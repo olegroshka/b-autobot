@@ -1,14 +1,12 @@
-# PT-Blotter Design — Approach Analysis
+# PT-Blotter Design
 
-Fixed income bond portfolio trading blotter: design options for a realistic mock
-that (a) demonstrates real trading workflow and (b) drives b-autobot BDD regression
-testing with a clean DSL.
+Fixed income bond portfolio trading blotter for the b-autobot BDD regression suite.
+Built with **React 18 + AG Grid + Vite**, served by an embedded WireMock server, with
+a companion **Config Service** that gates access to privileged actions via `isPTAdmin`.
 
 ---
 
-## What the blotter must do
-
-### Workflow (the thing we are actually testing)
+## Trading Workflow
 
 ```
 ION channel / REST API
@@ -23,1037 +21,253 @@ ION channel / REST API
   Uses toolbar:
     • Source   — TW / CP+ / CBBT
     • Side     — Bid / Ask / Mid
-    • Markup   — [−][  value  ][+]  (numeric, step depends on units)
+    • Markup   — [−][  value  ][+]  (numeric; step = 1 for c, 1 for bp)
     • Units    — c (price points)  or  bp (basis points)
         │
         ▼
   Presses APPLY  ──►  Price / Spread columns recalculated on row
         │
         ▼
-  Presses SEND   ──►  Row status → QUOTED,  Sent Price / Sent Spread snapshot taken
+  Presses SEND   ──►  Row status → QUOTED, Sent Price / Sent Spread snapshot taken
         │
-        │  Row stays fully editable — trader can re-APPLY a new skew,
-        │  see the updated Price / Spread, then press SEND again.
-        │  Each SEND refreshes Sent Price / Sent Spread.
+        │  Row stays fully editable — re-APPLY → re-SEND refreshes the snapshot.
+        │
+        ▼  (admin only — isPTAdmin = true, fetched from Config Service on startup)
+  Presses RELEASE PT ──►  Row status → RELEASED
 ```
-
-### Column layout
-
-| Column group | Columns |
-|---|---|
-| Identity | Checkbox, ISIN, Description, Maturity, Coupon, Notional, Side, Client |
-| Status | Status (PENDING / QUOTED / DONE / MISSED) |
-| TradeWeb (TW) | TW Price *(ticking, "bid / ask")*, TW Spread *(ticking, "bid / ask")* |
-| Bloomberg CP+ | CP+ Price *(ticking, "bid / ask")*, CP+ Spread *(ticking, "bid / ask")* |
-| Bloomberg CBBT | CBBT Price *(ticking, "bid / ask")*, CBBT Spread *(ticking, "bid / ask")* |
-| Toolbar (top) | Source (TW/CP+/CBBT), Side (Bid/Ask/Mid), Markup [−][val][+], Units (c/bp) |
-| Applied values | Price, Spread |
-| Sent snapshot | Sent Price, Sent Spread |
-
-### Mock data sources
-- Price simulation: `setInterval` with Gaussian noise around mid — no external feed needed.
-- ION inquiry: `POST /api/inquiry` via WireMock stub (or a "Simulate ION" button).
-- Quote submission: `POST /api/inquiry/{id}/quote` — WireMock confirms, updates row status.
 
 ---
 
-## Approach 1 — Vanilla AG Grid + WireMock static files
+## Column Layout
 
-### Stack
-- **AG Grid Community Edition** loaded from a local npm bundle or embedded CDN-equivalent
-- Pure HTML + vanilla JavaScript — no React, no Webpack, no build step for the page itself
-- Served as a **WireMock static file** (`src/test/resources/wiremock/__files/blotter.html`)
-- `setInterval`-driven price simulation in-page
-- REST endpoints (`POST /api/inquiry`, `POST /api/inquiry/{id}/quote`) as WireMock stubs
-- ION simulation: a "Simulate RFQ" button that calls the same POST stub
+| Column group    | Columns                                                                         |
+|-----------------|---------------------------------------------------------------------------------|
+| Identity        | Checkbox, Portfolio ID, PT Line ID, ISIN, Description, Maturity, Coupon, Notional, Side, Client |
+| Status          | Status (PENDING / QUOTED / DONE / MISSED / RELEASED)                           |
+| TradeWeb (TW)   | TW Price *(ticking, "bid / ask")*, TW Spread *(ticking, "bid / ask")*          |
+| Bloomberg CP+   | CP+ Price *(ticking, "bid / ask")*, CP+ Spread *(ticking, "bid / ask")*        |
+| Bloomberg CBBT  | CBBT Price *(ticking, "bid / ask")*, CBBT Spread *(ticking, "bid / ask")*      |
+| Applied values  | Pricing Action, Price, Spread                                                   |
+| Sent snapshot   | Sent Price, Sent Spread                                                         |
 
-### How it fits into the existing Maven project
+---
+
+## Stack
+
+| Component        | Technology                                                  |
+|------------------|-------------------------------------------------------------|
+| Blotter frontend | React 18 + AG Grid React (`ag-grid-react`) + Vite           |
+| Price simulation | `setInterval` with Gaussian noise at ~400 ms               |
+| REST mock        | WireMock (embedded, dynamic port)                           |
+| Config Service   | JDK `com.sun.net.httpserver.HttpServer` (in-memory store)  |
+| Config UI        | React 18 + Vite (served by MockConfigServer at /config-service/) |
+
+---
+
+## Directory Layout
 
 ```
 src/test/
+├── java/
+│   ├── stepdefs/
+│   │   ├── BondBlotterSteps.java    # Delegates 100% to BlotterDsl
+│   │   ├── ConfigServiceSteps.java  # Config Service step defs (Playwright-free)
+│   │   └── Hooks.java               # @BeforeAll/@AfterAll — starts MockBlotterServer + MockConfigServer
+│   └── utils/
+│       ├── BlotterDsl.java          # All Playwright interactions for the blotter
+│       ├── BlotterDevServer.java    # Standalone launcher for manual exploration
+│       ├── ConfigServiceDsl.java   # JDK HttpClient wrapper for Config Service REST API
+│       ├── ConfigDevServer.java    # Standalone launcher for Config Service + UI
+│       ├── MockBlotterServer.java  # Embedded WireMock + PT-Blotter REST stubs
+│       └── MockConfigServer.java   # Config microservice (JDK HttpServer, in-memory)
 ├── resources/
-│   ├── wiremock/
-│   │   ├── __files/
-│   │   │   └── blotter.html          ← served at http://localhost:{port}/blotter.html
-│   │   └── mappings/
-│   │       ├── inquiry-post.json
-│   │       └── inquiry-quote-post.json
-│   └── features/
-│       └── BondBlotter.feature       ← new Cucumber scenarios
-└── java/
-    └── stepdefs/
-        └── BondBlotterSteps.java     ← new step definitions
+│   ├── features/
+│   │   ├── BondBlotter.feature     # M0–M8 blotter scenarios (38 scenarios)
+│   │   └── ConfigService.feature   # Config Service REST API scenarios (14 scenarios)
+│   ├── config-service-ui/          # Vite build output for Config UI (git-committed)
+│   └── wiremock/__files/blotter/   # Vite build output for PT-Blotter (git-committed)
+├── webapp/                          # PT-Blotter React app source
+│   └── src/
+│       ├── App.tsx                  # Main grid + APPLY / SEND / RELEASE PT handlers
+│       ├── Toolbar.tsx              # Toolbar: Source / Side / Markup / Units / APPLY / SEND / RELEASE PT
+│       ├── PriceSimulator.ts        # Gaussian-noise ticking at ~400 ms
+│       ├── filterUtils.ts           # Column-specific filter parsing ("Portfolio:..." etc.)
+│       ├── api.ts                   # releasePt(), postQuote(), fetchInquiries()
+│       └── types.ts                 # Inquiry, Status (PENDING/QUOTED/DONE/MISSED/RELEASED), AppliedConfig
+└── webapp-config/                   # Config Service React app source
+    └── src/
+        ├── App.tsx                  # Namespace panel + type dropdown + config entry CRUD
+        ├── api.ts                   # fetchNamespaces, fetchTypes, fetchConfig, saveConfig, deleteConfig
+        └── types.ts                 # ConfigValue = string | number | boolean
 ```
-
-WireMock already starts in `@BeforeAll` (Hooks.java). Serving static HTML costs zero
-additional infrastructure — just drop `blotter.html` in `__files/`.
-
-### Pros
-
-| # | Pro |
-|---|---|
-| 1 | **Zero new infrastructure.** WireMock + existing Maven lifecycle. No separate server process to manage. |
-| 2 | **No build toolchain for the page.** AG Grid CE loads from a bundled JS file (copy once from npm). No Webpack/Vite/node_modules involved in CI. |
-| 3 | **Maximum determinism.** Everything mocked, no internet needed, reproducible in CI. |
-| 4 | **Familiar locator patterns.** Same `.ag-center-cols-container [row-index='N'] [col-id='X']` patterns, same probes, same `GridHarness`. Zero friction for b-autobot. |
-| 5 | **Fastest to iterate.** Change `blotter.html`, refresh browser — instant feedback. |
-| 6 | **Self-contained.** The entire mock lives inside the Maven project. Clone + `mvn verify` works everywhere. |
-| 7 | **AG Grid CE is fully capable.** Row selection, custom cell renderers, `enableCellChangeFlash`, `applyTransactionAsync` for ticking — all free, all in vanilla JS. |
-
-### Cons
-
-| # | Con |
-|---|---|
-| 1 | **Vanilla JS maintenance.** A complex workflow (dropdown state, APPLY logic, SEND transitions) gets verbose without a component framework. Manageable with clean modules but not as ergonomic as React. |
-| 2 | **No hot-module reload.** Edit → hard refresh. Slow when iterating on the page layout. |
-| 3 | **Cell editing UX.** Custom in-cell editors (skew input, ref source dropdown) require more boilerplate in vanilla JS than in React. |
-| 4 | **AG Grid vanilla API differences.** Older/community AG Grid docs mix framework examples; vanilla JS examples are fewer. |
-
-### Complexity: LOW. Fits current project perfectly.
 
 ---
 
-## Approach 2 — React + AG Grid CE + Vite (Finance Demo pattern)
+## Config Service
 
-### Stack
-- **React 18 + AG Grid React component** (`ag-grid-react`)
-- **Vite** for local development (HMR) and production build
-- **Express + ws** (or Vite's own dev server) for simulated WebSocket price feed
-- Build output (`dist/`) copied into `src/test/resources/static/` and served from embedded Jetty
-- WireMock stubs handle REST endpoints (`/api/inquiry`, `/api/inquiry/:id/quote`)
+### REST API
 
-### How it fits
+| Method   | Path                              | Description                          |
+|----------|-----------------------------------|--------------------------------------|
+| `GET`    | `/api/config`                     | List all namespaces (JSON array)     |
+| `GET`    | `/api/config/{ns}`                | List types under namespace           |
+| `GET`    | `/api/config/{ns}/{type}`         | All keys + values under type         |
+| `GET`    | `/api/config/{ns}/{type}/{key}`   | Single entry (JSON object)           |
+| `PUT`    | `/api/config/{ns}/{type}/{key}`   | Create or update entry               |
+| `DELETE` | `/api/config/{ns}/{type}/{key}`   | Remove entry                         |
+
+Static files: `GET /config-service/**` → served from `src/test/resources/config-service-ui/`
+
+### Seed Data
+
+| Namespace          | Type          | Key       | Values                                              |
+|--------------------|---------------|-----------|-----------------------------------------------------|
+| `credit.pt.access` | `Permissions` | `doej`    | `{"isPTAdmin": false}`                              |
+| `credit.pt.access` | `Permissions` | `smithj`  | `{"isPTAdmin": true}`                               |
+| `credit.pt.access` | `Permissions` | `patelv`  | `{"isPTAdmin": false}`                              |
+| `credit.pt.access` | `Permissions` | `nguyenl` | `{"isPTAdmin": true}`                               |
+| `credit.booking`   | `Settings`    | `default` | `{"autoBook": false, "bookingDesk": "FIXED_INCOME"}`|
+| `credit.risk`      | `Limits`      | `default` | `{"maxNotional": 50000000, "alertThreshold": 0.9}` |
+| `market.data`      | `Sources`     | `default` | `{"primary": "TW", "fallback": "CP+"}`              |
+
+### Blotter Integration
+
+The blotter fetches `isPTAdmin` on startup using URL parameters:
 
 ```
-src/
-├── main/web/                         ← React app source (new top-level directory)
-│   ├── src/
-│   │   ├── BlotterGrid.tsx
-│   │   ├── PriceSimulator.ts
-│   │   └── App.tsx
-│   ├── package.json
-│   └── vite.config.ts
-└── test/
-    ├── resources/
-    │   └── static/                   ← Vite build output (git-committed or built in Maven)
-    └── java/
-        └── utils/
-            └── BlotterServer.java    ← embedded Jetty serving static/
+http://localhost:{wiremockPort}/blotter/?user=smithj&configUrl=http://localhost:{configPort}
 ```
 
-Maven `generate-test-resources` phase runs `npm run build`, output lands in
-`src/test/resources/static/`, Jetty starts in `@BeforeAll`.
-
-### Pros
-
-| # | Pro |
-|---|---|
-| 1 | **React component model.** Complex workflow UI (dropdown → input → button state) is much cleaner as composable React components than vanilla JS. |
-| 2 | **AG Grid React component.** First-class citizen — same as the Finance Demo we already target. Identical internal structure, same Playwright locators work immediately. |
-| 3 | **HMR during development.** `npm run dev` gives instant feedback when building the blotter UI. |
-| 4 | **Most realistic mock.** Mirrors how real production React trading UIs are built. Maximises the value of the tests as regression evidence for a production system. |
-| 5 | **Vite is tiny.** Build toolchain is minimal compared to Webpack-era setups. `npm run build` in ~5 s. |
-| 6 | **Extensible.** Adding a new column, a new ref source, a new button is a one-file React component change. |
-
-### Cons
-
-| # | Con |
-|---|---|
-| 1 | **Node.js required in CI.** Every build agent needs Node.js + npm. Adds a prerequisite not currently in the project. |
-| 2 | **Two runtimes to manage.** JVM (Maven/WireMock/Jetty) + Node.js (Vite build). Maven exec plugin can call `npm run build` but adds complexity. |
-| 3 | **Build step on every change.** Need to rebuild and re-deploy for test changes to take effect. Adds 10–30 s to the test-compile cycle. |
-| 4 | **Committed build output dilemma.** Either commit `dist/` to git (messy) or rebuild it in Maven (requires Node.js in CI). |
-| 5 | **More moving parts = more points of failure.** Broken npm dep, Vite version clash, or Jetty port conflict breaks the test suite for non-JS reasons. |
-| 6 | **React fibre still needs to be traversed.** The Finance Demo pattern means AG Grid API still isn't on `window` — we already have that solved, but it's worth noting the pattern continues. |
-
-### Complexity: MEDIUM. Best balance of realism and engineering effort.
+If `isPTAdmin` is `true`, the **RELEASE PT** button is enabled.
+Tests pass `?user=` and `?configUrl=` via `BlotterDsl.openBlotter(String user)`.
 
 ---
 
-## Approach 3 — FINOS VUU (fork / adapt)
+## APPLY Formula
 
-### Stack
-- **VUU** (contributed by UBS, FINOS incubating): TypeScript React frontend + Scala/Java backend
-- Custom React grid built for 1M+ rows / 100k ticks per second
-- WebSocket (ViewServer protocol) for streaming
-- Server-side filtering, sorting, virtualization
-- Would require: running Scala ViewServer, adapting VUU blotter layouts, bridging WireMock
+```
+price  = refCell[bid|ask|mid] + markup    (units = c — price points)
+spread = refCell[bid|ask|mid] + markup    (units = bp — basis points)
+```
 
-### Research findings
-- VUU's grid is **not AG Grid** — it is a custom React component optimised for extreme data volumes
-- Production use at UBS for real trading blotter workloads
-- Incubating FINOS project — active but API is not stable
-- Full stack: Java/Scala ViewServer + TypeScript React frontend
-- Demo live at `demo.vuu.finos.org`
+`refCell` is the bid or ask side of the combined `"bid / ask"` string for the selected
+reference source, or the arithmetic mean for Mid.
 
-### Pros
-
-| # | Pro |
-|---|---|
-| 1 | **Production-proven for exactly this use case.** Built by UBS specifically for trading blotter workflows. |
-| 2 | **Extreme scalability.** Server-side streaming, virtualization — can handle real bond universe sizes (100k ISINs). |
-| 3 | **Pre-built trading UI patterns.** Column groups, instrument search, blotter layouts already designed for FI trading. |
-| 4 | **FINOS backing.** Open-source, governance, active community around FinTech use cases. |
-
-### Cons
-
-| # | Con |
-|---|---|
-| 1 | **Not AG Grid.** Our entire probe architecture (`window.agGridProbes`, `GridHarness`, locator patterns) targets AG Grid DOM structure. VUU's custom grid has entirely different DOM — all probes need rewriting. |
-| 2 | **Scala backend required.** VUU's ViewServer is Scala. Adding a Scala process to the Maven test lifecycle is a significant infrastructure change. |
-| 3 | **Incubating / unstable API.** VUU is not v1.0. Upgrading risks breaking the blotter layer. |
-| 4 | **Forking is a maintenance burden.** VUU is a full application, not a library. Customising it means diverging from upstream and absorbing all maintenance. |
-| 5 | **Massively overengineered for a mock.** We need a test target, not a production trading system. VUU's 1M-row / 100k-tick capability is irrelevant at mock scale. |
-| 6 | **Completely different tech stack.** TypeScript + Scala + ViewServer protocol — zero code reuse from the existing b-autobot framework. |
-
-### Complexity: HIGH. Misaligned with goals.
+After APPLY, `appliedConfig` is stored on the row. The price simulator re-derives
+`price`/`spread` on every 400 ms tick — the computed value continuously tracks live
+reference prices until the row reaches DONE / MISSED (not cleared by SEND).
 
 ---
 
-## Side-by-side comparison
+## Milestone Status
 
-| Criterion | Approach 1: Vanilla AG Grid | Approach 2: React + Vite | Approach 3: FINOS VUU |
-|---|---|---|---|
-| New infrastructure | None | Node.js + embedded Jetty | Scala + Node.js |
-| Build step | None (static HTML) | `npm run build` | Scala sbt + npm |
-| AG Grid locator reuse | Full — identical DOM | Full — identical DOM | None — different grid |
-| Probe reuse | Full | Full | None |
-| Time to first running mock | ~1 day | ~2–3 days | ~1–2 weeks |
-| UI maintainability | Moderate (vanilla JS) | High (React components) | High (but diverged fork) |
-| Realistic workflow | Yes | Yes | Yes |
-| CI simplicity | High | Medium | Low |
-| Bond trading fidelity | Sufficient for testing | Very good | Production-grade (overkill) |
-| Recommended for this project | **Yes (MVP)** | **Yes (evolved)** | No |
+| Milestone | Goal                                        | Scenarios | Status |
+|-----------|---------------------------------------------|-----------|--------|
+| M0        | Page loads                                  | 1         | ✓ Done |
+| M1        | Grid columns + seed rows                    | 2         | ✓ Done |
+| M2        | Ticking TW / CP+ / CBBT prices             | 3         | ✓ Done |
+| M3        | REST inquiry API                            | 2         | ✓ Done |
+| M4        | Toolbar APPLY (price + spread)              | 6         | ✓ Done |
+| M5        | SEND → QUOTED + sentPrice snapshot          | 3         | ✓ Done |
+| M6        | Multi-row APPLY / SEND                      | 3         | ✓ Done |
+| M7        | End-to-end DSL re-quote workflow            | 1         | ✓ Done |
+| M8        | RELEASE PT access control + workflow        | 5         | ✓ Done |
+| Config    | Config Service REST API + CRUD              | 14        | ✓ Done |
 
----
-
-## Recommendation (revised)
-
-### Why Approach 1 (vanilla HTML) was initially attractive but is the wrong call
-
-The original argument for Approach 1 rested on "zero new infrastructure — no Node.js needed."
-That argument is **already invalid**: the project added `src/test/js/` with `package.json`
-and Jest in the previous session, making Node.js a first-class prerequisite.  The main
-pillar of Approach 1 is gone.
-
-What you actually get with a monolithic `blotter.html`:
-
-- **AG Grid vanilla cell renderers** for ticking cells, status badges, dropdowns — these
-  exist in AG Grid CE vanilla JS but are significantly more boilerplate than their React
-  equivalents.  AG Grid's docs and examples are 90% React/Angular biased.
-- **Complex per-row state** (dropdown for ref source + convention + side, number input for
-  skew, derived applied prices) spread across `<script>` tags with no component boundaries —
-  a spaghetti attractor.
-- **Re-inventing React patterns badly** — because what the blotter needs (component state,
-  controlled inputs, derived computed values, row-level status machine) is exactly what
-  React was designed for.
-
-### Chosen approach: Approach 2 — React + AG Grid CE + Vite, from day 1
-
-| Prerequisite already met | Why |
-|---|---|
-| Node.js | Required by `src/test/js/` Jest probe tests |
-| npm exec in Maven | `exec-maven-plugin` already in pom.xml |
-| AG Grid DOM patterns | React AG Grid renders identical `[row-index]`/`[col-id]` DOM |
-| WireMock static file serving | `__files/` folder already used — serves Vite `dist/` with no extra server |
-
-The serving architecture requires **no new Java server**:
-
-```
-mvn test-compile
-  └── exec-maven-plugin: npm run build  (Vite)
-        └── dist/ → src/test/resources/wiremock/__files/blotter/
-
-mvn verify
-  └── @BeforeAll: MockBlotterServer.start()  (WireMock, already exists)
-        └── Playwright navigates to http://localhost:{wiremockPort}/blotter/index.html
-        └── REST stubs at /api/inquiry, /api/inquiry/{id}/quote
-```
-
-### Approach 3: Do not use
-
-VUU is excellent engineering but it is a full trading platform, not a test target.
-The grid is not AG Grid (all probe work would need rewriting) and the Scala backend
-is a disproportionate infrastructure commitment for a mock. Not the right tool.
-
----
-
-## Proposed column schema
-
-```
-┌─ TOOLBAR ──────────────────────────────────────────────────────────────────┐
-│  [Source TW|CP+|CBBT]  [Side Bid|Ask|Mid]  [−][markup][+]  [c|bp]          │
-│  [APPLY ▶]  [SEND ►]                            N selected                  │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-Checkbox | ISIN | Description | Maturity | Coupon | Notional | Side | Client
-Status: PENDING / QUOTED / DONE / MISSED
-TW Price*  ("bid / ask") | TW Spread*  ("bid_spread / ask_spread")
-CP+ Price* ("bid / ask") | CP+ Spread* ("bid_spread / ask_spread")
-CBBT Price*("bid / ask") | CBBT Spread*("bid_spread / ask_spread")
-Price | Spread
-Sent Price | Sent Spread
-
-* ticking cells — ag-cell-data-changed flash enabled; single cell shows "bid / ask" combined
-  Skew controls are toolbar-only — NOT stored as per-row grid columns.
-```
-
-## Proposed REST contract (WireMock stubs)
-
-```
-POST /api/inquiry
-  Request:  { isin, description, notional, side, client }
-  Response: 201 { inquiry_id, status: "PENDING", ... }
-
-POST /api/inquiry/{id}/quote
-  Request:  { price, spread, sent_price, sent_spread, ref_source, convention, skew }
-  Response: 200 { inquiry_id, status: "QUOTED", sent_price, sent_spread, timestamp }
-
-GET  /api/inquiries
-  Response: 200 [ ...all current inquiries ]
-
-POST /api/inquiry/unknown-isin  (WireMock priority stub)
-  Response: 404 { error: "ISIN not found" }
-```
-
-## Implementation plan (Approach 2 selected)
-
-### Directory layout
-
-```
-src/
-├── test/
-│   ├── webapp/                          ← Vite + React blotter app
-│   │   ├── src/
-│   │   │   ├── App.tsx                  ← root layout + toolbar (APPLY / SEND / CLEAR)
-│   │   │   ├── BlotterGrid.tsx          ← AG Grid component + column definitions
-│   │   │   ├── PriceSimulator.ts        ← setInterval Gaussian price feed
-│   │   │   ├── SkewControls.tsx         ← per-row ref source / convention / skew input
-│   │   │   ├── api.ts                   ← fetch wrappers for /api/inquiry endpoints
-│   │   │   └── types.ts                 ← Inquiry, RefSource, Convention, Status enums
-│   │   ├── index.html
-│   │   ├── package.json
-│   │   └── vite.config.ts               ← proxy /api → WireMock port in dev mode
-│   ├── resources/
-│   │   └── wiremock/
-│   │       ├── __files/
-│   │       │   └── blotter/             ← Vite build output (dist/)
-│   │       └── mappings/
-│   │           ├── inquiry-post.json
-│   │           ├── inquiry-quote-post.json
-│   │           ├── inquiry-unknown-isin.json  (priority stub → 404)
-│   │           └── inquiries-get.json
-│   └── java/
-│       └── stepdefs/
-│           └── BondBlotterSteps.java
-└── resources/
-    └── features/
-        └── BondBlotter.feature
-```
-
-### Maven wiring
-
-Add to `pom.xml` exec-maven-plugin (new execution, same plugin already present):
-```xml
-<execution>
-  <id>build-blotter-webapp</id>
-  <phase>test-compile</phase>
-  <goals><goal>exec</goal></goals>
-  <configuration>
-    <skip>${blotter.build.skip}</skip>   <!-- default false; set true for probe-only runs -->
-    <executable>npm</executable>
-    <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
-    <arguments><argument>run</argument><argument>build</argument></arguments>
-  </configuration>
-</execution>
-```
-
-Vite `outDir` set to `../../test/resources/wiremock/__files/blotter` so the build
-lands directly in WireMock's static file directory.
-
-### Development workflow
+**Current regression total: 51 / 51 passing**
 
 ```bash
-# Build once for Maven test runs
-cd src/test/webapp && npm install && npm run build
+# Full suite with Vite rebuild
+mvn verify -Dblotter.build.skip=false   # → 51/51
 
-# Live iteration with HMR (Vite proxies /api to WireMock)
-mvn test-compile -Dblotter.build.skip=true   # start WireMock only
-cd src/test/webapp && npm run dev             # Vite on :5173, /api → WireMock
-open http://localhost:5173
+# Config Service only (no build needed)
+mvn verify -Dcucumber.filter.tags="@config-service"   # → 14/14
 
-# Full regression run
-mvn verify
+# M8 access control + workflow (needs Vite build)
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"   # → 5/5
 ```
 
 ---
 
-## Milestone plan
+## Key Implementation Decisions
 
-### Guiding principles
+### `suppressColumnVirtualisation={true}`
 
-1. **Vertical slices, not horizontal layers.** Every milestone delivers a runnable,
-   testable increment — never "all the React components but no tests".
-2. **Unhit test first.** Each milestone opens by writing the Cucumber scenario(s).
-   Run them — they must fail (red).  Implement until they pass (green).  Do not advance
-   until green.
-3. **Regression guard is non-negotiable.** Every quality gate re-runs the full suite
-   (`mvn verify`).  A new passing scenario that breaks an old one is a failed gate.
-4. **Design contracts lock before code starts.** Column `col-id` names, REST URL shapes,
-   and status string values are agreed in this document and treated as frozen during
-   implementation.  Changing them is a major refactor, not a quick edit.
-5. **One milestone at a time.** Do not start M+1 while M quality gate is not green.
+AG Grid virtualises columns by default, removing off-screen column DOM nodes.
+Setting this to `true` keeps all columns in the DOM at all times so Playwright
+locators like `[col-id='sentPrice']` always resolve.
 
----
+### RELEASE PT — permission-only gate
 
-### Design contracts (frozen — agree before writing a line of code)
-
-These values appear in Gherkin features, Java step definitions, TypeScript types, and
-WireMock stubs simultaneously.  Changing one requires changing all four.
-
-#### AG Grid `col-id` names (stable identifiers used in probes + step defs)
-
-| Column | `col-id` | Notes |
-|---|---|---|
-| Select checkbox | `select` | |
-| Portfolio ID | `ptId` | e.g. `PT_BBG_20260306_3F7A`; groups line items by portfolio |
-| Line # | `ptLineId` | e.g. `PT_BBG_20260306_3F7A_1`; rendered as `1`, `2`, … |
-| ISIN | `isin` | |
-| Description | `description` | |
-| Maturity | `maturity` | |
-| Coupon | `coupon` | |
-| Notional | `notional` | |
-| Side | `side` | |
-| Client | `client` | |
-| Status | `status` | `PENDING` / `QUOTED` / `DONE` / `MISSED` |
-| TW Price | `twPrice` | Ticking; cell text = `"bid / ask"` e.g. `"99.0945 / 101.112"` |
-| TW Spread | `twSpread` | Ticking; cell text = `"bid_spread / ask_spread"` |
-| CP+ Price | `cpPrice` | Ticking; same combined format |
-| CP+ Spread | `cpSpread` | Ticking; same combined format |
-| CBBT Price | `cbbPrice` | Ticking; same combined format |
-| CBBT Spread | `cbbSpread` | Ticking; same combined format |
-| Price | `price` | Trader's applied price; updates on APPLY |
-| Spread | `spread` | Trader's applied spread; updates on APPLY |
-| Sent Price | `sentPrice` | Snapshot at last SEND; blank until first SEND |
-| Sent Spread | `sentSpread` | Snapshot at last SEND; blank until first SEND |
-
-#### Status values (string literals in feature files and TypeScript enums)
-
-`PENDING` · `QUOTED` · `DONE` · `MISSED`
-
-#### REST endpoints
-
-| Method | Path | Success |
-|---|---|---|
-| POST | `/api/inquiry` | 201 |
-| GET | `/api/inquiries` | 200 |
-| POST | `/api/inquiry/{id}/quote` | 200 |
-| POST | `/api/inquiry` with unknown ISIN | 404 |
-
-#### Price format
-- Reference prices: decimal with 4dp per side, combined cell `"bid / ask"` (e.g. `"99.0945 / 101.1120"`)
-- Reference spreads: same combined format for spread values (e.g. `"1.25 / 1.50"` in bp or decimal)
-- Skew in **Price** convention: decimal cents (e.g. `-0.25` = minus ¼ point)
-- Skew in **Spread** convention: integer basis points (e.g. `+5` = +5 bp)
-- `price` / `spread`: trader's current applied value, 4dp, updates on every APPLY
-- `sentPrice` / `sentSpread`: snapshot frozen at each SEND; blank until first SEND; updated on re-SEND
-
-#### Seed data (deterministic — same ISINs used in all feature files)
-
-| # | ISIN | Description | Coupon | Maturity | Notional | Side | Client |
-|---|---|---|---|---|---|---|---|
-| 1 | US912828YJ02 | UST 4.25% 2034 | 4.250 | 2034-11-15 | 10,000,000 | BUY | BLACKROCK |
-| 2 | XS2346573523 | EUR IG Corp 3.5% 2029 | 3.500 | 2029-03-20 | 5,000,000 | SELL | PIMCO |
-| 3 | US38141GXZ20 | Goldman Sachs 5.15% 2026 | 5.150 | 2026-05-22 | 8,000,000 | BUY | VANGUARD |
-| 4 | GB0031348658 | UK Gilt 1.25% 2027 | 1.250 | 2027-07-22 | 15,000,000 | SELL | FIDELITY |
-| 5 | FR0014004L86 | OAT 0.75% 2028 | 0.750 | 2028-05-25 | 7,500,000 | BUY | AMUNDI |
-
----
-
-### M0 — Build pipeline spine
-
-**Goal:** `mvn verify` compiles the React app, WireMock serves it, Playwright can navigate
-to the blotter URL, and all 12 existing scenarios still pass.  This is the highest-risk
-milestone — get it right before writing any blotter UI.
-
-**Deliverables:**
-- `src/test/webapp/` scaffolded (Vite + React-TS, minimal `index.html` saying "PT-Blotter")
-- `vite.config.ts` with `outDir: ../../test/resources/wiremock/__files/blotter`
-- `pom.xml` exec-maven-plugin execution: `npm run build` in `test-compile` phase
-- WireMock `mappings/blotter-static.json` stub: `GET /blotter/**` → serve from `__files/blotter/`
-- New Cucumber step: `Given the PT-Blotter is open` → navigates to `{wiremockUrl}/blotter/`
-
-**Unhit test (write first — must fail before M0 implementation):**
-```gherkin
-@blotter @smoke
-Scenario: PT-Blotter page loads
-  Given the PT-Blotter is open
-  Then the page title should contain "PT-Blotter"
+```tsx
+disabled={!isReleasePtEnabled}
 ```
 
-**Quality gate:**
+**Not** `disabled={selectedCount === 0 || !isReleasePtEnabled}`.
+The access-control test for `doej` asserts the button is disabled without selecting
+any rows. A selection gate would make the test ambiguous (permission vs selection).
+Clicking with zero selected rows is a no-op — the for-loop doesn't execute.
+
+### Config Service — zero new Maven dependencies
+
+Uses `com.sun.net.httpserver.HttpServer` (JDK built-in, Java 6+).
+No Jetty, no Spring, no embedded container — just a standard library class.
+
+### Vite fixed asset names
+
+```ts
+// vite.config.ts
+entryFileNames: 'assets/index.js',
+chunkFileNames: 'assets/[name].js',
+assetFileNames: 'assets/[name].[ext]',
+```
+
+WireMock stubs the JS/CSS by exact filename. Content-hash suffixes would break
+the stubs on every rebuild, so hashing is disabled.
+
+### `blotter.build.skip=true` default
+
+Vite assets are committed to git (`src/test/resources/wiremock/__files/blotter/`).
+Tests run against the committed build by default — no Node.js required in CI.
+Pass `-Dblotter.build.skip=false` to force a rebuild (e.g., after frontend changes).
+Same pattern applies to `-Dconfig.build.skip=false` for the Config Service UI.
+
+---
+
+## Running Interactively
+
+### PT-Blotter
+
 ```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @smoke"   # 1/1 NEW passing
-mvn verify                                                 # 13/13 total (12 old + 1 new)
+# 1. Build once
+mvn test-compile -Dblotter.build.skip=false
+
+# 2. Start WireMock mock server (port 9099)
+mvn exec:java -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test
+
+# 3a. Open pre-built page
+open http://localhost:9099/blotter/
+
+# 3b. Or use Vite dev server (live HMR)
+cd src/test/webapp
+VITE_WIREMOCK_PORT=9099 npm run dev
+# → http://localhost:5173/blotter/
 ```
 
-**Known risks:**
-- WireMock SPA fallback: React Router needs all unknown sub-paths to return `index.html`.
-  Mitigation: do NOT use React Router — single-page app, no client-side routing.
-- `npm run build` path resolution on Windows (forward vs back slashes in `outDir`).
-  Mitigation: use `path.resolve(__dirname, ...)` in `vite.config.ts`.
-- Maven exec plugin `npm` command not found on CI.
-  Mitigation: use full path or ensure Node.js is on `PATH`; document in README.
+### Config Service UI
 
-**Exit criteria:** Quality gate green. No WireMock port conflicts. Vite build artifact
-visible in `src/test/resources/wiremock/__files/blotter/`.
-
----
-
-### M1 — Grid structure visible
-
-**Goal:** AG Grid renders with all expected column groups and at least one seeded row.
-No ticking, no controls, no REST — just the grid skeleton and static data.
-
-**Deliverables:**
-- `BlotterGrid.tsx` with full column definition (all `col-id` values from design contracts)
-- Column groups: Identity, Status, TradeWeb, CP+, CBBT, Applied Values, Sent Snapshot
-- 5 seeded rows (design-contract seed data, hardcoded in component state for now)
-- Row checkbox selection enabled
-- All reference price cells display a static placeholder (e.g. `99.000`)
-
-**Unhit tests:**
-```gherkin
-@blotter @smoke
-Scenario: Blotter renders expected column groups
-  Given the PT-Blotter is open
-  Then the grid should display column "ptId"
-  And the grid should display column "ptLineId"
-  And the grid should display column "isin"
-  And the grid should display column "twPrice"
-  And the grid should display column "twSpread"
-  And the grid should display column "cpPrice"
-  And the grid should display column "cbbPrice"
-  And the grid should display column "price"
-  And the grid should display column "spread"
-  And the grid should display column "sentPrice"
-  And the grid should display column "sentSpread"
-  And the grid should display column "status"
-
-Scenario: Blotter loads with seeded inquiries
-  Given the PT-Blotter is open
-  Then the grid should have at least 5 rows
-  And the row with ISIN "US912828YJ02" should have status "PENDING"
-  And the row with ISIN "XS2346573523" should have status "PENDING"
-```
-
-**Quality gate:**
 ```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @smoke"   # 3/3 passing
-mvn verify                                                 # 15/15 total
+# 1. Build once
+mvn test-compile -Dconfig.build.skip=false
+
+# 2. Start Config Service backend (port 8090)
+mvn exec:java -Dexec.mainClass=utils.ConfigDevServer -Dexec.classpathScope=test
+
+# 3a. Open pre-built page
+open http://localhost:8090/config-service/
+
+# 3b. Or use Vite dev server (live HMR)
+cd src/test/webapp-config
+VITE_CONFIG_PORT=8090 npm run dev
+# → http://localhost:5174/config-service/
 ```
-
-**Known risks:**
-- AG Grid React `col-id` attribute only renders when `field` or `colId` is set in
-  `ColDef`.  Mitigation: always set `colId` explicitly in column definitions — never
-  rely on `field` name derivation.
-- Column group headers have a different DOM structure (`.ag-column-header`) than data
-  column headers — ensure `getHeaderCell(colId)` in `FinanceDemoPage` still works.
-
-**Exit criteria:** All column `col-id` attributes visible in DOM, confirmed by
-`assertColumnVisible(colId)` in the step def for each col in the design contract table.
-
----
-
-### M2 — Ticking reference prices
-
-**Goal:** TW, CP+, and CBBT combined price/spread cells update at ~400 ms intervals
-with Gaussian noise.  Each cell displays `"bid / ask"` as a single string.  The AG
-Grid flash animation fires on each update.  Values stay within a realistic range for
-each seeded bond.
-
-**Deliverables:**
-- `PriceSimulator.ts`: `setInterval`-based update engine, one mid-price per bond,
-  Gaussian noise (σ = 0.03 points), bid/ask spread of 0.125 pts
-- Cell values stored as combined strings: `"99.0945 / 101.1120"` — formatted in a
-  `valueFormatter` (not a custom cell renderer, so `getVisibleCellTexts` still works)
-- Price updates applied via `gridRef.current.api.applyTransactionAsync()`
-- `enableCellChangeFlash: true` on all six ref columns (`twPrice`, `twSpread`,
-  `cpPrice`, `cpSpread`, `cbbPrice`, `cbbSpread`)
-- Separate mid-spread simulation for spread columns; formatted as `"bp_bid / bp_ask"`
-
-**Unhit tests:**
-```gherkin
-@blotter @ticking
-Scenario: Reference price cells update within the live feed window
-  Given the PT-Blotter is open
-  When I wait up to 3 seconds for the "twPrice" cell in row 0 to change value
-  Then the "twPrice" cell in row 0 should match the pattern "NNN.NNNN / NNN.NNNN"
-
-Scenario: TW Price cell flashes on a live update
-  Given the PT-Blotter is open
-  When I wait for the "twPrice" cell in row 0 to flash
-  Then the "twPrice" cell in row 0 should have received at least one tick update
-
-Scenario: All three reference sources are ticking
-  Given the PT-Blotter is open
-  Then within 3 seconds the "cpPrice" cell in row 0 should change value
-  And within 3 seconds the "cbbPrice" cell in row 0 should change value
-```
-
-**Quality gate:**
-```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @ticking"  # 3/3 passing
-mvn verify                                                  # 18/18 total
-```
-
-**Known risks:**
-- Price simulation timing: `setInterval` at 400 ms means each scenario waits up to
-  ~800 ms (one missed tick plus jitter).  Use 3 s timeout budget — generous but not
-  flaky.  Never hard-code tick count expectations.
-- `applyTransactionAsync` batches updates — AG Grid may coalesce ticks.  Use
-  `waitForCellFlash` from existing `TickingCellHelper` as-is; it already handles both
-  flash mechanisms.
-- Seed mid-prices must be realistic for the instrument type (UST ~99, IG Corp ~101,
-  Gilts ~95 etc.) so assertions on "value in range" are stable.
-
-**Exit criteria:** `TickingCellHelper.waitForCellFlash` and `waitForCellUpdate`
-work against blotter cells without any changes to the existing helper class.
-
----
-
-### M3 — REST inquiry ingestion
-
-**Goal:** A new inquiry submitted via `POST /api/inquiry` appears as a new PENDING row
-in the blotter.  Unknown ISINs return 404.  `GET /api/inquiries` returns seeded data.
-
-**Deliverables:**
-- WireMock stubs: `inquiry-post.json`, `inquiry-unknown-isin.json` (priority 1 → 404),
-  `inquiries-get.json`
-- React: `useEffect` on mount calls `GET /api/inquiries` and merges with seed data
-- React: a "Simulate ION RFQ" button calls `POST /api/inquiry` and appends the new row
-- `api.ts` fetch wrapper; error surfaces in UI for 4xx responses
-
-**Unhit tests:**
-```gherkin
-@blotter @api
-Scenario: Inquiry submitted via API appears in blotter as PENDING
-  Given the PT-Blotter is open
-  When a new inquiry is submitted for ISIN "US38141GXZ20" notional "3000000" side "BUY" client "SCHRODERS"
-  Then the blotter should contain a row with ISIN "US38141GXZ20"
-  And that row should have status "PENDING"
-
-Scenario: Submission returns 201 with a non-blank inquiry ID
-  When a new inquiry is submitted for ISIN "GB0031348658" notional "2000000" side "SELL" client "INVESCO"
-  Then the API response status should be 201
-  And the response should contain a non-blank "inquiry_id"
-
-Scenario: Unknown ISIN is rejected with 404
-  When a new inquiry is submitted for ISIN "UNKNOWN-ISIN-XYZ"
-  Then the API response status should be 404
-```
-
-**Quality gate:**
-```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @api"  # 3/3 passing
-mvn verify                                              # 21/21 total
-```
-
-**Known risks:**
-- WireMock stub matching: the unknown-ISIN stub must use priority 1 and match on the
-  request body `isin` field.  Same pattern as the existing `UNKNOWN_TRADER` stub in
-  `MockBlotterServer` — copy that pattern.
-- React `fetch` to WireMock uses a relative URL (`/api/inquiry`).  WireMock must serve
-  the React app AND handle the API call on the same port — which it does since both come
-  from the same `MockBlotterServer` instance.
-- `GET /api/inquiries` response must be valid JSON array; WireMock stub body must not
-  be empty.
-
-**Exit criteria:** `PortfolioSteps` patterns reused wholesale in `BondBlotterSteps`
-for the REST assertions — no new REST infrastructure invented.
-
----
-
-### M4 — Toolbar: Ref Source / Ref Side / Markup ± / Units / APPLY
-
-**Goal:** Trader selects row(s), configures the top-of-page toolbar, and presses APPLY.
-The `price` column updates when units=`c`; the `spread` column updates when units=`bp`.
-Markup ± buttons provide fine-grained adjustment without touching the keyboard.
-
-**Toolbar layout (left → right):**
-```
-[Source: TW|CP+|CBBT]  [Side: Bid|Ask|Mid]  [−][markup input][+]  [c|bp]  [APPLY]  [SEND]  | N selected
-```
-
-**APPLY logic:**
-```
-ref_cell  = row[{source}Price]  if units='c'
-            row[{source}Spread] if units='bp'
-[bid, ask] = ref_cell.split(' / ').map(Number)
-anchor     = bid            if side='Bid'
-             ask            if side='Ask'
-             (bid+ask)/2    if side='Mid'
-computed   = anchor + markup
-row.price  = computed  if units='c'
-row.spread = computed  if units='bp'
-```
-
-**Deliverables:**
-- `Toolbar.tsx` + `Toolbar.css`: Source select, Side select, Markup input with [−][+]
-  buttons (step = 0.01 for c, 1 for bp), Units toggle (c / bp), APPLY + SEND buttons,
-  selection count badge
-- `App.tsx` APPLY handler implementing the formula above
-- `BlotterGrid.tsx` accepts `onGridReady` and `onSelectionChanged` callback props
-- `BlotterDsl.java` encapsulates all Playwright interaction (M7 contract met here)
-
-**Key aria-labels (used by Playwright locators):**
-| Element | aria-label |
-|---|---|
-| Source select | `Ref Source` |
-| Side select | `Ref Side` |
-| Markup input | `Markup Value` |
-| Decrement button | `Decrease Markup` |
-| Increment button | `Increase Markup` |
-| Units c button | `Units c` |
-| Units bp button | `Units bp` |
-| APPLY | `Apply` |
-| SEND | `Send` |
-
-**Unhit tests:**
-```gherkin
-@m4 @workflow
-Scenario: APPLY with units=c sets price from TW Mid reference
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  Then the "price" for ISIN "US912828YJ02" should be a numeric value
-
-Scenario: APPLY with units=bp sets spread from CP+ Bid reference
-  Given the PT-Blotter is open
-  When I select the row with ISIN "XS2346573523"
-  And I set the toolbar ref source "CP+" ref side "Bid" markup "0" units "bp"
-  And I press APPLY
-  Then the "spread" for ISIN "XS2346573523" should be a numeric value
-
-Scenario: Unselected row is not affected by APPLY
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  Then the "price" for ISIN "XS2346573523" should be blank
-
-Scenario: Markup plus button increments markup value
-  Given the PT-Blotter is open
-  When I press the markup plus button
-  Then the markup input should show a positive value
-
-Scenario: Markup minus button decrements markup value
-  Given the PT-Blotter is open
-  When I press the markup minus button
-  Then the markup input should show a negative value
-```
-
-**Step phrase (combined toolbar config):**
-```
-I set the toolbar ref source {string} ref side {string} markup {string} units {string}
-```
-
-**Quality gate:**
-```bash
-# Requires Vite build: mvn verify -Dblotter.build.skip=false
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m4"  # 5/5 passing
-# Regression guard — all non-build-required scenarios still pass:
-mvn verify "-Dcucumber.filter.tags=not @m1 and not @m2 and not @m4 and not @m5 and not @m6 and not @m7"
-```
-
-**Known risks:**
-- Ticking prices: the ref cell value changes between "I press APPLY" and any subsequent
-  assertion.  Assertions are "numeric value exists" not "exact value" — immune to ticking.
-- Pinned left columns: `select` and `isin` cols are `pinned: 'left'` → in
-  `.ag-pinned-left-cols-container`, not `.ag-center-cols-container`.  `BlotterDsl`
-  uses the correct container per col-id.
-- Checkbox click in AG Grid CE: target `input[type='checkbox']` inside the cell.
-
-**Exit criteria:** M4 quality gate green.  APPLY updates `price`/`spread` to a non-blank
-numeric value for selected rows only.  Markup ± buttons change the input value.
-
----
-
-### M5 — SEND and status machine
-
-**Goal:** SEND fires `POST /api/inquiry/{id}/quote`, row moves to QUOTED status,
-and the `sentPrice` / `sentSpread` columns are populated with the values from
-`price` / `spread` at that moment.  **The row stays fully editable** — trader can
-re-APPLY a new skew and press SEND again to update the sent values.
-
-**Deliverables:**
-- SEND button in toolbar (enabled only when ≥1 selected row has `price` / `spread` values)
-- On click: calls `POST /api/inquiry/{id}/quote` for each selected row with
-  `{ price, spread, sent_price: price, sent_spread: spread, ref_source, convention, skew }`
-- On 200 response:
-  - Row `status` → `QUOTED`
-  - Row `sentPrice` ← current `price`, `sentSpread` ← current `spread`
-- Row remains fully editable after SEND — all skew controls stay active, APPLY/SEND
-  still enabled; re-quoting is the expected workflow, not an error state
-- WireMock stub: `inquiry-quote-post.json` → `200 { inquiry_id, status: "QUOTED", sent_price, sent_spread, timestamp }`
-
-**Unhit tests:**
-```gherkin
-@m5 @workflow
-Scenario: SEND sets status to QUOTED
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  And I press SEND
-  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-
-Scenario: SEND captures sentPrice snapshot
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  And I press SEND
-  Then the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
-
-Scenario: Re-quote — APPLY then SEND twice updates sentPrice
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  And I press SEND
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0.5" units "c"
-  And I press APPLY
-  And I press SEND
-  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-  And the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
-```
-
-**Quality gate:**
-```bash
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m5"  # 3/3 passing
-```
-
-**Known risks:**
-- WireMock stub for `/api/inquiry/{id}/quote` must match any `{id}` path parameter.
-  Use WireMock URL regex pattern: `urlPathMatching("/api/inquiry/.*/quote")`.
-- Re-quote workflow changes `sentPrice`/`sentSpread` but not `price`/`spread` (those
-  only change on APPLY).  Assertion order matters: read `price` first, press SEND, then
-  assert `sentPrice` equals the previously read `price` value.
-- WireMock call count: in re-quote scenario, verify exactly 2 POST calls to `/quote`.
-
-**Exit criteria:** WireMock verifies the `/quote` stub was called with `price` and
-`spread` in the body.  Re-quote test passes: second SEND updates `sentPrice` while row
-stays QUOTED and editable.
-
----
-
-### M6 — Multi-row APPLY and SEND
-
-**Goal:** Trader selects 2+ rows and applies the same skew parameters to all selected
-rows in one APPLY press.  SEND sends all selected rows simultaneously.
-
-**Deliverables:**
-- APPLY iterates over all selected rows, computing applied price from each row's own
-  reference price at the time of the APPLY press
-- SEND iterates, calling `POST /api/inquiry/{id}/quote` for each selected PENDING row
-  (skips already-QUOTED rows)
-- Selection counter badge in toolbar ("2 rows selected")
-
-**Unhit tests:**
-```gherkin
-@m6 @multi
-Scenario: APPLY updates all selected rows
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I select the row with ISIN "XS2346573523"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  Then the "price" for ISIN "US912828YJ02" should be a numeric value
-  And the "price" for ISIN "XS2346573523" should be a numeric value
-
-Scenario: SEND quotes all selected rows
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I select the row with ISIN "XS2346573523"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  And I press SEND
-  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-  And the row with ISIN "XS2346573523" should have status "QUOTED"
-
-Scenario: Mix of Price and Spread across rows via two APPLY passes
-  Given the PT-Blotter is open
-  When I select the row with ISIN "US912828YJ02"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  And I select the row with ISIN "GB0031348658"
-  And I set the toolbar ref source "CBBT" ref side "Bid" markup "0" units "bp"
-  And I press APPLY
-  Then the "price"  for ISIN "US912828YJ02" should be a numeric value
-  And the "spread" for ISIN "GB0031348658" should be a numeric value
-```
-
-**Quality gate:**
-```bash
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m6"  # 3/3 passing
-# Full blotter suite with build:
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"
-```
-
-**Known risks:**
-- AG Grid `getSelectedRows()` returns a snapshot; reference prices may tick between
-  the APPLY call and the assertion.  Mitigation: step def stores the reference price
-  read from the DOM before pressing APPLY, uses that as the expected value basis.
-- WireMock call count verification: use `WireMock.verify(1, postRequestedFor(urlPathMatching(...)))`
-  in the step def for the "called exactly once" assertion.
-
-**Exit criteria:** WireMock call count assertions pass.  All three multi-row scenarios
-pass reliably over 5 consecutive `mvn verify` runs (no flakiness from ticking prices).
-
----
-
-### M7 — DSL crystallisation
-
-**Goal:** The step definition layer reads like a domain language, not like test
-automation plumbing.  A new scenario can be written using only existing step phrases —
-no Java code needed.  `BondBlotterSteps.java` contains zero direct Playwright calls.
-
-**Deliverables:**
-- `BlotterDsl.java` — encapsulates all Playwright interaction with the blotter:
-  - `openBlotter()`, `assertTitle(String)`
-  - `assertColumnVisible(String colId)`, `assertAtLeastRows(int min)`
-  - `selectRowByIsin(String isin)` — locates via JS probe, clicks checkbox in pinned container
-  - `setToolbar(refSource, refSide, markup, units)` — fills all four toolbar controls
-  - `pressApply()`, `pressSend()`, `pressMarkupPlus()`, `pressMarkupMinus()`
-  - `readMarkupValue()` — returns current markup input value as double
-  - `assertStatus(isin, expected)` — auto-retrying (handles SEND async update)
-  - `assertCellNumeric(colId, isin)` — auto-retrying Playwright containsText(\\d)
-  - `assertCellBlank(colId, isin)` — no retry (static "nothing happened" assertion)
-  - REST: `submitInquiry(isin, ...)`, `assertApiStatus(response, n)`, `assertResponseContainsField(...)`
-- `BondBlotterSteps.java` delegates 100% to `BlotterDsl`
-- `BondBlotterSteps.java` has zero direct Playwright calls (no `Page`, no `Locator` imports)
-
-**Unhit test (uses only pre-existing step phrases — no new Java needed):**
-```gherkin
-@m7 @dsl
-Scenario: Full re-quote workflow end-to-end
-  Given the PT-Blotter is open
-  When I select the row with ISIN "GB0031348658"
-  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
-  And I press APPLY
-  And I press SEND
-  Then the row with ISIN "GB0031348658" should have status "QUOTED"
-  And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
-  When I set the toolbar ref source "CP+" ref side "Ask" markup "-0.25" units "c"
-  And I press APPLY
-  And I press SEND
-  Then the row with ISIN "GB0031348658" should have status "QUOTED"
-  And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
-```
-
-**Quality gate:**
-```bash
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m7"  # 1/1 passing
-```
-
-Code review gate (manual):
-- `BondBlotterSteps.java`: zero `page.locator()`, zero `page.evaluate()`, zero `Page` imports
-- `BlotterDsl.java`: row selection uses `window.agGridProbes.dom.findRowIndexByText`
-- Any new blotter scenario expressible using existing step phrases alone
-
-**Exit criteria:** Pair-review the feature file with someone unfamiliar with the codebase.
-If they can understand what the test does without reading any Java, the DSL is working.
-
----
-
-### M8 — Full regression suite and evidence
-
-**Goal:** All 31+ scenarios run in CI under a single `mvn verify`.  Blotter scenarios
-are correctly tagged for selective execution.  HTML regression report includes the
-blotter feature.
-
-**Deliverables:**
-- Tag taxonomy finalised: `@blotter`, `@blotter-smoke`, `@ticking`, `@api`,
-  `@workflow`, `@multi`, `@dsl`
-- `cucumber.properties` updated if needed
-- CI instructions updated in README (Node.js prerequisite, `npm install` step)
-- `mvn verify` report includes blotter scenarios with pass/fail charts
-
-**Quality gate:**
-```bash
-# Full suite — the only gate that matters for CI
-mvn verify   # all scenarios passing, HTML report generated
-
-# Selective tag examples that must all work
-mvn verify -Dcucumber.filter.tags="@blotter and not @ticking"   # fast, no live prices
-mvn verify -Dcucumber.filter.tags="@blotter and @smoke"         # smoke only
-mvn verify -Dcucumber.filter.tags="@ticking"                    # all ticking (finance + blotter)
-mvn verify -Dcucumber.filter.tags="@blotter and @api"           # API-only, no browser needed
-```
-
-**Exit criteria:**
-- 5 consecutive clean `mvn verify` runs on a fresh checkout (validates no environment
-  bleed between scenarios)
-- README documents Node.js prerequisite and blotter build step
-- HTML report at `target/cucumber-html-reports/overview-features.html` shows blotter
-  feature with correct scenario count and pass indicators
-
----
-
-### Milestone summary
-
-| Milestone | Core deliverable | New scenarios | Cumulative total | Key risk |
-|---|---|---|---|---|
-| M0 | Build pipeline + WireMock serving | 1 smoke | 13 | Vite outDir + WireMock SPA routing |
-| M1 | Grid columns + static seed data | 2 smoke/data | 15 | AG Grid `col-id` not rendering |
-| M2 | Ticking reference prices | 3 ticking | 18 | Flash timing / test flakiness |
-| M3 | REST inquiry ingestion | 3 api | 21 | WireMock stub matching + ISIN 404 |
-| M4 | Skew controls + APPLY (price/spread) | 3 workflow | 24 | Float precision + bid/ask parsing |
-| M5 | SEND + sentPrice/sentSpread (non-locking) | 3 workflow | 27 | Re-quote workflow + WireMock verify |
-| M6 | Multi-row APPLY/SEND | 3 multi | 30 | Ticking race + WireMock call count |
-| M7 | DSL crystallisation | 1 dsl | 31 | Zero raw Playwright in step defs |
-| M8 | Full regression + evidence | — | 31 | Tag taxonomy + CI Node.js prereq |
-
----
-
-## Implementation notes (actual vs plan)
-
-### Actual scenario counts (M8 complete — 33/33 passing)
-
-| Milestone | Planned scenarios | Actual scenarios | Notes |
-|---|---|---|---|
-| M0 | 1 | 1 | As planned |
-| M1 | 2 | 2 | As planned |
-| M2 | 3 | 3 | As planned |
-| M3 | 3 | 2 | "Blotter should contain row after POST" deferred (requires grid + API polling); REST assertion scenarios retained |
-| M4 | 5 (design) / 3 (summary) | 6 | Added "Positive markup shifts price above mid"; markup ± button scenarios from design included |
-| M5 | 3 | 3 | As planned |
-| M6 | 3 | 3 | As planned |
-| M7 | 1 | 1 | As planned |
-| **Total blotter** | **21** | **21** | Same count; distribution differs |
-| Legacy (finance + portfolio) | 12 | 12 | Unchanged |
-| **Grand total** | **33** | **33** | |
-
-### Features added beyond the milestone plan
-
-| Feature | Where | Notes |
-|---|---|---|
-| Editable Price / Spread cells | `BlotterGrid.tsx` | AG Grid `valueSetter`; clears `appliedConfig` so simulator stops overwriting manual entry; `pricingAction` shows "Price input" / "Spread input" |
-| Pricing Action column | `BlotterGrid.tsx` | Shows applied skew label (e.g. `TW Mid +0.5c`); updates on APPLY, clears on manual edit |
-| Toolbar filter input | `Toolbar.tsx`, `filterUtils.ts` | Supports `Label:"value"` column-specific syntax and plain-text quick filter; `×` clear button; pushed to right via `margin-left: auto` |
-| Double-click auto-filter | `BlotterGrid.tsx`, `App.tsx` | Double-clicking a stable cell (Portfolio, ISIN, Side, Client, Status, Maturity) populates the filter input and applies the column filter |
-| `suppressColumnVirtualisation` | `BlotterGrid.tsx` | Keeps all columns in DOM regardless of scroll position — critical for test locators on rightmost columns (price, spread, sentPrice, sentSpread) |
-
-### Key implementation lessons
-
-| Problem | Root cause | Fix |
-|---|---|---|
-| `assertTitle` always timed out | `Pattern.quote()` produces `\Q...\E` — valid Java regex, rejected by JS engine inside Playwright | `waitForFunction("exp => document.title.includes(exp)", expected)` |
-| `openBlotter()` failed intermittently | `type="module"` scripts are deferred; `DOMContentLoaded` fires before React/AG Grid renders | `waitForSelector(".ag-center-cols-container [row-index='0']")` |
-| `findRowIndex()` returned −1 immediately | Single synchronous `evaluate()` ran before grid rendered | Added `waitForFunction` poll before `evaluate` |
-| `findRowIndexByText` missed pinned columns | `ROWS = '.ag-center-cols-container'` doesn't include `.ag-pinned-left-cols-container` | Iterate all three containers in the probe |
-| `selectRowByIsin()` timed out | Old code targeted `[col-id='select'] input[type='checkbox']`; checkbox column was removed | Ctrl+click on `.ag-pinned-left-cols-container [row-index='N']` |
-| Multi-select deselected first row | Plain click replaces selection; Ctrl+click on selected row toggles it off | Idempotent check: skip click if `.ag-row-selected` already present |
-| Click rejected by stability gate | 400ms price simulator ticks cause flash animations that fail Playwright's pointer-events stability check | `setForce(true)` on the click |
