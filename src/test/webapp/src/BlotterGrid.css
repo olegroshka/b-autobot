@@ -58,3 +58,15 @@
 /* ── Side colours ─────────────────────────────────────────────────────────────── */
 .blotter-grid .side-buy  { color: #00a878; font-weight: 600; }
 .blotter-grid .side-sell { color: #d63031; font-weight: 600; }
+
+/* ── Editable price / spread — dashed underline hint ─────────────────────────── */
+.blotter-grid .ag-cell[col-id="price"],
+.blotter-grid .ag-cell[col-id="spread"] {
+  border-bottom: 1px dashed #1e3a5f;
+  cursor: text;
+}
+.blotter-grid .ag-cell[col-id="price"]:hover,
+.blotter-grid .ag-cell[col-id="spread"]:hover {
+  border-bottom-color: #2a5fc0;
+  background: rgba(30, 80, 192, 0.07);
+}

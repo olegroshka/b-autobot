@@ -214,7 +214,7 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     And I select the row with ISIN "GB0031348658"
     And I set the toolbar ref source "CBBT" ref side "Bid" markup "0" units "bp"
     And I press APPLY
-    Then the "price"  for ISIN "US912828YJ02" should be a numeric value
+    Then the "price" for ISIN "US912828YJ02" should be a numeric value
     And the "spread" for ISIN "GB0031348658" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────

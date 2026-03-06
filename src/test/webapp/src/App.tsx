@@ -6,6 +6,7 @@ import BlotterGrid from './BlotterGrid'
 import Toolbar from './Toolbar'
 import { sendQuote } from './api'
 import { computeApplied, formatPricingAction } from './priceUtils'
+import { applyGridFilter, formatFilterText } from './filterUtils'
 import './App.css'
 
 // ── Root component ────────────────────────────────────────────────────────────
@@ -23,6 +24,7 @@ import './App.css'
 export default function App() {
   const gridApiRef    = useRef<GridApi<Inquiry> | null>(null)
   const [selectedCount, setSelectedCount] = useState(0)
+  const [filterText,    setFilterText]    = useState('')
   const [clock, setClock] = useState('')
 
   useEffect(() => {
@@ -38,6 +40,21 @@ export default function App() {
 
   const handleSelectionChanged = useCallback((count: number) => {
     setSelectedCount(count)
+  }, [])
+
+  // ── Filter ────────────────────────────────────────────────────────────────
+
+  const handleFilterChange = useCallback((text: string) => {
+    setFilterText(text)
+    const api = gridApiRef.current
+    if (api) applyGridFilter(api, text)
+  }, [])
+
+  const handleDoubleClickFilter = useCallback((colId: string, value: string) => {
+    const text = formatFilterText(colId, value)
+    setFilterText(text)
+    const api = gridApiRef.current
+    if (api) applyGridFilter(api, text)
   }, [])
 
   // ── APPLY ─────────────────────────────────────────────────────────────────
@@ -119,12 +136,15 @@ export default function App() {
         selectedCount={selectedCount}
         onApply={handleApply}
         onSend={handleSend}
+        filterText={filterText}
+        onFilterChange={handleFilterChange}
       />
 
       <main className="blotter-main">
         <BlotterGrid
           onGridReady={handleGridReady}
           onSelectionChanged={handleSelectionChanged}
+          onDoubleClickFilter={handleDoubleClickFilter}
         />
       </main>
     </div>

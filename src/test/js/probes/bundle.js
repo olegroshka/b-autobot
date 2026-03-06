@@ -82,8 +82,17 @@
     },
 
     findRowIndexByText: function (colId, value) {
-      var cells = Array.from(
-        doc.querySelectorAll(ROWS + ' [col-id="' + colId + '"]'));
+      /* Search centre + both pinned containers so pinned columns (isin, ptId) work. */
+      var sel = '[col-id="' + colId + '"]';
+      var containers = [
+        '.ag-center-cols-container',
+        '.ag-pinned-left-cols-container',
+        '.ag-pinned-right-cols-container'
+      ];
+      var cells = [];
+      containers.forEach(function (c) {
+        cells = cells.concat(Array.from(doc.querySelectorAll(c + ' ' + sel)));
+      });
       var match = cells.find(function (el) {
         return el.textContent.trim() === value;
       });

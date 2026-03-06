@@ -7,6 +7,7 @@ import com.microsoft.playwright.Page;
 import com.microsoft.playwright.options.RequestOptions;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -36,13 +37,19 @@ public final class BlotterDsl {
 
     public void openBlotter() {
         page.navigate(MockBlotterServer.getBlotterUrl());
-        page.waitForLoadState(com.microsoft.playwright.options.LoadState.DOMCONTENTLOADED);
+        // Wait for AG Grid to render the first data row.
+        // type="module" scripts are deferred, so DOMCONTENTLOADED fires before React runs;
+        // waiting for a rendered row guarantees the grid is fully initialised.
+        page.waitForSelector(".ag-center-cols-container [row-index='0']");
     }
 
     // ── M0 ─────────────────────────────────────────────────────────────────────
 
     public void assertTitle(String expected) {
-        assertThat(page).hasTitle(Pattern.compile(".*" + Pattern.quote(expected) + ".*"));
+        // Pattern.quote() produces \Q...\E which is Java-only; JavaScript (used by
+        // Playwright's hasTitle poller) treats \Q as literal 'Q'.  Use a plain
+        // contains-style waitForFunction instead, which runs entirely in Java/JS.
+        page.waitForFunction("exp => document.title.includes(exp)", expected);
     }
 
     // ── M1 — Grid structure ────────────────────────────────────────────────────
@@ -64,6 +71,11 @@ public final class BlotterDsl {
      * Asserts the row is visible and returns its index (≥ 0).
      */
     public int findRowIndex(String isin) {
+        // Poll until the probe returns a valid row index (handles async grid updates).
+        page.waitForFunction(
+                "isin => { var idx = window.agGridProbes.dom.findRowIndexByText('isin', isin);" +
+                " return typeof idx === 'number' && idx >= 0; }",
+                isin);
         Object result = page.evaluate(
                 "isin => window.agGridProbes.dom.findRowIndexByText('isin', isin)", isin);
         int index = result instanceof Number n ? n.intValue() : -1;
@@ -158,9 +170,20 @@ public final class BlotterDsl {
      */
     public void selectRowByIsin(String isin) {
         int rowIndex = findRowIndex(isin);
-        // Use the pinned left container for the checkbox column
-        page.locator(".ag-pinned-left-cols-container [row-index='" + rowIndex
-                + "'] [col-id='select'] input[type='checkbox']").click();
+        // Skip if already selected — Ctrl+click on a selected row would DEselect it.
+        // This makes selectRowByIsin idempotent (calling it twice for the same ISIN is safe).
+        Boolean alreadySelected = (Boolean) page.evaluate(
+                "idx => Array.from(document.querySelectorAll('.ag-row[row-index=\"' + idx + '\"]'))" +
+                        ".some(function(r){return r.classList.contains('ag-row-selected');})",
+                rowIndex);
+        if (Boolean.TRUE.equals(alreadySelected)) return;
+        // Ctrl+click in multiRow mode: adds the row to the current selection without replacing.
+        // force:true bypasses Playwright's stability check — the live price simulator ticks every
+        // 400ms causing cell flash-animations that can fail the stability gate.
+        page.locator(".ag-pinned-left-cols-container [row-index='" + rowIndex + "']")
+                .click(new Locator.ClickOptions()
+                        .setModifiers(List.of(com.microsoft.playwright.options.KeyboardModifier.CONTROL))
+                        .setForce(true));
     }
 
     // ── M4 — Toolbar interaction ───────────────────────────────────────────────

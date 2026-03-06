@@ -120,9 +120,47 @@
 .units-btn:hover  { background: #0b0f18; color: #8aacbf; }
 .units-btn.active { background: #0d2340; color: #1e90ff; }
 
+/* ── Filter input ────────────────────────────────────────────────────────────── */
+.toolbar-group.filter-group {
+  margin-left: auto;   /* pushes filter + badge + buttons to the right */
+  flex-shrink: 0;
+}
+
+.filter-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.filter-input {
+  width: 180px;
+  background: var(--c-bg, #06090f);
+  color: #8aacbf;
+  border: 1px solid var(--c-border, #182436);
+  border-radius: 2px;
+  padding: 3px 24px 3px 7px;
+  font-size: 11px;
+  font-family: 'Roboto Mono', 'Consolas', monospace;
+}
+.filter-input::placeholder { color: #2e4255; }
+.filter-input:focus         { outline: none; border-color: #1565c0; }
+
+.filter-clear {
+  position: absolute;
+  right: 4px;
+  background: none;
+  border: none;
+  color: #466070;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+  transition: color 0.1s;
+}
+.filter-clear:hover { color: #8aacbf; }
+
 /* ── Selection badge ─────────────────────────────────────────────────────────── */
 .selection-badge {
-  margin-left: auto;
   font-size: 11px;
   font-family: 'Roboto Mono', monospace;
   color: var(--c-text-dim, #466070);

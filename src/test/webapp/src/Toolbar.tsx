@@ -6,12 +6,14 @@ interface ToolbarProps {
   selectedCount: number
   onApply: (refSource: RefSource, refSide: RefSide, markup: number, units: Units) => void
   onSend: () => void
+  filterText: string
+  onFilterChange: (text: string) => void
 }
 
 /** Increment steps per unit mode. */
 const STEP: Record<Units, number> = { c: 0.01, bp: 1 }
 
-export default function Toolbar({ selectedCount, onApply, onSend }: ToolbarProps) {
+export default function Toolbar({ selectedCount, onApply, onSend, filterText, onFilterChange }: ToolbarProps) {
   const [refSource, setRefSource] = useState<RefSource>('TW')
   const [refSide,   setRefSide]   = useState<RefSide>('Mid')
   const [markup,    setMarkup]    = useState(0)
@@ -110,6 +112,29 @@ export default function Toolbar({ selectedCount, onApply, onSend }: ToolbarProps
             className={`units-btn${units === 'bp' ? ' active' : ''}`}
             onClick={() => setUnits('bp')}
           >bp</button>
+        </div>
+      </div>
+
+      {/* ── Filter input ───────────────────────────────────────────────────── */}
+      <div className="toolbar-group filter-group">
+        <span className="toolbar-label">Filter</span>
+        <div className="filter-control">
+          <input
+            type="text"
+            className="filter-input"
+            placeholder='Portfolio:"PT_BBG_…"'
+            value={filterText}
+            onChange={(e) => onFilterChange(e.target.value)}
+            aria-label="Grid Filter"
+          />
+          {filterText && (
+            <button
+              type="button"
+              className="filter-clear"
+              onClick={() => onFilterChange('')}
+              aria-label="Clear Filter"
+            >×</button>
+          )}
         </div>
       </div>
 

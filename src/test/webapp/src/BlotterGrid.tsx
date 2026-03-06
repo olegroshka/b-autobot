@@ -5,6 +5,8 @@ import {
   type ColGroupDef,
   type GridReadyEvent,
   type SelectionChangedEvent,
+  type CellValueChangedEvent,
+  type CellDoubleClickedEvent,
   type GridApi,
   AllCommunityModule,
   ModuleRegistry,
@@ -13,6 +15,7 @@ import {
 import type { Inquiry } from './types'
 import { buildSeedInquiries } from './seedData'
 import { initSimulator, startSimulator, stopSimulator } from './PriceSimulator'
+import { DOUBLE_CLICK_FILTER_COLS } from './filterUtils'
 import './BlotterGrid.css'
 
 // Register all AG Grid Community modules once at module load.
@@ -65,6 +68,7 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
         field: 'ptId',
         width: 155,
         pinned: 'left',
+        filter: 'agTextColumnFilter',
       },
       {
         colId: 'ptLineId',
@@ -74,9 +78,9 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
         pinned: 'left',
         valueFormatter: (p) => p.value?.split('_').pop() ?? '',
       },
-      { colId: 'isin',        headerName: 'ISIN',        field: 'isin',        width: 130, pinned: 'left' },
-      { colId: 'description', headerName: 'Description', field: 'description', width: 200, minWidth: 120 },
-      { colId: 'maturity',    headerName: 'Maturity',    field: 'maturity',    width: 100 },
+      { colId: 'isin',        headerName: 'ISIN',        field: 'isin',        width: 130, pinned: 'left', filter: 'agTextColumnFilter' },
+      { colId: 'description', headerName: 'Description', field: 'description', width: 200, minWidth: 120, filter: 'agTextColumnFilter' },
+      { colId: 'maturity',    headerName: 'Maturity',    field: 'maturity',    width: 100, filter: 'agTextColumnFilter' },
       {
         colId: 'coupon',
         headerName: 'Coupon',
@@ -92,9 +96,9 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
         valueFormatter: (p) =>
           p.value != null ? (p.value as number).toLocaleString('en-US') : '',
       },
-      { colId: 'side',   headerName: 'Side',   field: 'side',   width: 60,
+      { colId: 'side',   headerName: 'Side',   field: 'side',   width: 60,   filter: 'agTextColumnFilter',
         cellClassRules: { 'side-buy': (p) => p.value === 'BUY', 'side-sell': (p) => p.value === 'SELL' } },
-      { colId: 'client', headerName: 'Client', field: 'client', width: 100 },
+      { colId: 'client', headerName: 'Client', field: 'client', width: 100, filter: 'agTextColumnFilter' },
     ],
   },
 
@@ -107,6 +111,7 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
         headerName: 'Status',
         field: 'status',
         width: 90,
+        filter: 'agTextColumnFilter',
         cellClassRules: {
           'status-pending': (p) => p.value === 'PENDING',
           'status-quoted':  (p) => p.value === 'QUOTED',
@@ -159,10 +164,32 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
           'pricing-label': (p) => p.value != null,
         },
       },
-      { colId: 'price',  headerName: 'Price',  field: 'price',  width: 95,
-        valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(4) : '' },
-      { colId: 'spread', headerName: 'Spread', field: 'spread', width: 95,
-        valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(2) : '' },
+      {
+        colId: 'price', headerName: 'Price', field: 'price', width: 95,
+        valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(4) : '',
+        editable: true,
+        valueSetter: (params) => {
+          const v = parseFloat(String(params.newValue))
+          if (isNaN(v)) return false
+          params.data.price = v
+          params.data.appliedConfig = undefined
+          params.data.pricingAction = 'Price input'
+          return true
+        },
+      },
+      {
+        colId: 'spread', headerName: 'Spread', field: 'spread', width: 95,
+        valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(2) : '',
+        editable: true,
+        valueSetter: (params) => {
+          const v = parseFloat(String(params.newValue))
+          if (isNaN(v)) return false
+          params.data.spread = v
+          params.data.appliedConfig = undefined
+          params.data.pricingAction = 'Spread input'
+          return true
+        },
+      },
     ],
   },
 
@@ -191,11 +218,13 @@ interface BlotterGridProps {
   onGridReady?: (api: GridApi<Inquiry>) => void
   /** Called whenever row selection changes; receives the new selected-row count. */
   onSelectionChanged?: (count: number) => void
+  /** Called when the user double-clicks a stable (non-ticking, non-editable) cell. */
+  onDoubleClickFilter?: (colId: string, value: string) => void
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionChanged }: BlotterGridProps) {
+export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionChanged, onDoubleClickFilter }: BlotterGridProps) {
   const gridRef   = useRef<AgGridReact<Inquiry>>(null)
   const apiRef    = useRef<GridApi<Inquiry> | null>(null)
   const [rowData] = useState<Inquiry[]>(() => buildSeedInquiries())
@@ -211,6 +240,24 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
     onSelectionChanged?.(event.api.getSelectedRows().length)
   }, [onSelectionChanged])
 
+  // After a manual price/spread edit, refresh the pricingAction cell in the same row
+  const handleCellValueChanged = useCallback((event: CellValueChangedEvent<Inquiry>) => {
+    const col = event.column.getColId()
+    if (col === 'price' || col === 'spread') {
+      event.api.refreshCells({ rowNodes: [event.node], columns: ['pricingAction'], force: true })
+    }
+  }, [])
+
+  // Double-click on a stable column → propagate to App for auto-filter
+  const handleCellDoubleClicked = useCallback((event: CellDoubleClickedEvent<Inquiry>) => {
+    if (!onDoubleClickFilter) return
+    const colId = event.column.getColId()
+    if (!DOUBLE_CLICK_FILTER_COLS.has(colId)) return
+    const value = String(event.value ?? '')
+    if (!value) return
+    onDoubleClickFilter(colId, value)
+  }, [onDoubleClickFilter])
+
   useEffect(() => {
     return () => stopSimulator()
   }, [])
@@ -225,9 +272,12 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
         defaultColDef={DEFAULT_COL_DEF}
         getRowId={(params) => params.data.id}
         rowSelection={{ mode: 'multiRow', checkboxes: false, headerCheckbox: false, enableClickSelection: true }}
+        suppressColumnVirtualisation={true}
         animateRows={true}
         onGridReady={onGridReady}
         onSelectionChanged={handleSelectionChanged}
+        onCellValueChanged={handleCellValueChanged}
+        onCellDoubleClicked={handleCellDoubleClicked}
       />
     </div>
   )
