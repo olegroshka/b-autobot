@@ -121,19 +121,19 @@ b-autobot/
 
 ### `BondBlotter.feature` — PT-Blotter fixed income UI (`@blotter`)
 
-| Milestone | Scenarios | Tags | Build needed |
+| Milestone | Scenarios | Tags | Status |
 |---|---|---|---|
-| M0 — page loads | 1 | `@smoke` | No |
-| M1 — grid columns + seed rows | 2 | `@m1` | Yes |
-| M2 — ticking reference prices | 3 | `@m2 @ticking` | Yes |
-| M3 — REST inquiry API | 2 | `@m3 @api` | No |
-| M4 — Toolbar APPLY (source/side/markup/units) | 6 | `@m4 @workflow` | Yes |
-| M5 — SEND → QUOTED, sentPrice snapshot | 3 | `@m5 @workflow` | Yes |
-| M6 — multi-row APPLY / SEND | 3 | `@m6 @multi` | Yes |
-| M7 — end-to-end DSL re-quote workflow | 1 | `@m7 @dsl` | Yes |
+| M0 — page loads | 1 | `@smoke` | ✓ Done |
+| M1 — grid columns + seed rows | 2 | `@m1` | ✓ Done |
+| M2 — ticking reference prices | 3 | `@m2 @ticking` | ✓ Done |
+| M3 — REST inquiry API | 2 | `@m3 @api` | ✓ Done |
+| M4 — Toolbar APPLY (source/side/markup/units) | 6 | `@m4 @workflow` | ✓ Done |
+| M5 — SEND → QUOTED, sentPrice snapshot | 3 | `@m5 @workflow` | ✓ Done |
+| M6 — multi-row APPLY / SEND | 3 | `@m6 @multi` | ✓ Done |
+| M7 — end-to-end DSL re-quote workflow | 1 | `@m7 @dsl` | ✓ Done |
 
-**Current status: 15 / 15 passing without Vite build (M0 + M3 + all legacy).
-Full suite with build: `mvn verify -Dblotter.build.skip=false`.**
+**Current status: 33 / 33 passing (21 blotter + 12 legacy).
+M1/M2/M4–M7 require the Vite build: `mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"`.**
 
 ---
 
@@ -202,12 +202,15 @@ $env:VITE_WIREMOCK_PORT=9099; npm run dev
 | Action | How |
 |---|---|
 | See 5 seed inquiries | They load automatically with ticking TW / CP+ / CBBT prices |
-| Select rows | Click the checkbox at the far left of any row |
+| Select rows | Click any row to select it; Ctrl+click to add more rows to the selection |
 | Apply a price | Set Source, Side, Markup, Units → **APPLY** → `Price` column fills in |
 | Apply a spread | Change Units to `bp` → **APPLY** → `Spread` column fills in |
 | Adjust markup | Click **−** or **+** next to the markup input; or type directly |
 | Send a quote | After APPLY, press **SEND** → status → `QUOTED`, `Sent Price` captures the snapshot |
 | Re-quote | While still QUOTED, change markup, APPLY, SEND again → `Sent Price` updates |
+| Filter rows | Type in the **Filter** box (right of toolbar): `Portfolio:"PT_BBG_"` for column-specific, or plain text for quick-filter |
+| Double-click filter | Double-click a stable cell (Portfolio, ISIN, Side, Client, Status, Maturity) to auto-populate the Filter box |
+| Edit price / spread | Double-click the **Price** or **Spread** cell and type a value; `Pricing Action` shows "Price input" / "Spread input" |
 | Post an inquiry via API | `POST http://localhost:9099/api/inquiry` (Postman / curl) |
 
 ### Mock API reference
@@ -273,19 +276,20 @@ mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
 # Only the external live-grid scenarios
 mvn verify -Dcucumber.filter.tags="@external"
 
-# ── PT-Blotter specific ───────────────────────────────────────────────────────
+# ── PT-Blotter specific (all M0–M7 done, 33/33 passing) ─────────────────────
 
-# Smoke: page loads (no Vite build required)
-mvn verify -Dcucumber.filter.tags="@smoke"
-
-# REST API scenarios only (no Vite build required)
-mvn verify -Dcucumber.filter.tags="@m3"
-
-# All blotter scenarios that don't need a Vite build
-mvn verify "-Dcucumber.filter.tags=not @m1 and not @m2 and not @m4 and not @m5 and not @m6 and not @m7"
-
-# Full blotter suite (requires Vite build — see PT-Blotter section above)
+# Full blotter suite — requires Vite build (M1/M2/M4–M7 use the React app)
 mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"
+
+# Smoke + API — no Vite build needed (uses committed assets)
+mvn verify -Dcucumber.filter.tags="@blotter and @smoke"
+mvn verify -Dcucumber.filter.tags="@blotter and @api"
+
+# Non-ticking blotter scenarios (fast — no live-price wait)
+mvn verify -Dcucumber.filter.tags="@blotter and not @ticking"
+
+# All ticking scenarios across both features (finance demo + blotter)
+mvn verify -Dcucumber.filter.tags="@ticking"
 
 # Individual milestones (all require Vite build)
 mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m4"

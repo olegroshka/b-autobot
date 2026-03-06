@@ -1015,3 +1015,45 @@ mvn verify -Dcucumber.filter.tags="@blotter and @api"           # API-only, no b
 | M6 | Multi-row APPLY/SEND | 3 multi | 30 | Ticking race + WireMock call count |
 | M7 | DSL crystallisation | 1 dsl | 31 | Zero raw Playwright in step defs |
 | M8 | Full regression + evidence | — | 31 | Tag taxonomy + CI Node.js prereq |
+
+---
+
+## Implementation notes (actual vs plan)
+
+### Actual scenario counts (M8 complete — 33/33 passing)
+
+| Milestone | Planned scenarios | Actual scenarios | Notes |
+|---|---|---|---|
+| M0 | 1 | 1 | As planned |
+| M1 | 2 | 2 | As planned |
+| M2 | 3 | 3 | As planned |
+| M3 | 3 | 2 | "Blotter should contain row after POST" deferred (requires grid + API polling); REST assertion scenarios retained |
+| M4 | 5 (design) / 3 (summary) | 6 | Added "Positive markup shifts price above mid"; markup ± button scenarios from design included |
+| M5 | 3 | 3 | As planned |
+| M6 | 3 | 3 | As planned |
+| M7 | 1 | 1 | As planned |
+| **Total blotter** | **21** | **21** | Same count; distribution differs |
+| Legacy (finance + portfolio) | 12 | 12 | Unchanged |
+| **Grand total** | **33** | **33** | |
+
+### Features added beyond the milestone plan
+
+| Feature | Where | Notes |
+|---|---|---|
+| Editable Price / Spread cells | `BlotterGrid.tsx` | AG Grid `valueSetter`; clears `appliedConfig` so simulator stops overwriting manual entry; `pricingAction` shows "Price input" / "Spread input" |
+| Pricing Action column | `BlotterGrid.tsx` | Shows applied skew label (e.g. `TW Mid +0.5c`); updates on APPLY, clears on manual edit |
+| Toolbar filter input | `Toolbar.tsx`, `filterUtils.ts` | Supports `Label:"value"` column-specific syntax and plain-text quick filter; `×` clear button; pushed to right via `margin-left: auto` |
+| Double-click auto-filter | `BlotterGrid.tsx`, `App.tsx` | Double-clicking a stable cell (Portfolio, ISIN, Side, Client, Status, Maturity) populates the filter input and applies the column filter |
+| `suppressColumnVirtualisation` | `BlotterGrid.tsx` | Keeps all columns in DOM regardless of scroll position — critical for test locators on rightmost columns (price, spread, sentPrice, sentSpread) |
+
+### Key implementation lessons
+
+| Problem | Root cause | Fix |
+|---|---|---|
+| `assertTitle` always timed out | `Pattern.quote()` produces `\Q...\E` — valid Java regex, rejected by JS engine inside Playwright | `waitForFunction("exp => document.title.includes(exp)", expected)` |
+| `openBlotter()` failed intermittently | `type="module"` scripts are deferred; `DOMContentLoaded` fires before React/AG Grid renders | `waitForSelector(".ag-center-cols-container [row-index='0']")` |
+| `findRowIndex()` returned −1 immediately | Single synchronous `evaluate()` ran before grid rendered | Added `waitForFunction` poll before `evaluate` |
+| `findRowIndexByText` missed pinned columns | `ROWS = '.ag-center-cols-container'` doesn't include `.ag-pinned-left-cols-container` | Iterate all three containers in the probe |
+| `selectRowByIsin()` timed out | Old code targeted `[col-id='select'] input[type='checkbox']`; checkbox column was removed | Ctrl+click on `.ag-pinned-left-cols-container [row-index='N']` |
+| Multi-select deselected first row | Plain click replaces selection; Ctrl+click on selected row toggles it off | Idempotent check: skip click if `.ag-row-selected` already present |
+| Click rejected by stability gate | 400ms price simulator ticks cause flash animations that fail Playwright's pointer-events stability check | `setForce(true)` on the click |
