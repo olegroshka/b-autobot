@@ -8,6 +8,7 @@ import {
   type GridApi,
   AllCommunityModule,
   ModuleRegistry,
+  themeBalham,
 } from 'ag-grid-community'
 import type { Inquiry } from './types'
 import { buildSeedInquiries } from './seedData'
@@ -17,6 +18,30 @@ import './BlotterGrid.css'
 // Register all AG Grid Community modules once at module load.
 // Required in AG Grid v33+.
 ModuleRegistry.registerModules([AllCommunityModule])
+
+// ── Dark theme (AG Grid v33 Theming API) ──────────────────────────────────────
+//
+// AG Grid v33 uses a JavaScript-based theming system.  Passing a `theme` prop
+// to <AgGridReact> is required; otherwise the grid ignores any `ag-theme-*`
+// CSS class and renders with its built-in light Quartz defaults.
+//
+const darkTheme = themeBalham.withParams({
+  accentColor:                '#1e90ff',
+  backgroundColor:            '#06090f',
+  borderColor:                '#182436',
+  browserColorScheme:         'dark',
+  fontFamily:                 "'Segoe UI', system-ui, sans-serif",
+  fontSize:                   12,
+  foregroundColor:            '#bccedd',
+  headerBackgroundColor:      '#0b0f18',
+  headerTextColor:            '#466070',
+  rowHeight:                  28,
+  headerHeight:               30,
+  oddRowBackgroundColor:      '#090d15',
+  rowHoverColor:              'rgba(21, 101, 192, 0.13)',
+  selectedRowBackgroundColor: 'rgba(21, 101, 192, 0.20)',
+  chromeBackgroundColor:      '#0b0f18',
+})
 
 // ── Column definitions ────────────────────────────────────────────────────────
 //
@@ -190,9 +215,10 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
   }, [])
 
   return (
-    <div className="blotter-grid ag-theme-balham-dark">
+    <div className="blotter-grid">
       <AgGridReact<Inquiry>
         ref={gridRef}
+        theme={darkTheme}
         rowData={rowData}
         columnDefs={COLUMN_DEFS}
         defaultColDef={DEFAULT_COL_DEF}
