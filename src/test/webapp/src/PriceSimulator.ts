@@ -125,11 +125,11 @@ export function startSimulator(api: GridApi<Inquiry>): void {
       // Merge fresh ref prices into the row snapshot
       const updatedRow: Inquiry = { ...node.data, ...delta }
 
-      // Re-derive applied price/spread so it continuously tracks ref + markup
+      // Re-derive both price AND spread so they continuously track ref + markup
       if (updatedRow.appliedConfig) {
-        const applied = computeApplied(updatedRow, updatedRow.appliedConfig)
-        if (applied.price  !== undefined) updatedRow.price  = applied.price
-        if (applied.spread !== undefined) updatedRow.spread = applied.spread
+        const { price, spread } = computeApplied(updatedRow, updatedRow.appliedConfig)
+        updatedRow.price  = price
+        updatedRow.spread = spread
       }
 
       updates.push(updatedRow)

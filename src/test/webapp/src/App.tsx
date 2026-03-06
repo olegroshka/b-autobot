@@ -1,10 +1,11 @@
 import { useRef, useState, useCallback, useEffect } from 'react'
 import type { GridApi } from 'ag-grid-community'
 import type { Inquiry, RefSource, RefSide, Units } from './types'
+// RefSource/RefSide/Units are used by the Toolbar callback signature below
 import BlotterGrid from './BlotterGrid'
 import Toolbar from './Toolbar'
 import { sendQuote } from './api'
-import { getRefValue } from './priceUtils'
+import { computeApplied, formatPricingAction } from './priceUtils'
 import './App.css'
 
 // ── Root component ────────────────────────────────────────────────────────────
@@ -46,15 +47,15 @@ export default function App() {
       const api = gridApiRef.current
       if (!api) return
 
+      const config = { refSource, refSide, markup, units }
       const updates: Inquiry[] = api.getSelectedRows().map((row) => {
-        const refValue = getRefValue(row, refSource, refSide, units)
-        const computed = refValue + markup
+        const { price, spread } = computeApplied(row, config)
         return {
           ...row,
-          price:  units === 'c'  ? computed : row.price,
-          spread: units === 'bp' ? computed : row.spread,
-          // Store config so PriceSimulator re-derives price/spread on every tick
-          appliedConfig: { refSource, refSide, markup, units },
+          pricingAction: formatPricingAction(config),
+          price,
+          spread,
+          appliedConfig: config,
         }
       })
 

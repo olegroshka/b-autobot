@@ -61,8 +61,9 @@ export interface Inquiry {
   cbbSpread: string
 
   // Applied values — updated on APPLY; blank until first APPLY
-  price:  number | null
-  spread: number | null
+  pricingAction: string | null   // human-readable label, e.g. "TW bid +0.50c"
+  price:         number | null   // derived from ref + markup (units=c)
+  spread:        number | null   // cross-driven from price, or direct (units=bp)
 
   // Sent snapshot — captured on SEND; updated on each re-SEND
   sentPrice:  number | null

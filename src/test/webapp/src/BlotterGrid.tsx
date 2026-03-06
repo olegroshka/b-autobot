@@ -148,6 +148,17 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
   {
     headerName: 'Applied',
     children: [
+      {
+        colId: 'pricingAction',
+        headerName: 'Pricing Action',
+        field: 'pricingAction',
+        width: 140,
+        cellClassRules: {
+          'pricing-pos': (p) => typeof p.value === 'string' && p.value.includes('+'),
+          'pricing-neg': (p) => typeof p.value === 'string' && p.value.includes('-'),
+          'pricing-label': (p) => p.value != null,
+        },
+      },
       { colId: 'price',  headerName: 'Price',  field: 'price',  width: 95,
         valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(4) : '' },
       { colId: 'spread', headerName: 'Spread', field: 'spread', width: 95,
