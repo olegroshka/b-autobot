@@ -1,0 +1,166 @@
+/* ── Toolbar shell ────────────────────────────────────────────────────────────── */
+.blotter-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 0 12px;
+  height: 38px;
+  background: var(--c-toolbar, #0d1320);
+  border-bottom: 1px solid var(--c-border, #182436);
+  flex-shrink: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+}
+.blotter-toolbar::-webkit-scrollbar { display: none; }
+
+/* ── Vertical separator between groups ───────────────────────────────────────── */
+.toolbar-sep {
+  width: 1px;
+  height: 20px;
+  background: var(--c-border, #182436);
+  margin: 0 10px;
+  flex-shrink: 0;
+}
+
+/* ── Label + control group ───────────────────────────────────────────────────── */
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+}
+
+.toolbar-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--c-text-dim, #466070);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+}
+
+/* ── Select controls ─────────────────────────────────────────────────────────── */
+.blotter-toolbar select {
+  background: var(--c-bg, #06090f);
+  color: #8aacbf;
+  border: 1px solid var(--c-border, #182436);
+  border-radius: 2px;
+  padding: 3px 22px 3px 7px;
+  font-size: 11.5px;
+  font-family: inherit;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5'%3E%3Cpath d='M0 0l4 5 4-5z' fill='%23466070'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 6px center;
+}
+.blotter-toolbar select:hover { border-color: #1e3050; }
+.blotter-toolbar select:focus { outline: none; border-color: #1565c0; }
+
+/* ── Markup control: [−] [value] [+] ────────────────────────────────────────── */
+.markup-control {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid var(--c-border, #182436);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.markup-btn {
+  background: #0b0f18;
+  color: #8aacbf;
+  border: none;
+  padding: 3px 8px;
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.1s, color 0.1s;
+}
+.markup-btn:hover  { background: #111a28; color: #bccedd; }
+.markup-btn:active { background: #06090f; }
+
+.markup-input {
+  width: 64px;
+  background: var(--c-bg, #06090f);
+  color: #bccedd;
+  border: none;
+  border-left: 1px solid var(--c-border, #182436);
+  border-right: 1px solid var(--c-border, #182436);
+  padding: 3px 6px;
+  font-size: 11.5px;
+  font-family: 'Roboto Mono', 'Consolas', monospace;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.markup-input::-webkit-outer-spin-button,
+.markup-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.markup-input:focus { outline: none; }
+
+/* ── Units toggle ────────────────────────────────────────────────────────────── */
+.units-toggle {
+  display: flex;
+  border: 1px solid var(--c-border, #182436);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.units-btn {
+  background: var(--c-bg, #06090f);
+  color: var(--c-text-dim, #466070);
+  border: none;
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+.units-btn + .units-btn { border-left: 1px solid var(--c-border, #182436); }
+.units-btn:hover  { background: #0b0f18; color: #8aacbf; }
+.units-btn.active { background: #0d2340; color: #1e90ff; }
+
+/* ── Selection badge ─────────────────────────────────────────────────────────── */
+.selection-badge {
+  margin-left: auto;
+  font-size: 11px;
+  font-family: 'Roboto Mono', monospace;
+  color: var(--c-text-dim, #466070);
+  white-space: nowrap;
+  padding: 0 8px;
+  transition: color 0.2s;
+}
+.selection-badge.has-selection { color: #1e90ff; }
+
+/* ── Action buttons ──────────────────────────────────────────────────────────── */
+.toolbar-btn {
+  padding: 4px 13px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  letter-spacing: 0.1em;
+  cursor: pointer;
+  transition: background 0.1s, opacity 0.15s;
+  flex-shrink: 0;
+}
+.toolbar-btn:disabled { opacity: 0.28; cursor: not-allowed; }
+
+.apply-btn {
+  background: #0a2a50;
+  color: #4da6ff;
+  border-color: #1565c0;
+  margin-left: 8px;
+}
+.apply-btn:not(:disabled):hover  { background: #0d3570; }
+.apply-btn:not(:disabled):active { background: #061830; }
+
+.send-btn {
+  background: #062018;
+  color: #00d09e;
+  border-color: #00856e;
+  margin-left: 6px;
+}
+.send-btn:not(:disabled):hover  { background: #0a2a22; }
+.send-btn:not(:disabled):active { background: #041410; }

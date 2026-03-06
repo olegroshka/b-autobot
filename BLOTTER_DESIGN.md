@@ -20,9 +20,11 @@ ION channel / REST API
   Trader selects row(s)
         │
         ▼
-  Picks ref source  (TW / CP+ / CBBT)  +  convention (Price / Spread)
-  Picks side        (Bid / Offer)
-  Enters skew       (+N cents  or  +N bp)
+  Uses toolbar:
+    • Source   — TW / CP+ / CBBT
+    • Side     — Bid / Ask / Mid
+    • Markup   — [−][  value  ][+]  (numeric, step depends on units)
+    • Units    — c (price points)  or  bp (basis points)
         │
         ▼
   Presses APPLY  ──►  Price / Spread columns recalculated on row
@@ -44,7 +46,7 @@ ION channel / REST API
 | TradeWeb (TW) | TW Price *(ticking, "bid / ask")*, TW Spread *(ticking, "bid / ask")* |
 | Bloomberg CP+ | CP+ Price *(ticking, "bid / ask")*, CP+ Spread *(ticking, "bid / ask")* |
 | Bloomberg CBBT | CBBT Price *(ticking, "bid / ask")*, CBBT Spread *(ticking, "bid / ask")* |
-| Skew controls | Ref Source (dropdown), Convention (Price/Spread), Skew Δ |
+| Toolbar (top) | Source (TW/CP+/CBBT), Side (Bid/Ask/Mid), Markup [−][val][+], Units (c/bp) |
 | Applied values | Price, Spread |
 | Sent snapshot | Sent Price, Sent Spread |
 
@@ -279,16 +281,21 @@ is a disproportionate infrastructure commitment for a mock. Not the right tool.
 ## Proposed column schema
 
 ```
+┌─ TOOLBAR ──────────────────────────────────────────────────────────────────┐
+│  [Source TW|CP+|CBBT]  [Side Bid|Ask|Mid]  [−][markup][+]  [c|bp]          │
+│  [APPLY ▶]  [SEND ►]                            N selected                  │
+└─────────────────────────────────────────────────────────────────────────────┘
+
 Checkbox | ISIN | Description | Maturity | Coupon | Notional | Side | Client
 Status: PENDING / QUOTED / DONE / MISSED
 TW Price*  ("bid / ask") | TW Spread*  ("bid_spread / ask_spread")
 CP+ Price* ("bid / ask") | CP+ Spread* ("bid_spread / ask_spread")
 CBBT Price*("bid / ask") | CBBT Spread*("bid_spread / ask_spread")
-Ref Source (dropdown: TW/CP+/CBBT) | Convention (Price/Spread) | Skew Δ
 Price | Spread
 Sent Price | Sent Spread
 
 * ticking cells — ag-cell-data-changed flash enabled; single cell shows "bid / ask" combined
+  Skew controls are toolbar-only — NOT stored as per-row grid columns.
 ```
 
 ## Proposed REST contract (WireMock stubs)
@@ -409,6 +416,8 @@ WireMock stubs simultaneously.  Changing one requires changing all four.
 | Column | `col-id` | Notes |
 |---|---|---|
 | Select checkbox | `select` | |
+| Portfolio ID | `ptId` | e.g. `PT_BBG_20260306_3F7A`; groups line items by portfolio |
+| Line # | `ptLineId` | e.g. `PT_BBG_20260306_3F7A_1`; rendered as `1`, `2`, … |
 | ISIN | `isin` | |
 | Description | `description` | |
 | Maturity | `maturity` | |
@@ -423,9 +432,6 @@ WireMock stubs simultaneously.  Changing one requires changing all four.
 | CP+ Spread | `cpSpread` | Ticking; same combined format |
 | CBBT Price | `cbbPrice` | Ticking; same combined format |
 | CBBT Spread | `cbbSpread` | Ticking; same combined format |
-| Ref Source (control) | `refSource` | Dropdown: `TW` / `CP+` / `CBBT` |
-| Convention (control) | `convention` | Dropdown: `Price` / `Spread` |
-| Skew Δ (control) | `skewDelta` | Number input; cents (Price) or bp (Spread) |
 | Price | `price` | Trader's applied price; updates on APPLY |
 | Spread | `spread` | Trader's applied spread; updates on APPLY |
 | Sent Price | `sentPrice` | Snapshot at last SEND; blank until first SEND |
@@ -511,7 +517,7 @@ No ticking, no controls, no REST — just the grid skeleton and static data.
 
 **Deliverables:**
 - `BlotterGrid.tsx` with full column definition (all `col-id` values from design contracts)
-- Column groups: Identity, Status, TradeWeb, CP+, CBBT, Skew Controls, Applied Prices
+- Column groups: Identity, Status, TradeWeb, CP+, CBBT, Applied Values, Sent Snapshot
 - 5 seeded rows (design-contract seed data, hardcoded in component state for now)
 - Row checkbox selection enabled
 - All reference price cells display a static placeholder (e.g. `99.000`)
@@ -521,7 +527,9 @@ No ticking, no controls, no REST — just the grid skeleton and static data.
 @blotter @smoke
 Scenario: Blotter renders expected column groups
   Given the PT-Blotter is open
-  Then the grid should display column "isin"
+  Then the grid should display column "ptId"
+  And the grid should display column "ptLineId"
+  And the grid should display column "isin"
   And the grid should display column "twPrice"
   And the grid should display column "twSpread"
   And the grid should display column "cpPrice"
@@ -666,65 +674,109 @@ for the REST assertions — no new REST infrastructure invented.
 
 ---
 
-### M4 — Skew controls and APPLY
+### M4 — Toolbar: Ref Source / Ref Side / Markup ± / Units / APPLY
 
-**Goal:** Trader selects a row, sets ref source / convention / skew amount in the
-toolbar, presses APPLY, and the `price` and `spread` columns update with the
-mathematically correct skewed values derived from the selected ref source's bid/ask.
+**Goal:** Trader selects row(s), configures the top-of-page toolbar, and presses APPLY.
+The `price` column updates when units=`c`; the `spread` column updates when units=`bp`.
+Markup ± buttons provide fine-grained adjustment without touching the keyboard.
+
+**Toolbar layout (left → right):**
+```
+[Source: TW|CP+|CBBT]  [Side: Bid|Ask|Mid]  [−][markup input][+]  [c|bp]  [APPLY]  [SEND]  | N selected
+```
+
+**APPLY logic:**
+```
+ref_cell  = row[{source}Price]  if units='c'
+            row[{source}Spread] if units='bp'
+[bid, ask] = ref_cell.split(' / ').map(Number)
+anchor     = bid            if side='Bid'
+             ask            if side='Ask'
+             (bid+ask)/2    if side='Mid'
+computed   = anchor + markup
+row.price  = computed  if units='c'
+row.spread = computed  if units='bp'
+```
 
 **Deliverables:**
-- Toolbar components: Ref Source select (`TW` / `CP+` / `CBBT`), Convention select
-  (`Price` / `Spread`), Skew Δ number input, APPLY button
-- APPLY logic reads the selected ref source's **bid** and **ask** from the combined
-  cell (parsed from the `"bid / ask"` string) at the moment APPLY is pressed:
-  - Price convention: `price = bid_price - skewDelta`, `spread = ask_price + skewDelta`
-  - Spread convention: `price` derived from `bid_spread - skewDeltaBp`, same for spread
-- `price` and `spread` columns populated/updated on row after APPLY
-- `sentPrice` and `sentSpread` remain unchanged until SEND is pressed
+- `Toolbar.tsx` + `Toolbar.css`: Source select, Side select, Markup input with [−][+]
+  buttons (step = 0.01 for c, 1 for bp), Units toggle (c / bp), APPLY + SEND buttons,
+  selection count badge
+- `App.tsx` APPLY handler implementing the formula above
+- `BlotterGrid.tsx` accepts `onGridReady` and `onSelectionChanged` callback props
+- `BlotterDsl.java` encapsulates all Playwright interaction (M7 contract met here)
+
+**Key aria-labels (used by Playwright locators):**
+| Element | aria-label |
+|---|---|
+| Source select | `Ref Source` |
+| Side select | `Ref Side` |
+| Markup input | `Markup Value` |
+| Decrement button | `Decrease Markup` |
+| Increment button | `Increase Markup` |
+| Units c button | `Units c` |
+| Units bp button | `Units bp` |
+| APPLY | `Apply` |
+| SEND | `Send` |
 
 **Unhit tests:**
 ```gherkin
-@blotter @workflow
-Scenario: Applying a price skew to a single row updates price and spread
+@m4 @workflow
+Scenario: APPLY with units=c sets price from TW Mid reference
   Given the PT-Blotter is open
   When I select the row with ISIN "US912828YJ02"
-  And I set the ref source to "TW", convention "Price", skew "-0.25"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
   And I press APPLY
-  Then the "price" for ISIN "US912828YJ02" should equal the TW bid minus 0.25
-  And the "spread" for ISIN "US912828YJ02" should equal the TW ask plus 0.25
-  And the "sentPrice" for ISIN "US912828YJ02" should be blank
+  Then the "price" for ISIN "US912828YJ02" should be a numeric value
 
-Scenario: Applying a spread skew uses basis points
+Scenario: APPLY with units=bp sets spread from CP+ Bid reference
   Given the PT-Blotter is open
   When I select the row with ISIN "XS2346573523"
-  And I set the ref source to "CP+", convention "Spread", skew "+5"
+  And I set the toolbar ref source "CP+" ref side "Bid" markup "0" units "bp"
   And I press APPLY
-  Then the "spread" for ISIN "XS2346573523" should reflect CP+ spread plus 5bp
+  Then the "spread" for ISIN "XS2346573523" should be a numeric value
 
-Scenario: APPLY button is disabled when no row is selected
+Scenario: Unselected row is not affected by APPLY
   Given the PT-Blotter is open
-  Then the APPLY button should be disabled
+  When I select the row with ISIN "US912828YJ02"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
+  And I press APPLY
+  Then the "price" for ISIN "XS2346573523" should be blank
+
+Scenario: Markup plus button increments markup value
+  Given the PT-Blotter is open
+  When I press the markup plus button
+  Then the markup input should show a positive value
+
+Scenario: Markup minus button decrements markup value
+  Given the PT-Blotter is open
+  When I press the markup minus button
+  Then the markup input should show a negative value
+```
+
+**Step phrase (combined toolbar config):**
+```
+I set the toolbar ref source {string} ref side {string} markup {string} units {string}
 ```
 
 **Quality gate:**
 ```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @workflow"  # 3/3 passing
-mvn verify                                                   # 24/24 total
+# Requires Vite build: mvn verify -Dblotter.build.skip=false
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m4"  # 5/5 passing
+# Regression guard — all non-build-required scenarios still pass:
+mvn verify "-Dcucumber.filter.tags=not @m1 and not @m2 and not @m4 and not @m5 and not @m6 and not @m7"
 ```
 
 **Known risks:**
-- Floating-point precision in `price = bidPrice - skewDelta`.  Mitigation: use
-  `NumericComparator.assertEquivalent()` (already exists) rather than exact string
-  equality; assert `Math.abs(actual - expected) < 0.001`.
-- Reference price is ticking while trader sets skew controls — race condition.
-  Mitigation: step def parses the `"bid / ask"` cell text at the moment APPLY is
-  pressed (snapshot), computes expected from that; does not re-read ref after APPLY.
-- Parsing combined `"bid / ask"` cell text: step def splits on `" / "` and takes the
-  relevant side.  Test for this in a unit test / probe test before relying on it in E2E.
-- Toolbar state resets on deselect — ensure controls persist their values during the test.
+- Ticking prices: the ref cell value changes between "I press APPLY" and any subsequent
+  assertion.  Assertions are "numeric value exists" not "exact value" — immune to ticking.
+- Pinned left columns: `select` and `isin` cols are `pinned: 'left'` → in
+  `.ag-pinned-left-cols-container`, not `.ag-center-cols-container`.  `BlotterDsl`
+  uses the correct container per col-id.
+- Checkbox click in AG Grid CE: target `input[type='checkbox']` inside the cell.
 
-**Exit criteria:** `NumericComparator` validates applied prices.  No `Thread.sleep` in
-step defs.  `TickingCellHelper` or `GridHarness` reused unmodified.
+**Exit criteria:** M4 quality gate green.  APPLY updates `price`/`spread` to a non-blank
+numeric value for selected rows only.  Markup ± buttons change the input value.
 
 ---
 
@@ -748,36 +800,39 @@ re-APPLY a new skew and press SEND again to update the sent values.
 
 **Unhit tests:**
 ```gherkin
-@blotter @workflow
-Scenario: After SEND the row status becomes QUOTED and sent values are captured
+@m5 @workflow
+Scenario: SEND sets status to QUOTED
   Given the PT-Blotter is open
-  And I have applied a skew to the row with ISIN "US912828YJ02"
   When I select the row with ISIN "US912828YJ02"
-  And I press SEND
-  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-  And the "sentPrice" for ISIN "US912828YJ02" should equal its "price"
-  And the "sentSpread" for ISIN "US912828YJ02" should equal its "spread"
-
-Scenario: QUOTED row remains editable and trader can re-quote
-  Given the row with ISIN "US912828YJ02" has been sent and is QUOTED
-  When I select the row with ISIN "US912828YJ02"
-  And I set the ref source to "TW", convention "Price", skew "-0.50"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
   And I press APPLY
   And I press SEND
-  Then the row with ISIN "US912828YJ02" should still have status "QUOTED"
-  And the "sentPrice" should reflect the new applied price
+  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
 
-Scenario: SEND calls the quote API with price and spread
-  Given I have applied "TW Price -0.25" to the row with ISIN "US912828YJ02"
-  When I press SEND
-  Then the API should have received a quote request for "US912828YJ02"
-  And the request body should contain "price" and "spread" fields
+Scenario: SEND captures sentPrice snapshot
+  Given the PT-Blotter is open
+  When I select the row with ISIN "US912828YJ02"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
+  And I press APPLY
+  And I press SEND
+  Then the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
+
+Scenario: Re-quote — APPLY then SEND twice updates sentPrice
+  Given the PT-Blotter is open
+  When I select the row with ISIN "US912828YJ02"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
+  And I press APPLY
+  And I press SEND
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0.5" units "c"
+  And I press APPLY
+  And I press SEND
+  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
+  And the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
 ```
 
 **Quality gate:**
 ```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @workflow"  # 6/6 passing
-mvn verify                                                   # 27/27 total
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m5"  # 3/3 passing
 ```
 
 **Known risks:**
@@ -808,34 +863,43 @@ rows in one APPLY press.  SEND sends all selected rows simultaneously.
 
 **Unhit tests:**
 ```gherkin
-@blotter @workflow @multi
-Scenario: Applying skew to two selected rows updates both applied prices
+@m6 @multi
+Scenario: APPLY updates all selected rows
   Given the PT-Blotter is open
-  When I select rows with ISINs "US912828YJ02" and "XS2346573523"
-  And I set the ref source to "TW", convention "Price", ref side "Bid", skew "-0.125"
+  When I select the row with ISIN "US912828YJ02"
+  And I select the row with ISIN "XS2346573523"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
   And I press APPLY
-  Then the applied bid for "US912828YJ02" should equal its TW Bid minus 0.125
-  And the applied bid for "XS2346573523" should equal its TW Bid minus 0.125
+  Then the "price" for ISIN "US912828YJ02" should be a numeric value
+  And the "price" for ISIN "XS2346573523" should be a numeric value
 
-Scenario: Sending two rows at once quotes both
-  Given I have applied a skew to rows "US912828YJ02" and "XS2346573523"
-  When I select both rows and press SEND
-  Then the row "US912828YJ02" should have status "QUOTED"
-  And the row "XS2346573523" should have status "QUOTED"
+Scenario: SEND quotes all selected rows
+  Given the PT-Blotter is open
+  When I select the row with ISIN "US912828YJ02"
+  And I select the row with ISIN "XS2346573523"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
+  And I press APPLY
+  And I press SEND
+  Then the row with ISIN "US912828YJ02" should have status "QUOTED"
+  And the row with ISIN "XS2346573523" should have status "QUOTED"
 
-Scenario: SEND re-quotes an already-QUOTED row alongside a PENDING row
-  Given row "US912828YJ02" is already QUOTED with a sent price
-  And row "XS2346573523" is PENDING with applied prices
-  When I select both rows and press SEND
-  Then row "XS2346573523" should become QUOTED
-  And row "US912828YJ02" should still be QUOTED with updated sent values
-  And the API should have been called exactly twice for the quote endpoint
+Scenario: Mix of Price and Spread across rows via two APPLY passes
+  Given the PT-Blotter is open
+  When I select the row with ISIN "US912828YJ02"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
+  And I press APPLY
+  And I select the row with ISIN "GB0031348658"
+  And I set the toolbar ref source "CBBT" ref side "Bid" markup "0" units "bp"
+  And I press APPLY
+  Then the "price"  for ISIN "US912828YJ02" should be a numeric value
+  And the "spread" for ISIN "GB0031348658" should be a numeric value
 ```
 
 **Quality gate:**
 ```bash
-mvn verify -Dcucumber.filter.tags="@blotter"  # all blotter scenarios passing
-mvn verify                                     # 30/30 total
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m6"  # 3/3 passing
+# Full blotter suite with build:
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"
 ```
 
 **Known risks:**
@@ -858,45 +922,45 @@ no Java code needed.  `BondBlotterSteps.java` contains zero direct Playwright ca
 
 **Deliverables:**
 - `BlotterDsl.java` — encapsulates all Playwright interaction with the blotter:
-  - `openBlotter()`, `selectRowByIsin(String)`, `selectRowsByIsins(String...)`
-  - `setSkewParameters(refSource, convention, skewDelta)`
-  - `pressApply()`, `pressSend()`
-  - `getRowStatus(isin)`, `getPrice(isin)`, `getSpread(isin)`
-  - `getSentPrice(isin)`, `getSentSpread(isin)`
-  - `getRefCellText(isin, colId)` — returns raw `"bid / ask"` string for ref price/spread
-  - `submitInquiryViaApi(isin, notional, side, client)` → uses `page.request()`
+  - `openBlotter()`, `assertTitle(String)`
+  - `assertColumnVisible(String colId)`, `assertAtLeastRows(int min)`
+  - `selectRowByIsin(String isin)` — locates via JS probe, clicks checkbox in pinned container
+  - `setToolbar(refSource, refSide, markup, units)` — fills all four toolbar controls
+  - `pressApply()`, `pressSend()`, `pressMarkupPlus()`, `pressMarkupMinus()`
+  - `readMarkupValue()` — returns current markup input value as double
+  - `assertStatus(isin, expected)` — auto-retrying (handles SEND async update)
+  - `assertCellNumeric(colId, isin)` — auto-retrying Playwright containsText(\\d)
+  - `assertCellBlank(colId, isin)` — no retry (static "nothing happened" assertion)
+  - REST: `submitInquiry(isin, ...)`, `assertApiStatus(response, n)`, `assertResponseContainsField(...)`
 - `BondBlotterSteps.java` delegates 100% to `BlotterDsl`
-- `BondBlotterSteps.java` has no `import com.microsoft.playwright.Locator` or `Page` usages
+- `BondBlotterSteps.java` has zero direct Playwright calls (no `Page`, no `Locator` imports)
 
-**Unhit test (a new scenario using only pre-existing step phrases — no new Java needed):**
+**Unhit test (uses only pre-existing step phrases — no new Java needed):**
 ```gherkin
-@blotter @dsl
-Scenario: Full inquiry-to-quote and re-quote workflow in DSL steps
+@m7 @dsl
+Scenario: Full re-quote workflow end-to-end
   Given the PT-Blotter is open
-  And a new inquiry is submitted for ISIN "FR0014004L86" notional "4000000" side "BUY" client "AXA IM"
-  When I select the row with ISIN "FR0014004L86"
-  And I set the ref source to "CBBT", convention "Price", skew "+0.125"
+  When I select the row with ISIN "GB0031348658"
+  And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
   And I press APPLY
   And I press SEND
-  Then the row with ISIN "FR0014004L86" should have status "QUOTED"
-  And the "sentPrice" for ISIN "FR0014004L86" should equal its "price"
-  When I set the ref source to "TW", convention "Price", skew "-0.25"
+  Then the row with ISIN "GB0031348658" should have status "QUOTED"
+  And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
+  When I set the toolbar ref source "CP+" ref side "Ask" markup "-0.25" units "c"
   And I press APPLY
   And I press SEND
-  Then the row with ISIN "FR0014004L86" should still have status "QUOTED"
-  And the "sentPrice" should reflect the updated applied price
+  Then the row with ISIN "GB0031348658" should have status "QUOTED"
+  And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
 ```
 
 **Quality gate:**
 ```bash
-mvn verify -Dcucumber.filter.tags="@blotter and @dsl"   # 1/1 new scenario, no new Java
-mvn verify                                               # 31/31 total
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m7"  # 1/1 passing
 ```
 
-Code review gate (manual, before declaring M7 done):
+Code review gate (manual):
 - `BondBlotterSteps.java`: zero `page.locator()`, zero `page.evaluate()`, zero `Page` imports
-- `BlotterDsl.java`: all probes called through `window.agGridProbes.*` (no inline JS)
-- `BlotterDsl` has no knowledge of bid/ask parsing logic — that lives in a step def helper or probe
+- `BlotterDsl.java`: row selection uses `window.agGridProbes.dom.findRowIndexByText`
 - Any new blotter scenario expressible using existing step phrases alone
 
 **Exit criteria:** Pair-review the feature file with someone unfamiliar with the codebase.

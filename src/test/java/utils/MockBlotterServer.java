@@ -48,14 +48,30 @@ public final class MockBlotterServer {
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
+    /**
+     * Starts on a random dynamic port (default for automated tests).
+     * Reads the optional system property {@code blotter.dev.port} — if set,
+     * starts on that fixed port instead (used by {@code BlotterDevServer}).
+     */
     public static void start() {
-        // withRootDirectory tells WireMock where to find __files/ and mappings/.
-        // Path is relative to the Maven working directory (project root).
+        String portProp = System.getProperty("blotter.dev.port");
+        start(portProp != null ? Integer.parseInt(portProp) : 0);
+    }
+
+    /**
+     * Starts on the given port.  Pass {@code 0} for a random dynamic port.
+     * Called directly by {@code BlotterDevServer} with a well-known port.
+     */
+    public static void start(int port) {
         String wireMockRoot = "src/test/resources/wiremock";
-        server = new WireMockServer(
-                WireMockConfiguration.options()
-                        .dynamicPort()
-                        .withRootDirectory(wireMockRoot));
+        WireMockConfiguration config = WireMockConfiguration.options()
+                .withRootDirectory(wireMockRoot);
+        if (port > 0) {
+            config = config.port(port);
+        } else {
+            config = config.dynamicPort();
+        }
+        server = new WireMockServer(config);
         server.start();
         registerStubs();
     }
@@ -197,14 +213,23 @@ public final class MockBlotterServer {
                 "\"timestamp\":\"2026-03-05T00:00:00Z\"}", INQUIRY_ID);
     }
 
+    // Portfolio IDs — mirror seedData.ts constants so API responses are consistent.
+    private static final String PT1 = "PT_BBG_20260306_3F7A";
+    private static final String PT2 = "PT_BBG_20260306_9C2E";
+
     private static String seedInquiriesBody() {
-        // Minimal seed list — matches the five design-contract ISINs.
+        // Minimal seed list — matches the five design-contract ISINs across two portfolios.
         return "[" +
-                "{\"inquiry_id\":\"INQ-001\",\"isin\":\"US912828YJ02\",\"status\":\"PENDING\"}," +
-                "{\"inquiry_id\":\"INQ-002\",\"isin\":\"XS2346573523\",\"status\":\"PENDING\"}," +
-                "{\"inquiry_id\":\"INQ-003\",\"isin\":\"US38141GXZ20\",\"status\":\"PENDING\"}," +
-                "{\"inquiry_id\":\"INQ-004\",\"isin\":\"GB0031348658\",\"status\":\"PENDING\"}," +
-                "{\"inquiry_id\":\"INQ-005\",\"isin\":\"FR0014004L86\",\"status\":\"PENDING\"}" +
+                "{\"inquiry_id\":\"INQ-001\",\"isin\":\"US912828YJ02\",\"status\":\"PENDING\"," +
+                "\"pt_id\":\"" + PT1 + "\",\"pt_line_id\":\"" + PT1 + "_1\"}," +
+                "{\"inquiry_id\":\"INQ-002\",\"isin\":\"XS2346573523\",\"status\":\"PENDING\"," +
+                "\"pt_id\":\"" + PT1 + "\",\"pt_line_id\":\"" + PT1 + "_2\"}," +
+                "{\"inquiry_id\":\"INQ-003\",\"isin\":\"US38141GXZ20\",\"status\":\"PENDING\"," +
+                "\"pt_id\":\"" + PT1 + "\",\"pt_line_id\":\"" + PT1 + "_3\"}," +
+                "{\"inquiry_id\":\"INQ-004\",\"isin\":\"GB0031348658\",\"status\":\"PENDING\"," +
+                "\"pt_id\":\"" + PT2 + "\",\"pt_line_id\":\"" + PT2 + "_1\"}," +
+                "{\"inquiry_id\":\"INQ-005\",\"isin\":\"FR0014004L86\",\"status\":\"PENDING\"," +
+                "\"pt_id\":\"" + PT2 + "\",\"pt_line_id\":\"" + PT2 + "_2\"}" +
                 "]";
     }
 

@@ -4,6 +4,7 @@ import {
   type ColDef,
   type ColGroupDef,
   type GridReadyEvent,
+  type SelectionChangedEvent,
   type GridApi,
   AllCommunityModule,
   ModuleRegistry,
@@ -23,6 +24,9 @@ ModuleRegistry.registerModules([AllCommunityModule])
 // These same values appear in Cucumber feature files as quoted strings, so
 // changing a colId here requires matching changes in BondBlotter.feature and
 // BondBlotterSteps.java.
+//
+// Skew controls (ref source, ref side, markup, units) are toolbar-only and
+// intentionally NOT represented as grid columns.
 
 const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
 
@@ -39,6 +43,21 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
         resizable: false,
         suppressHeaderMenuButton: true,
         pinned: 'left',
+      },
+      {
+        colId: 'ptId',
+        headerName: 'Portfolio',
+        field: 'ptId',
+        width: 155,
+        pinned: 'left',
+      },
+      {
+        colId: 'ptLineId',
+        headerName: '#',
+        field: 'ptLineId',
+        width: 44,
+        pinned: 'left',
+        valueFormatter: (p) => p.value?.split('_').pop() ?? '',
       },
       { colId: 'isin',        headerName: 'ISIN',        field: 'isin',        width: 130, pinned: 'left' },
       { colId: 'description', headerName: 'Description', field: 'description', width: 200, minWidth: 120 },
@@ -110,19 +129,6 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
     ],
   },
 
-  // ── Skew controls ────────────────────────────────────────────────────────────
-  {
-    headerName: 'Skew Controls',
-    children: [
-      { colId: 'refSource',  headerName: 'Ref Source',  field: 'refSource',  width: 95,
-        valueFormatter: (p) => p.value ?? '' },
-      { colId: 'convention', headerName: 'Convention',  field: 'convention', width: 95,
-        valueFormatter: (p) => p.value ?? '' },
-      { colId: 'skewDelta',  headerName: 'Skew Δ',      field: 'skewDelta',  width: 80,
-        valueFormatter: (p) => p.value != null ? String(p.value) : '' },
-    ],
-  },
-
   // ── Applied values ────────────────────────────────────────────────────────────
   {
     headerName: 'Applied',
@@ -152,20 +158,32 @@ const DEFAULT_COL_DEF: ColDef = {
   suppressHeaderMenuButton: false,
 }
 
+// ── Props ─────────────────────────────────────────────────────────────────────
+
+interface BlotterGridProps {
+  /** Called once when the AG Grid API is ready. App uses this to issue APPLY/SEND transactions. */
+  onGridReady?: (api: GridApi<Inquiry>) => void
+  /** Called whenever row selection changes; receives the new selected-row count. */
+  onSelectionChanged?: (count: number) => void
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function BlotterGrid() {
+export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionChanged }: BlotterGridProps) {
   const gridRef   = useRef<AgGridReact<Inquiry>>(null)
   const apiRef    = useRef<GridApi<Inquiry> | null>(null)
   const [rowData] = useState<Inquiry[]>(() => buildSeedInquiries())
 
-  // Start price simulator when grid is ready; stop on unmount.
   const onGridReady = useCallback((event: GridReadyEvent<Inquiry>) => {
     apiRef.current = event.api
     initSimulator(rowData)
     startSimulator(event.api)
-    // Future: fetch live inquiries from /api/inquiries here (M3)
-  }, [rowData])
+    onGridReadyProp?.(event.api)
+  }, [rowData, onGridReadyProp])
+
+  const handleSelectionChanged = useCallback((event: SelectionChangedEvent<Inquiry>) => {
+    onSelectionChanged?.(event.api.getSelectedRows().length)
+  }, [onSelectionChanged])
 
   useEffect(() => {
     return () => stopSimulator()
@@ -178,10 +196,11 @@ export default function BlotterGrid() {
         rowData={rowData}
         columnDefs={COLUMN_DEFS}
         defaultColDef={DEFAULT_COL_DEF}
+        getRowId={(params) => params.data.id}
         rowSelection="multiple"
         animateRows={true}
-        enableCellChangeFlash={true}
         onGridReady={onGridReady}
+        onSelectionChanged={handleSelectionChanged}
       />
     </div>
   )

@@ -1,15 +1,67 @@
-/* Grid container — fills whatever space App.tsx assigns */
+/* ── Grid container — fills the flex parent ──────────────────────────────────── */
 .blotter-grid {
   width: 100%;
   height: 100%;
 }
 
-/* ── Status badge colours ──────────────────────────────────────────────────── */
-.ag-theme-balham-dark .status-pending { color: #fbbf24; font-weight: 600; }
-.ag-theme-balham-dark .status-quoted  { color: #34d399; font-weight: 600; }
-.ag-theme-balham-dark .status-done    { color: #60a5fa; font-weight: 600; }
-.ag-theme-balham-dark .status-missed  { color: #f87171; font-weight: 600; }
+/* ── AG Grid Balham-Dark theme overrides ─────────────────────────────────────── */
+.blotter-grid.ag-theme-balham-dark {
+  --ag-background-color:              #06090f;
+  --ag-header-background-color:       #0b0f18;
+  --ag-odd-row-background-color:      #090d15;
+  --ag-row-hover-color:               rgba(21, 101, 192, 0.13);
+  --ag-selected-row-background-color: rgba(21, 101, 192, 0.20);
+  --ag-border-color:                  #182436;
+  --ag-foreground-color:              #bccedd;
+  --ag-header-foreground-color:       #466070;
+  --ag-secondary-foreground-color:    #3a5a70;
+  --ag-font-family:                   'Segoe UI', system-ui, sans-serif;
+  --ag-font-size:                     12px;
+  --ag-cell-horizontal-padding:       8px;
+  --ag-row-height:                    28px;
+  --ag-header-height:                 30px;
+  --ag-column-hover-color:            rgba(21, 101, 192, 0.07);
+  --ag-range-selection-border-color:  #1565c0;
+  --ag-checkbox-checked-color:        #1e90ff;
+  --ag-pinned-column-box-shadow:      3px 0 8px rgba(0, 0, 0, 0.6);
+}
 
-/* ── Side colours ──────────────────────────────────────────────────────────── */
-.ag-theme-balham-dark .side-buy  { color: #34d399; }
-.ag-theme-balham-dark .side-sell { color: #f87171; }
+/* ── Monospace font for price and numeric cells ───────────────────────────────── */
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="twPrice"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="twSpread"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="cpPrice"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="cpSpread"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="cbbPrice"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="cbbSpread"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="price"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="spread"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="sentPrice"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="sentSpread"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="coupon"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="notional"] {
+  font-family: 'Roboto Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11.5px;
+}
+
+/* ── Portfolio ID columns — dimmed monospace ──────────────────────────────────── */
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="ptId"],
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="ptLineId"] {
+  font-family: 'Roboto Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  color: #3a6080;
+}
+
+/* Line number column: centred */
+.blotter-grid.ag-theme-balham-dark .ag-cell[col-id="ptLineId"] {
+  text-align: center;
+}
+
+/* ── Status badge colours ─────────────────────────────────────────────────────── */
+.ag-theme-balham-dark .status-pending { color: #d4a017; font-weight: 600; }
+.ag-theme-balham-dark .status-quoted  { color: #00a878; font-weight: 600; }
+.ag-theme-balham-dark .status-done    { color: #1e90ff; font-weight: 600; }
+.ag-theme-balham-dark .status-missed  { color: #d63031; font-weight: 600; }
+
+/* ── Side colours ─────────────────────────────────────────────────────────────── */
+.ag-theme-balham-dark .side-buy  { color: #00a878; font-weight: 600; }
+.ag-theme-balham-dark .side-sell { color: #d63031; font-weight: 600; }

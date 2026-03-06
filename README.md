@@ -54,12 +54,15 @@ b-autobot/
     │   ├── runners/
     │   │   └── TestRunner.java      # @Suite JUnit 5 runner (discovers Cucumber scenarios)
     │   ├── stepdefs/
+    │   │   ├── BondBlotterSteps.java # Step defs for BondBlotter.feature (delegates to BlotterDsl)
     │   │   ├── FinanceDemoSteps.java # Step defs for finance_demo.feature
     │   │   ├── Hooks.java           # @BeforeAll / @Before / @After lifecycle
     │   │   └── PortfolioSteps.java  # Step defs for PortfolioRegression.feature
     │   └── utils/
+    │       ├── BlotterDevServer.java # Standalone launcher — start WireMock for manual browsing
+    │       ├── BlotterDsl.java      # PT-Blotter DSL — all Playwright interactions (M7 contract)
     │       ├── GridHarness.java     # Virtualisation-aware row finder (3-phase)
-    │       ├── MockBlotterServer.java # Embedded WireMock server
+    │       ├── MockBlotterServer.java # Embedded WireMock + PT-Blotter stubs
     │       ├── NumericComparator.java # BigDecimal-based UI vs API value comparison
     │       ├── PlaywrightManager.java # Thread-local Playwright lifecycle manager
     │       ├── ProbesLoader.java    # Loads bundle.js from classpath, injects via addInitScript
@@ -116,7 +119,114 @@ b-autobot/
 | Blotter grid loads and renders expected Finance Demo columns | `@portfolio @regression @external @ticking` |
 | GridHarness locates a row scrolled out of the visible viewport | `@portfolio @regression @external @ticking` |
 
-**Current status: 12 / 12 scenarios passing.**
+### `BondBlotter.feature` — PT-Blotter fixed income UI (`@blotter`)
+
+| Milestone | Scenarios | Tags | Build needed |
+|---|---|---|---|
+| M0 — page loads | 1 | `@smoke` | No |
+| M1 — grid columns + seed rows | 2 | `@m1` | Yes |
+| M2 — ticking reference prices | 3 | `@m2 @ticking` | Yes |
+| M3 — REST inquiry API | 2 | `@m3 @api` | No |
+| M4 — Toolbar APPLY (source/side/markup/units) | 6 | `@m4 @workflow` | Yes |
+| M5 — SEND → QUOTED, sentPrice snapshot | 3 | `@m5 @workflow` | Yes |
+| M6 — multi-row APPLY / SEND | 3 | `@m6 @multi` | Yes |
+| M7 — end-to-end DSL re-quote workflow | 1 | `@m7 @dsl` | Yes |
+
+**Current status: 15 / 15 passing without Vite build (M0 + M3 + all legacy).
+Full suite with build: `mvn verify -Dblotter.build.skip=false`.**
+
+---
+
+## PT-Blotter — running the mock UI interactively
+
+The PT-Blotter is a React + AG Grid app served by an embedded WireMock server.
+You can open it in a browser and click through the full APPLY / SEND workflow
+without running any tests.
+
+### Prerequisites
+
+- **Java 21+** on your PATH
+- **Node.js 20+** — only needed if you want the Vite dev server (hot-reload).
+  The Maven build downloads Node automatically via `frontend-maven-plugin`.
+
+### Step 1 — build the React app (once)
+
+```bash
+mvn test-compile -Dblotter.build.skip=false
+```
+
+This downloads Node 20 into `.node/`, runs `npm install`, and builds the React app
+into `src/test/resources/wiremock/__files/blotter/`.  Takes ~60 s on first run,
+~10 s after Node is cached.
+
+### Step 2 — start the mock server
+
+```bash
+mvn exec:java -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test
+```
+
+The server starts on **port 9099** by default and prints the URL.
+To use a different port, pass it as an argument:
+
+```bash
+mvn exec:java -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test "-Dexec.args=8765"
+```
+
+### Step 3 — open the blotter
+
+**Option A — pre-built page (no Node needed after Step 1):**
+
+```
+http://localhost:9099/blotter/
+```
+
+**Option B — Vite dev server (live hot-module-reload for UI development):**
+
+```bash
+# macOS / Linux / Git Bash
+cd src/test/webapp
+VITE_WIREMOCK_PORT=9099 npm run dev
+# → open http://localhost:5173/blotter/
+
+# Windows Command Prompt
+cd src\test\webapp
+set VITE_WIREMOCK_PORT=9099 && npm run dev
+
+# Windows PowerShell
+cd src\test\webapp
+$env:VITE_WIREMOCK_PORT=9099; npm run dev
+```
+
+### What you can click through
+
+| Action | How |
+|---|---|
+| See 5 seed inquiries | They load automatically with ticking TW / CP+ / CBBT prices |
+| Select rows | Click the checkbox at the far left of any row |
+| Apply a price | Set Source, Side, Markup, Units → **APPLY** → `Price` column fills in |
+| Apply a spread | Change Units to `bp` → **APPLY** → `Spread` column fills in |
+| Adjust markup | Click **−** or **+** next to the markup input; or type directly |
+| Send a quote | After APPLY, press **SEND** → status → `QUOTED`, `Sent Price` captures the snapshot |
+| Re-quote | While still QUOTED, change markup, APPLY, SEND again → `Sent Price` updates |
+| Post an inquiry via API | `POST http://localhost:9099/api/inquiry` (Postman / curl) |
+
+### Mock API reference
+
+| Method | URL | Response |
+|---|---|---|
+| `GET` | `/api/inquiries` | 200 — 5 seed inquiries (PENDING) |
+| `POST` | `/api/inquiry` | 201 — new inquiry with generated `inquiry_id` |
+| `POST` | `/api/inquiry` with `"UNKNOWN-ISIN-XYZ"` | 404 — ISIN not found |
+| `POST` | `/api/inquiry/{id}/quote` | 200 — QUOTED with sent snapshot |
+
+```bash
+# Example: submit an inquiry via curl
+curl -s -X POST http://localhost:9099/api/inquiry \
+  -H "Content-Type: application/json" \
+  -d '{"isin":"US912828YJ02","notional":5000000,"side":"BUY","client":"TEST"}'
+```
+
+Press **ENTER** in the terminal running `BlotterDevServer` to stop the server.
 
 ---
 
@@ -162,6 +272,26 @@ mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
 
 # Only the external live-grid scenarios
 mvn verify -Dcucumber.filter.tags="@external"
+
+# ── PT-Blotter specific ───────────────────────────────────────────────────────
+
+# Smoke: page loads (no Vite build required)
+mvn verify -Dcucumber.filter.tags="@smoke"
+
+# REST API scenarios only (no Vite build required)
+mvn verify -Dcucumber.filter.tags="@m3"
+
+# All blotter scenarios that don't need a Vite build
+mvn verify "-Dcucumber.filter.tags=not @m1 and not @m2 and not @m4 and not @m5 and not @m6 and not @m7"
+
+# Full blotter suite (requires Vite build — see PT-Blotter section above)
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"
+
+# Individual milestones (all require Vite build)
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m4"
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m5"
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m6"
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m7"
 ```
 
 ### Run JavaScript probe unit tests (Jest)

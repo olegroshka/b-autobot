@@ -5,10 +5,11 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  base: '/blotter/',
   build: {
     // Output directly into WireMock's __files/blotter/ so the Maven test run
     // picks it up automatically without a copy step.
-    outDir: path.resolve(__dirname, '../../resources/wiremock/__files/blotter'),
+    outDir: path.resolve(__dirname, '../resources/wiremock/__files/blotter'),
     emptyOutDir: true,
     rollupOptions: {
       output: {
