@@ -111,10 +111,9 @@ public final class BlotterDsl {
     }
 
     public void assertCellMatchesPattern(String colId, int rowIndex, String pattern) {
-        String text = dataCell(colId, rowIndex).textContent().trim();
-        assertThat(text)
-                .as("Cell [col-id='%s'][row-index=%d]", colId, rowIndex)
-                .matches(Pattern.compile(pattern));
+        /* Use Playwright's auto-retrying assertion so ticking cells are stable.
+         * containsText(Pattern) polls until the cell text matches — no timing race. */
+        assertThat(dataCell(colId, rowIndex)).containsText(Pattern.compile(pattern));
     }
 
     public void assertCellNotBlankByIndex(String colId, int rowIndex) {

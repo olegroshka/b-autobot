@@ -51,7 +51,7 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
   Scenario: Reference price cells update within the live feed window
     Given the PT-Blotter is open
     When I wait up to 3 seconds for the "twPrice" cell in row 0 to change value
-    Then the "twPrice" cell in row 0 should match the pattern "\\d+\\.\\d+ / \\d+\\.\\d+"
+    Then the "twPrice" cell in row 0 should match the pattern "[0-9]+[.][0-9]+ / [0-9]+[.][0-9]+"
 
   @m2 @ticking
   Scenario: TW Price cell flashes on a live update
