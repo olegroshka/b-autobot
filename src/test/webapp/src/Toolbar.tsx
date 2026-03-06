@@ -34,6 +34,7 @@ export default function Toolbar({ selectedCount, onApply, onSend }: ToolbarProps
       <div className="toolbar-group">
         <span className="toolbar-label">Source</span>
         <select
+          id="toolbar-ref-source"
           aria-label="Ref Source"
           value={refSource}
           onChange={(e) => setRefSource(e.target.value as RefSource)}
@@ -50,6 +51,7 @@ export default function Toolbar({ selectedCount, onApply, onSend }: ToolbarProps
       <div className="toolbar-group">
         <span className="toolbar-label">Side</span>
         <select
+          id="toolbar-ref-side"
           aria-label="Ref Side"
           value={refSide}
           onChange={(e) => setRefSide(e.target.value as RefSide)}
@@ -73,6 +75,7 @@ export default function Toolbar({ selectedCount, onApply, onSend }: ToolbarProps
             type="button"
           >−</button>
           <input
+            id="toolbar-markup"
             aria-label="Markup Value"
             type="number"
             step={step}

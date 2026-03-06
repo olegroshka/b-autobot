@@ -62,8 +62,6 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
       {
         colId: 'select',
         headerName: '',
-        checkboxSelection: true,
-        headerCheckboxSelection: true,
         width: 40,
         resizable: false,
         suppressHeaderMenuButton: true,
@@ -223,7 +221,7 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
         columnDefs={COLUMN_DEFS}
         defaultColDef={DEFAULT_COL_DEF}
         getRowId={(params) => params.data.id}
-        rowSelection="multiple"
+        rowSelection={{ mode: 'multiRow', checkboxes: true, headerCheckbox: true }}
         animateRows={true}
         onGridReady={onGridReady}
         onSelectionChanged={handleSelectionChanged}
