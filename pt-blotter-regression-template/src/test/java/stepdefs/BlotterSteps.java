@@ -1,5 +1,6 @@
 package stepdefs;
 
+import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.PlaywrightManager;
 import com.bbot.core.registry.BBotRegistry;
 import io.cucumber.java.en.And;
@@ -29,6 +30,10 @@ public class BlotterSteps {
     // DSL is instantiated fresh for every scenario via BBotRegistry.
     private final PtBlotterDsl blotter =
             BBotRegistry.dsl("blotter", PlaywrightManager.getPage(), PtBlotterDsl.class);
+
+    private TestDataConfig testData() {
+        return BBotRegistry.getConfig().getTestData();
+    }
 
     // ── Navigation ────────────────────────────────────────────────────────────
 
@@ -112,4 +117,34 @@ public class BlotterSteps {
 
     @Then("the RELEASE PT button should be enabled")
     public void releasePtShouldBeEnabled()  { blotter.assertReleasePtEnabled(); }
+
+    // ── Named-user navigation ─────────────────────────────────────────────────
+
+    @Given("the PT-Blotter is open as the trader")
+    public void ptBlotterIsOpenAsTrader() { blotter.openBlotter(testData().getUser("trader")); }
+
+    @Given("the PT-Blotter is open as the admin")
+    public void ptBlotterIsOpenAsAdmin()  { blotter.openBlotter(testData().getUser("admin")); }
+
+    // ── Bond-list ISIN step variants ──────────────────────────────────────────
+
+    @When("I select the row with ISIN from {string} field {string}")
+    public void selectRowByBondRef(String bondList, String field) {
+        blotter.selectRowByIsin(testData().resolveBondRef(bondList, field));
+    }
+
+    @Then("the row with ISIN from {string} field {string} should have status {string}")
+    public void rowByBondRefShouldHaveStatus(String bondList, String field, String status) {
+        blotter.assertRowStatus(testData().resolveBondRef(bondList, field), status);
+    }
+
+    @Then("the {string} for ISIN from {string} field {string} should be a numeric value")
+    public void cellByBondRefShouldBeNumeric(String colId, String bondList, String field) {
+        blotter.assertCellNumeric(colId, testData().resolveBondRef(bondList, field));
+    }
+
+    @Then("the {string} for ISIN from {string} field {string} should be blank")
+    public void cellByBondRefShouldBeBlank(String colId, String bondList, String field) {
+        blotter.assertCellBlank(colId, testData().resolveBondRef(bondList, field));
+    }
 }

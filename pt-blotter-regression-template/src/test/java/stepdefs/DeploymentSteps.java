@@ -47,4 +47,10 @@ public class DeploymentSteps {
     public void serviceShouldBeAtVersion(String name, String status, String version) {
         deployment.assertServiceStatusAndVersion(name, status, version);
     }
+
+    @And("the service {string} is {string} at its tested version")
+    public void serviceShouldBeAtTestedVersion(String name, String status) {
+        String version = BBotRegistry.getConfig().getTestData().getServiceVersion(name);
+        deployment.assertServiceStatusAndVersion(name, status, version);
+    }
 }

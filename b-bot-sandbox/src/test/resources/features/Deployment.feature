@@ -31,21 +31,23 @@ Feature: Deployment Dashboard — service registry and health monitor
     And the deployment API should list service "market-data-gateway"
 
   # ── API — version evidence (formal proof for regression report) ─────────────
+  # Versions are declared in b-bot.test-data.service-versions (application.conf).
+  # Update there when deploying a new build; these scenarios stay stable.
 
   @api @versions
   Scenario: credit-rfq-blotter is deployed and running at the tested version
     Given the deployment dashboard is available
-    Then the service "credit-rfq-blotter" should be "RUNNING" at version "v2.4.1"
+    Then the service "credit-rfq-blotter" should be "RUNNING" at its tested version
 
   @api @versions
   Scenario: credit-pt-pricer is deployed and running at the tested version
     Given the deployment dashboard is available
-    Then the service "credit-pt-pricer" should be "RUNNING" at version "v1.8.3"
+    Then the service "credit-pt-pricer" should be "RUNNING" at its tested version
 
   @api @versions
   Scenario: credit-pt-neg-engine is deployed and running at the tested version
     Given the deployment dashboard is available
-    Then the service "credit-pt-neg-engine" should be "RUNNING" at version "v3.1.0"
+    Then the service "credit-pt-neg-engine" should be "RUNNING" at its tested version
 
   # ── API — status distribution ───────────────────────────────────────────────
 

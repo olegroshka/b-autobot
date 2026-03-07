@@ -75,7 +75,11 @@ public final class TestDataConfig {
         Map<String, String> result = new LinkedHashMap<>();
         root.entrySet().stream()
             .filter(e -> !e.getKey().startsWith("bond-lists")
-                      && !e.getKey().startsWith("templates"))
+                      && !e.getKey().startsWith("templates")
+                      && !e.getKey().startsWith("api-actions")
+                      && !e.getKey().startsWith("portfolios")
+                      && !e.getKey().startsWith("service-versions")
+                      && !e.getKey().startsWith("users"))
             .forEach(e -> result.put(e.getKey(), e.getValue().unwrapped().toString()));
         return Collections.unmodifiableMap(result);
     }
@@ -134,6 +138,44 @@ public final class TestDataConfig {
                 "Add:  templates." + templateName + " = \"path/to/file.json\"");
         return cfg.getString(path);
     }
+    // ── Service versions ──────────────────────────────────────────────────────
+
+    /**
+     * Returns the tested version string for the named service from
+     * {@code b-bot.test-data.service-versions}.
+     *
+     * <p>Example: {@code getServiceVersion("credit-rfq-blotter")} → {@code "v2.4.1"}.
+     *
+     * @throws AssertionError if the service name is not declared
+     */
+    public String getServiceVersion(String serviceName) {
+        String path = ROOT + ".service-versions." + serviceName;
+        if (!cfg.hasPath(path))
+            throw new AssertionError(
+                "Service version for '" + serviceName + "' not found in b-bot.test-data.service-versions. " +
+                "Add:  service-versions.\"" + serviceName + "\" = \"vX.Y.Z\"");
+        return cfg.getString(path);
+    }
+
+    // ── Users ─────────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the username for the named role from {@code b-bot.test-data.users}.
+     *
+     * <p>Example: {@code getUser("trader")} → {@code "doej"},
+     * {@code getUser("admin")} → {@code "smithj"}.
+     *
+     * @throws AssertionError if the role is not declared
+     */
+    public String getUser(String role) {
+        String path = ROOT + ".users." + role;
+        if (!cfg.hasPath(path))
+            throw new AssertionError(
+                "User role '" + role + "' not found in b-bot.test-data.users. " +
+                "Add:  users." + role + " = \"username\"");
+        return cfg.getString(path);
+    }
+
     // ── API actions ───────────────────────────────────────────────────────────
 
     /**

@@ -9,20 +9,19 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
   # its pass/fail state appears at the top of the Cucumber regression report,
   # giving QA sign-off evidence that the correct software was tested.
   #
-  # The checked versions must match the seed data in MockDeploymentServer.
+  # Versions are declared in b-bot.test-data.service-versions (application.conf).
   # Quality gate: mvn verify -Dcucumber.filter.tags="@blotter and @precondition" → 1/1
   # ──────────────────────────────────────────────────────────────────────────────
 
   @precondition @deployment
   Scenario: Required credit trading services are deployed at the tested versions
     Given the deployment dashboard is available
-    Then the service "credit-rfq-blotter" should be "RUNNING" at version "v2.4.1"
-    And the service "credit-pt-pricer" should be "RUNNING" at version "v1.8.3"
-    And the service "credit-pt-neg-engine" should be "RUNNING" at version "v3.1.0"
+    Then the service "credit-rfq-blotter" should be "RUNNING" at its tested version
+    And the service "credit-pt-pricer" should be "RUNNING" at its tested version
+    And the service "credit-pt-neg-engine" should be "RUNNING" at its tested version
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M0 — Build pipeline spine
-  # Goal: Playwright can open the blotter URL served by WireMock.
   # Quality gate: mvn verify -Dcucumber.filter.tags="@blotter and @smoke" → 1/1
   # ──────────────────────────────────────────────────────────────────────────────
 
@@ -32,8 +31,7 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     Then the page title should contain "PT-Blotter"
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # M1 — Grid structure visible  [UNHIT — fails until Vite build runs]
-  # Goal: AG Grid renders with all expected columns and seeded rows.
+  # M1 — Grid structure visible
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m1"
   # ──────────────────────────────────────────────────────────────────────────────
 
@@ -57,12 +55,11 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
   Scenario: Blotter loads with seeded inquiries
     Given the PT-Blotter is open
     Then the grid should have at least 5 rows
-    And the row with ISIN "US912828YJ02" should have status "PENDING"
-    And the row with ISIN "XS2346573523" should have status "PENDING"
+    And the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # M2 — Ticking reference prices  [UNHIT — fails until Vite build runs]
-  # Goal: TW/CP+/CBBT price and spread cells update at ~400 ms; flash on each tick.
+  # M2 — Ticking reference prices
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m2"
   # ──────────────────────────────────────────────────────────────────────────────
 
@@ -86,14 +83,13 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M3 — REST inquiry ingestion
-  # Goal: POST /api/inquiry adds a new PENDING row; unknown ISINs return 404.
   # Quality gate: mvn verify -Dcucumber.filter.tags="@m3" → 2/2 (no build needed)
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m3 @api
   Scenario: Inquiry submitted via API appears in blotter as PENDING
     Given the PT-Blotter is open
-    When a new inquiry is submitted for ISIN "US38141GXZ20" notional "3000000" side "BUY" client "SCHRODERS"
+    When a new inquiry is submitted for ISIN from "HYPT_1" field "ISIN3" notional "3000000" side "BUY" client "SCHRODERS"
     Then the blotter API response status should be 201
     And the response should contain a non-blank "inquiry_id"
 
@@ -105,47 +101,43 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M4 — Toolbar: Ref Source / Ref Side / Markup ± / Units / APPLY
-  #       [UNHIT — fails until Vite build runs]
-  # Goal: APPLY computes price (units=c) or spread (units=bp) for selected rows
-  #       using the chosen reference source, side, and markup offset.
-  # Toolbar layout: [Source TW|CP+|CBBT] [Side Bid|Ask|Mid] [- markup +] [c|bp] [APPLY] [SEND]
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m4"
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m4 @workflow
   Scenario: APPLY with units=c sets price from TW Mid reference
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN "US912828YJ02" should be a numeric value
+    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @m4 @workflow
   Scenario: APPLY with units=bp sets spread from CP+ Bid reference
     Given the PT-Blotter is open
-    When I select the row with ISIN "XS2346573523"
+    When I select the row with ISIN from "HYPT_1" field "ISIN2"
     And I set the toolbar ref source "CP+" ref side "Bid" markup "0" units "bp"
     And I press APPLY
-    Then the "spread" for ISIN "XS2346573523" should be a numeric value
+    Then the "spread" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 
   @m4 @workflow
   Scenario: Positive markup shifts price above mid
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0.5" units "c"
     And I press APPLY
-    Then the "price" for ISIN "US912828YJ02" should be a numeric value
+    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @m4 @workflow
   Scenario: Unselected row is not affected by APPLY
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN "XS2346573523" should be blank
+    Then the "price" for ISIN from "HYPT_1" field "ISIN2" should be blank
 
   @m4 @workflow
   Scenario: Markup plus button increments markup value
@@ -160,140 +152,135 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     Then the markup input should show a negative value
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # M5 — SEND: non-locking quote submission  [UNHIT — fails until Vite build runs]
-  # Goal: SEND POSTs quote, stamps status=QUOTED, captures sentPrice/sentSpread.
-  #       Row stays editable; re-APPLY → re-SEND updates the snapshot each time.
+  # M5 — SEND: non-locking quote submission
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m5"
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m5 @workflow
   Scenario: SEND sets status to QUOTED
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "US912828YJ02" should have status "QUOTED"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
 
   @m5 @workflow
   Scenario: SEND captures sentPrice snapshot
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
+    Then the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @m5 @workflow
   Scenario: Re-quote — SEND again after re-APPLY updates sentPrice
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
     And I set the toolbar ref source "TW" ref side "Mid" markup "0.5" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-    And the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # M6 — Multi-row APPLY / SEND  [UNHIT — fails until Vite build runs]
-  # Goal: APPLY and SEND operate on all checked rows simultaneously.
+  # M6 — Multi-row APPLY / SEND
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m6"
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m6 @multi
   Scenario: APPLY updates all selected rows
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
-    And I select the row with ISIN "XS2346573523"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    And I select the row with ISIN from "HYPT_1" field "ISIN2"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN "US912828YJ02" should be a numeric value
-    And the "price" for ISIN "XS2346573523" should be a numeric value
+    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "price" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 
   @m6 @multi
   Scenario: SEND quotes all selected rows
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
-    And I select the row with ISIN "XS2346573523"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    And I select the row with ISIN from "HYPT_1" field "ISIN2"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-    And the row with ISIN "XS2346573523" should have status "QUOTED"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "QUOTED"
 
   @m6 @multi
   Scenario: Mix of Price and Spread across rows via two APPLY passes
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
-    And I select the row with ISIN "GB0031348658"
+    And I select the row with ISIN from "IG_1" field "ISIN1"
     And I set the toolbar ref source "CBBT" ref side "Bid" markup "0" units "bp"
     And I press APPLY
-    Then the "price" for ISIN "US912828YJ02" should be a numeric value
-    And the "spread" for ISIN "GB0031348658" should be a numeric value
+    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "spread" for ISIN from "IG_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # M7 — DSL: end-to-end re-quote workflow  [UNHIT — fails until Vite build runs]
-  # Goal: Full APPLY → SEND → re-APPLY → re-SEND cycle via composed step phrases.
+  # M7 — DSL: end-to-end re-quote workflow
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m7"
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m7 @dsl
   Scenario: Full re-quote workflow end-to-end
     Given the PT-Blotter is open
-    When I select the row with ISIN "GB0031348658"
+    When I select the row with ISIN from "IG_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "GB0031348658" should have status "QUOTED"
-    And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
+    Then the row with ISIN from "IG_1" field "ISIN1" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "IG_1" field "ISIN1" should be a numeric value
     # Re-quote: change markup and re-SEND without selecting again
     When I set the toolbar ref source "CP+" ref side "Ask" markup "-0.25" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "GB0031348658" should have status "QUOTED"
-    And the "sentPrice" for ISIN "GB0031348658" should be a numeric value
+    Then the row with ISIN from "IG_1" field "ISIN1" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "IG_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
-  # M8 — RELEASE PT access control + workflow  [UNHIT — fails until Vite build runs]
-  # Goal: RELEASE PT button respects isPTAdmin from config service;
-  #       admin can move rows to RELEASED status.
+  # M8 — RELEASE PT access control + workflow
   # Quality gate: mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"
+  # User roles are declared in b-bot.test-data.users (application.conf).
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m8 @access
-  Scenario: RELEASE PT button is not accessible when doej isPTAdmin flag is false
-    Given the PT-Blotter is open as user "doej"
+  Scenario: RELEASE PT button is not accessible when trader isPTAdmin flag is false
+    Given the PT-Blotter is open as the trader
     Then the RELEASE PT button should be disabled
 
   @m8 @access
-  Scenario: RELEASE PT button is accessible when smithj isPTAdmin flag is true
-    Given the PT-Blotter is open as user "smithj"
+  Scenario: RELEASE PT button is accessible when admin isPTAdmin flag is true
+    Given the PT-Blotter is open as the admin
     Then the RELEASE PT button should be enabled
 
   @m8 @workflow
-  Scenario: smithj releases a row — status becomes RELEASED
-    Given the PT-Blotter is open as user "smithj"
-    When I select the row with ISIN "US912828YJ02"
+  Scenario: Admin releases a row — status becomes RELEASED
+    Given the PT-Blotter is open as the admin
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I press RELEASE PT
-    Then the row with ISIN "US912828YJ02" should have status "RELEASED"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "RELEASED"
 
   @m8 @workflow
-  Scenario: Release PT does not affect rows not selected by smithj
-    Given the PT-Blotter is open as user "smithj"
-    When I select the row with ISIN "US912828YJ02"
+  Scenario: Release PT does not affect rows not selected by admin
+    Given the PT-Blotter is open as the admin
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I press RELEASE PT
-    Then the row with ISIN "XS2346573523" should have status "PENDING"
+    Then the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
 
   @m8 @workflow
-  Scenario: smithj releases multiple rows simultaneously
-    Given the PT-Blotter is open as user "smithj"
-    When I select the row with ISIN "US912828YJ02"
-    And I select the row with ISIN "XS2346573523"
+  Scenario: Admin releases multiple rows simultaneously
+    Given the PT-Blotter is open as the admin
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    And I select the row with ISIN from "HYPT_1" field "ISIN2"
     And I press RELEASE PT
-    Then the row with ISIN "US912828YJ02" should have status "RELEASED"
-    And the row with ISIN "XS2346573523" should have status "RELEASED"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "RELEASED"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "RELEASED"

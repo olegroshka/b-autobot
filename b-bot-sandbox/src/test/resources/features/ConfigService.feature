@@ -4,6 +4,9 @@ Feature: Config Service — in-memory configuration store
   # Quality gate: mvn verify -Dcucumber.filter.tags="@config-service and @smoke" → 2/2
   # Quality gate: mvn verify -Dcucumber.filter.tags="@config-service and @api"   → 12/12
   # Quality gate: mvn verify -Dcucumber.filter.tags="@config-service"            → 14/14
+  #
+  # User role names (trader, admin, trader2, admin2) are declared in
+  # b-bot.test-data.users (application.conf); usernames are never hardcoded here.
 
   # ── Namespace discovery ─────────────────────────────────────────────────────
 
@@ -26,33 +29,33 @@ Feature: Config Service — in-memory configuration store
   Scenario: All four seed users are present in Permissions config
     Given the config service is running
     When I read all entries under "credit.pt.access" / "Permissions"
-    Then the entry list should contain key "doej"
-    And the entry list should contain key "smithj"
-    And the entry list should contain key "patelv"
-    And the entry list should contain key "nguyenl"
+    Then the entry list should contain user "trader"
+    And the entry list should contain user "admin"
+    And the entry list should contain user "trader2"
+    And the entry list should contain user "admin2"
 
   @api
-  Scenario: doej is not a PT admin by default
+  Scenario: Trader is not a PT admin by default
     Given the config service is running
-    When I read config "credit.pt.access" / "Permissions" / "doej"
+    When I read config "credit.pt.access" / "Permissions" / user "trader"
     Then the config value "isPTAdmin" should be "false"
 
   @api
-  Scenario: smithj is a PT admin by default
+  Scenario: Admin is a PT admin by default
     Given the config service is running
-    When I read config "credit.pt.access" / "Permissions" / "smithj"
+    When I read config "credit.pt.access" / "Permissions" / user "admin"
     Then the config value "isPTAdmin" should be "true"
 
   @api
-  Scenario: patelv is not a PT admin by default
+  Scenario: Second trader is not a PT admin by default
     Given the config service is running
-    When I read config "credit.pt.access" / "Permissions" / "patelv"
+    When I read config "credit.pt.access" / "Permissions" / user "trader2"
     Then the config value "isPTAdmin" should be "false"
 
   @api
-  Scenario: nguyenl is a PT admin by default
+  Scenario: Second admin is a PT admin by default
     Given the config service is running
-    When I read config "credit.pt.access" / "Permissions" / "nguyenl"
+    When I read config "credit.pt.access" / "Permissions" / user "admin2"
     Then the config value "isPTAdmin" should be "true"
 
   # ── Other namespaces ────────────────────────────────────────────────────────
@@ -81,12 +84,12 @@ Feature: Config Service — in-memory configuration store
   # ── Mutable config — update and read back ──────────────────────────────────
 
   @api
-  Scenario: Promote doej to PT admin and restore
+  Scenario: Promote trader to PT admin and restore
     Given the config service is running
-    When I update config "credit.pt.access" / "Permissions" / "doej" setting "isPTAdmin" to "true"
+    When I update config "credit.pt.access" / "Permissions" / user "trader" setting "isPTAdmin" to "true"
     Then the config value "isPTAdmin" should be "true"
     # Reset — avoid polluting other tests
-    When I update config "credit.pt.access" / "Permissions" / "doej" setting "isPTAdmin" to "false"
+    When I update config "credit.pt.access" / "Permissions" / user "trader" setting "isPTAdmin" to "false"
     Then the config value "isPTAdmin" should be "false"
 
   # ── Create and delete entries ───────────────────────────────────────────────

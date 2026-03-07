@@ -1,5 +1,6 @@
 package stepdefs;
 
+import com.bbot.core.data.TestDataConfig;
 import com.microsoft.playwright.APIResponse;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -33,6 +34,10 @@ public class BondBlotterSteps {
 
     private final BlotterDsl dsl =
             BBotRegistry.dsl("blotter", PlaywrightManager.getPage(), BlotterDsl.class);
+
+    private TestDataConfig testData() {
+        return BBotRegistry.getConfig().getTestData();
+    }
 
     // Shared state between When/Then steps within a scenario
     private APIResponse lastApiResponse;
@@ -183,6 +188,52 @@ public class BondBlotterSteps {
     @Given("the PT-Blotter is open as user {string}")
     public void openBlotterAsUser(String user) {
         dsl.openBlotter(user);
+    }
+
+    @Given("the PT-Blotter is open as the trader")
+    public void openBlotterAsTrader() {
+        dsl.openBlotter(testData().getUser("trader"));
+    }
+
+    @Given("the PT-Blotter is open as the admin")
+    public void openBlotterAsAdmin() {
+        dsl.openBlotter(testData().getUser("admin"));
+    }
+
+    // ── Bond-list ISIN step variants ──────────────────────────────────────────
+    // Use these instead of hardcoding ISINs in feature files.
+    // The ISIN is resolved from b-bot.test-data.bond-lists at runtime.
+
+    @When("I select the row with ISIN from {string} field {string}")
+    public void selectRowByBondRef(String bondList, String field) {
+        dsl.selectRowByIsin(testData().resolveBondRef(bondList, field));
+    }
+
+    @Then("the row with ISIN from {string} field {string} should have status {string}")
+    public void rowByBondRefShouldHaveStatus(String bondList, String field, String status) {
+        dsl.assertStatus(testData().resolveBondRef(bondList, field), status);
+    }
+
+    @Then("the {string} for ISIN from {string} field {string} should be a numeric value")
+    public void cellByBondRefShouldBeNumeric(String colId, String bondList, String field) {
+        dsl.assertCellNumeric(colId, testData().resolveBondRef(bondList, field));
+    }
+
+    @Then("the {string} for ISIN from {string} field {string} should be blank")
+    public void cellByBondRefShouldBeBlank(String colId, String bondList, String field) {
+        dsl.assertCellBlank(colId, testData().resolveBondRef(bondList, field));
+    }
+
+    @When("a new inquiry is submitted for ISIN from {string} field {string} notional {string} side {string} client {string}")
+    public void submitInquiryByBondRef(String bondList, String field,
+                                        String notional, String side, String client) {
+        lastApiResponse = dsl.submitInquiry(
+                testData().resolveBondRef(bondList, field), notional, side, client);
+    }
+
+    @When("a new inquiry is submitted for ISIN from {string} field {string}")
+    public void submitInquiryByBondRefSimple(String bondList, String field) {
+        lastApiResponse = dsl.submitInquiry(testData().resolveBondRef(bondList, field));
     }
 
     @Then("the RELEASE PT button should be disabled")

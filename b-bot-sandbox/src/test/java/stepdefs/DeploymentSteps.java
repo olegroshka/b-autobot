@@ -54,6 +54,13 @@ public class DeploymentSteps {
         api.assertServiceRunningAtVersion(name, status, version);
     }
 
+    @Then("the service {string} should be {string} at its tested version")
+    public void serviceAtTestedVersion(String name, String status)
+            throws IOException, InterruptedException {
+        String version = BBotRegistry.getConfig().getTestData().getServiceVersion(name);
+        api.assertServiceRunningAtVersion(name, status, version);
+    }
+
     @Then("the service {string} should have status {string}")
     public void serviceStatus(String name, String status) throws IOException, InterruptedException {
         api.assertServiceStatus(name, status);

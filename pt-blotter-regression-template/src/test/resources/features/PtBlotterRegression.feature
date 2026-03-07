@@ -4,22 +4,8 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   # ─────────────────────────────────────────────────────────────────────────────
   # Philosophy: each section proves one observable aspect of the system.
   #
-  #   1. Environment health gate   — the right service versions are deployed.
-  #      Fails fast with a clear "start the mock env" message if servers are down.
-  #
-  #   2. Smoke                     — the UI is reachable and the grid renders.
-  #
-  #   3. Grid schema & seed data   — the data model is intact on startup.
-  #
-  #   4. Live price feed           — the ticking simulator is running.
-  #
-  #   5. Trading workflow          — APPLY → SEND → RELEASE PT core use-case.
-  #
-  #   6. Access control            — RELEASE PT respects isPTAdmin from Config Service.
-  #
-  #   7. Config Service            — the permission microservice serves correct data.
-  #
-  #   8. Deployment Dashboard      — the service registry tracks the right versions.
+  # All ISINs, versions, and user identities are declared in application-mockuat.conf
+  # under b-bot.test-data.  Feature files contain no hardcoded data values.
   #
   # Running the suite:
   #   Start:  scripts/start-mock-uat.sh        (Unix/Mac)
@@ -42,17 +28,16 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   #   Unix/Mac: scripts/start-mock-uat.sh
   #   Windows:  scripts\start-mock-uat.bat
   #
-  # This scenario also serves as the formal version-gate for the regression report:
-  # proof that the exact service builds under test were deployed at execution time.
+  # Versions are declared in b-bot.test-data.service-versions (application-mockuat.conf).
 
   @precondition
   Scenario: Mock UAT stack is live and services are at the tested versions
     Given the "blotter" app is healthy
     And the "config-service" app is healthy
     And the "deployment" app is healthy
-    And the service "credit-rfq-blotter" is "RUNNING" at version "v2.4.1"
-    And the service "credit-pt-pricer" is "RUNNING" at version "v1.8.3"
-    And the service "credit-pt-neg-engine" is "RUNNING" at version "v3.1.0"
+    And the service "credit-rfq-blotter" is "RUNNING" at its tested version
+    And the service "credit-pt-pricer" is "RUNNING" at its tested version
+    And the service "credit-pt-neg-engine" is "RUNNING" at its tested version
 
   # ── 2. Smoke ─────────────────────────────────────────────────────────────────
 
@@ -78,11 +63,10 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   Scenario: Blotter loads with seeded inquiries in PENDING status
     Given the PT-Blotter is open
     Then the grid should have at least 5 rows
-    And the row with ISIN "US912828YJ02" should have status "PENDING"
-    And the row with ISIN "XS2346573523" should have status "PENDING"
+    And the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
 
   # ── 4. Live price feed ────────────────────────────────────────────────────────
-  # The TW price simulator ticks at ~400 ms. This scenario proves it is running.
 
   @ticking
   Scenario: TW reference price updates within the live feed window
@@ -91,63 +75,60 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     Then the "twPrice" cell in row 0 should match the pattern "[0-9]+[.][0-9]+ / [0-9]+[.][0-9]+"
 
   # ── 5. Trading workflow ───────────────────────────────────────────────────────
-  # Core PT-Blotter use case: select a row → set pricing parameters → APPLY → SEND
 
   @workflow
   Scenario: APPLY with price units sets a numeric price from TW Mid reference
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN "US912828YJ02" should be a numeric value
+    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @workflow
   Scenario: APPLY with spread units sets a numeric spread from CP+ Bid reference
     Given the PT-Blotter is open
-    When I select the row with ISIN "XS2346573523"
+    When I select the row with ISIN from "HYPT_1" field "ISIN2"
     And I set the toolbar source "CP+" side "Bid" markup "0" units "bp"
     And I press APPLY
-    Then the "spread" for ISIN "XS2346573523" should be a numeric value
+    Then the "spread" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 
   @workflow
   Scenario: SEND captures a sentPrice snapshot and moves the row to QUOTED
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "US912828YJ02" should have status "QUOTED"
-    And the "sentPrice" for ISIN "US912828YJ02" should be a numeric value
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @workflow
   Scenario: APPLY only affects selected rows — unselected row price stays blank
     Given the PT-Blotter is open
-    When I select the row with ISIN "US912828YJ02"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN "XS2346573523" should be blank
+    Then the "price" for ISIN from "HYPT_1" field "ISIN2" should be blank
 
   # ── 6. Access control — RELEASE PT ───────────────────────────────────────────
-  # RELEASE PT is gated by the isPTAdmin flag served by the Config Service.
-  # doej is a trader (isPTAdmin=false); smithj is an admin (isPTAdmin=true).
+  # User roles are declared in b-bot.test-data.users (application-mockuat.conf).
 
   @access
-  Scenario: Trader doej cannot access the RELEASE PT button
-    Given the PT-Blotter is open as "doej"
+  Scenario: Trader cannot access the RELEASE PT button
+    Given the PT-Blotter is open as the trader
     Then the RELEASE PT button should be disabled
 
   @access
-  Scenario: Admin smithj can release a quoted row — status becomes RELEASED
-    Given the PT-Blotter is open as "smithj"
-    When I select the row with ISIN "US912828YJ02"
+  Scenario: Admin can release a quoted row — status becomes RELEASED
+    Given the PT-Blotter is open as the admin
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
     And I press RELEASE PT
-    Then the row with ISIN "US912828YJ02" should have status "RELEASED"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "RELEASED"
 
   # ── 7. Config Service ─────────────────────────────────────────────────────────
-  # REST-only scenarios — no browser needed.
 
   @config-service
   Scenario: Config service is healthy and the permission namespace is present
@@ -155,15 +136,14 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     Then the config namespace "credit.pt.access" should be present
 
   @config-service
-  Scenario: doej does not have PT admin access
-    Then the user "doej" should have isPTAdmin "false" in config service
+  Scenario: Trader does not have PT admin access
+    Then the user from role "trader" should have isPTAdmin "false" in config service
 
   @config-service
-  Scenario: smithj has PT admin access
-    Then the user "smithj" should have isPTAdmin "true" in config service
+  Scenario: Admin has PT admin access
+    Then the user from role "admin" should have isPTAdmin "true" in config service
 
   # ── 8. Deployment Dashboard ───────────────────────────────────────────────────
-  # REST-only scenarios — no browser needed.
 
   @deployment
   Scenario: All critical credit trading services are registered in the deployment registry
@@ -177,21 +157,13 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   @deployment @versions
   Scenario: All tested services are RUNNING at the exact versions under test
     Given the deployment dashboard is available
-    Then the service "credit-rfq-blotter" is "RUNNING" at version "v2.4.1"
-    And the service "credit-pt-pricer" is "RUNNING" at version "v1.8.3"
-    And the service "credit-pt-neg-engine" is "RUNNING" at version "v3.1.0"
-
+    Then the service "credit-rfq-blotter" is "RUNNING" at its tested version
+    And the service "credit-pt-pricer" is "RUNNING" at its tested version
+    And the service "credit-pt-neg-engine" is "RUNNING" at its tested version
 
   # ── 9. REST probes with config-driven test data ──────────────────────────────
-  # These scenarios demonstrate the JSON template + bond-list pattern:
-  # - No hardcoded ISINs or dates in the feature file.
-  # - Bond lists are declared in application-mockuat.conf under b-bot.test-data.
-  # - When bonds expire, update the ISIN in the conf once -- scenarios stay stable.
-  #
-  # Philosophy:
-  #   Test data belongs in config, not in feature files.
-  #   Templates belong in resource files, not in step definitions.
-  #   Response fields captured in one step flow naturally to the next.
+  # All ISINs resolved from bond-lists in application-mockuat.conf.
+  # No hardcoded ISINs, dates, or URLs in this section.
 
   @rest-probe @api
   Scenario: REST probe -- submit RFQ for HYPT_1 bond and verify inquiry created
@@ -217,10 +189,8 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     And the response field "status" should be "QUOTED"
 
   # ── 10. Dynamic portfolio submission via named API actions ───────────────────
-  # The conf file is the API contract: action names, methods, paths, and templates
-  # are all declared in application-mockuat.conf under b-bot.test-data.api-actions.
-  # Portfolio structures (ISINs, quantities, PT IDs) live in b-bot.test-data.portfolios.
-  # Feature files reference names only — no URLs, no ISINs, no dates hardcoded here.
+  # The conf is the API contract: action names, methods, paths, templates.
+  # Portfolio bond lists are in b-bot.test-data.portfolios (application-mockuat.conf).
 
   @rest-probe @api
   Scenario: Named actions -- submit and quote an RFQ using action names defined in conf
@@ -233,21 +203,21 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     And the response field "status" should be "QUOTED"
 
   @rest-probe @api @portfolio
-  Scenario: Portfolio submission -- HYPT_1 bonds accepted and seed data intact in inquiry list
+  Scenario: Portfolio submission -- all HYPT_1 bonds accepted and seed data intact in inquiry list
     Given I submit all inquiries for portfolio "HYPT_1"
     When I perform "list-inquiries"
     Then the response status should be 200
-    And the response field "$[0].inquiry_id" should be "INQ-001"
+    And the response field "$[0].status" should be "PENDING"
     And the response field "$[0].isin" should equal bond "HYPT_1" field "ISIN1"
 
   @rest-probe @workflow @portfolio
   Scenario: Dynamic portfolio -- HYPT_1 bonds submitted via API, priced and quoted in blotter
     Given I submit all inquiries for portfolio "HYPT_1"
     And the PT-Blotter is open
-    Then the row with ISIN "US912828YJ02" should have status "PENDING"
-    And the row with ISIN "XS2346573523" should have status "PENDING"
-    When I select the row with ISIN "US912828YJ02"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN "US912828YJ02" should have status "QUOTED"
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"

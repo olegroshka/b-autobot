@@ -7,6 +7,7 @@ import com.bbot.core.registry.BBotRegistry;
 import utils.ConfigServiceDsl;
 
 import java.io.IOException;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -91,6 +92,31 @@ public class ConfigServiceSteps {
     @Then("the entry list should contain key {string}")
     public void entryListShouldContainKey(String key) throws IOException, InterruptedException {
         dsl.assertKeyPresent(lastNs, lastType, key);
+    }
+
+    @Then("the entry list should contain user {string}")
+    public void entryListShouldContainUser(String role) throws IOException, InterruptedException {
+        String username = BBotRegistry.getConfig().getTestData().getUser(role);
+        dsl.assertKeyPresent(lastNs, lastType, username);
+    }
+
+    @When("I read config {string} \\/ {string} \\/ user {string}")
+    public void iReadConfigForUser(String ns, String type, String role)
+            throws IOException, InterruptedException {
+        lastNs   = ns;
+        lastType = type;
+        lastKey  = BBotRegistry.getConfig().getTestData().getUser(role);
+        dsl.readConfig(lastNs, lastType, lastKey);
+    }
+
+    @When("I update config {string} \\/ {string} \\/ user {string} setting {string} to {string}")
+    public void iUpdateConfigForUser(String ns, String type, String role,
+                                      String field, String value)
+            throws IOException, InterruptedException {
+        lastNs   = ns;
+        lastType = type;
+        lastKey  = BBotRegistry.getConfig().getTestData().getUser(role);
+        dsl.updateConfig(lastNs, lastType, lastKey, field, value);
     }
 
     // ── Delete config ─────────────────────────────────────────────────────────
