@@ -161,39 +161,27 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     And the service "credit-pt-pricer" is "RUNNING" at its tested version
     And the service "credit-pt-neg-engine" is "RUNNING" at its tested version
 
-  # ── 9. REST probes with config-driven test data ──────────────────────────────
-  # All ISINs resolved from bond-lists in application-mockuat.conf.
-  # No hardcoded ISINs, dates, or URLs in this section.
+  # ── 9. REST API contract — named actions from conf ───────────────────────────
+  # All action names, paths, methods, and templates are declared in
+  # b-bot.test-data.api-actions (application-mockuat.conf).
+  # All ISINs come from bond-lists.  No paths or ISINs hardcoded in this section.
 
   @rest-probe @api
-  Scenario: REST probe -- submit RFQ for HYPT_1 bond and verify inquiry created
-    When I POST template "credit-rfq" with bond list "HYPT_1" to app "blotter" path "/api/inquiry"
+  Scenario: API contract -- submit RFQ for HYPT_1 bond and verify inquiry accepted
+    When I perform "submit-rfq" with bond list "HYPT_1"
     Then the response status should be 201
     And the response field "status" should be "PENDING"
     And the response field "inquiry_id" should not be empty
 
   @rest-probe @api
-  Scenario: REST probe -- inquiry list contains seed data matching the HYPT_1 bond list
-    When I GET from app "blotter" path "/api/inquiries"
+  Scenario: API contract -- inquiry list seed matches HYPT_1 bond list in conf
+    When I perform "list-inquiries"
     Then the response status should be 200
     And the response field "$[0].status" should be "PENDING"
     And the response field "$[0].isin" should equal bond "HYPT_1" field "ISIN1"
 
   @rest-probe @api
-  Scenario: REST probe -- capture inquiry ID from POST and use in subsequent quote call
-    When I POST template "credit-rfq" with bond list "HYPT_1" to app "blotter" path "/api/inquiry"
-    Then the response status should be 201
-    And I capture the response field "inquiry_id"
-    When I POST template "quote-inquiry" to app "blotter" path "/api/inquiry/${inquiry_id}/quote"
-    Then the response status should be 200
-    And the response field "status" should be "QUOTED"
-
-  # ── 10. Dynamic portfolio submission via named API actions ───────────────────
-  # The conf is the API contract: action names, methods, paths, templates.
-  # Portfolio bond lists are in b-bot.test-data.portfolios (application-mockuat.conf).
-
-  @rest-probe @api
-  Scenario: Named actions -- submit and quote an RFQ using action names defined in conf
+  Scenario: API contract -- submit RFQ, capture inquiry ID, quote via named actions
     When I perform "submit-rfq" with bond list "HYPT_1"
     Then the response status should be 201
     And the response field "status" should be "PENDING"
@@ -201,6 +189,10 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     When I perform "quote-inquiry"
     Then the response status should be 200
     And the response field "status" should be "QUOTED"
+
+  # ── 10. Dynamic portfolio submission ─────────────────────────────────────────
+  # Portfolio structures (ISINs, quantities, PT IDs) declared in
+  # b-bot.test-data.portfolios (application-mockuat.conf).
 
   @rest-probe @api @portfolio
   Scenario: Portfolio submission -- all HYPT_1 bonds accepted and seed data intact in inquiry list
