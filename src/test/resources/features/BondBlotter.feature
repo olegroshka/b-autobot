@@ -2,6 +2,25 @@
 Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
 
   # ──────────────────────────────────────────────────────────────────────────────
+  # Deployment precondition — Version gate
+  #
+  # Formal proof: the exact service versions under test are deployed and healthy
+  # in UAT before any blotter scenarios execute.  This scenario runs first and
+  # its pass/fail state appears at the top of the Cucumber regression report,
+  # giving QA sign-off evidence that the correct software was tested.
+  #
+  # The checked versions must match the seed data in MockDeploymentServer.
+  # Quality gate: mvn verify -Dcucumber.filter.tags="@blotter and @precondition" → 1/1
+  # ──────────────────────────────────────────────────────────────────────────────
+
+  @precondition @deployment
+  Scenario: Required credit trading services are deployed at the tested versions
+    Given the deployment dashboard is available
+    Then the service "credit-rfq-blotter" should be "RUNNING" at version "v2.4.1"
+    And the service "credit-pt-pricer" should be "RUNNING" at version "v1.8.3"
+    And the service "credit-pt-neg-engine" should be "RUNNING" at version "v3.1.0"
+
+  # ──────────────────────────────────────────────────────────────────────────────
   # M0 — Build pipeline spine
   # Goal: Playwright can open the blotter URL served by WireMock.
   # Quality gate: mvn verify -Dcucumber.filter.tags="@blotter and @smoke" → 1/1

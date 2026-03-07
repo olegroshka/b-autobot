@@ -124,7 +124,7 @@ public final class MockBlotterServer {
         // ── PT-Blotter SPA: HTML ──────────────────────────────────────────────
         // Serve the pre-built (or Vite-built) index.html at the blotter root.
         // All sub-paths return the same HTML so client-side routing works.
-        server.stubFor(get(urlEqualTo("/blotter/"))
+        server.stubFor(get(urlPathEqualTo("/blotter/"))
                 .willReturn(aResponse()
                         .withStatus(200)
                         .withHeader("Content-Type", "text/html; charset=utf-8")

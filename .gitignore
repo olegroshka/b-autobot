@@ -24,6 +24,7 @@ playwright/
 # Webapp dependencies (installed by frontend-maven-plugin or npm install)
 src/test/webapp/node_modules/
 src/test/webapp-config/node_modules/
+src/test/webapp-deployment/node_modules/
 
 # PT-Blotter Vite build output — assets/index.js and assets/index.css are git-tracked
 # (committed as pre-built fallback so tests run without a Node build).
