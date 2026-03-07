@@ -3,9 +3,9 @@ package stepdefs;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import utils.DeploymentDsl;
-import utils.MockDeploymentServer;
 import com.bbot.core.PlaywrightManager;
+import com.bbot.core.registry.BBotRegistry;
+import utils.DeploymentDsl;
 
 import java.io.IOException;
 
@@ -21,14 +21,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class DeploymentSteps {
 
-    /** API-only DSL — no browser required. */
-    private final DeploymentDsl api = new DeploymentDsl();
+    /** API-only DSL (page=null). */
+    private final DeploymentDsl api =
+            BBotRegistry.dsl("deployment", null, DeploymentDsl.class);
 
     /** Browser DSL — lazily instantiated when a @grid or @filter step runs. */
     private DeploymentDsl ui;
 
     private DeploymentDsl ui() {
-        if (ui == null) ui = new DeploymentDsl(PlaywrightManager.getPage());
+        if (ui == null)
+            ui = BBotRegistry.dsl("deployment", PlaywrightManager.getPage(), DeploymentDsl.class);
         return ui;
     }
 
@@ -36,9 +38,7 @@ public class DeploymentSteps {
 
     @Given("the deployment dashboard is available")
     public void deploymentDashboardIsAvailable() {
-        assertThat(MockDeploymentServer.getBaseUrl())
-                .as("Deployment server should be running")
-                .isNotBlank();
+        BBotRegistry.checkHealth("deployment");
     }
 
     // ── API — service assertions ──────────────────────────────────────────────

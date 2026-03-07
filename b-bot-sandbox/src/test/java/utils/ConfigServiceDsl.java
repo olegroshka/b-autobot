@@ -16,12 +16,19 @@ import static org.assertj.core.api.Assertions.assertThat;
  * DSL for the Config Service REST API.
  *
  * <p>Uses the JDK {@link java.net.http.HttpClient} — zero new test-scope
- * dependencies.  All calls are directed at {@link MockConfigServer#getBaseUrl()}.
+ * dependencies.  The base URL is injected at construction time via
+ * {@link com.bbot.core.registry.AppContext#getApiBaseUrl()}.
  */
 public final class ConfigServiceDsl {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final HttpClient   CLIENT = HttpClient.newHttpClient();
+
+    private final String baseUrl;
+
+    public ConfigServiceDsl(String baseUrl) {
+        this.baseUrl = baseUrl;
+    }
 
     // ── Assertions ────────────────────────────────────────────────────────────
 
@@ -66,7 +73,7 @@ public final class ConfigServiceDsl {
         // Read current entry (may not exist yet — treat 404 as empty object)
         String path0 = "/api/config/" + ns + "/" + type + "/" + key;
         HttpRequest r0 = HttpRequest.newBuilder()
-                .uri(URI.create(MockConfigServer.getBaseUrl() + path0)).GET().build();
+                .uri(URI.create(baseUrl + path0)).GET().build();
         HttpResponse<String> r0resp = CLIENT.send(r0, HttpResponse.BodyHandlers.ofString());
         ObjectNode node = r0resp.statusCode() == 200
                 ? (ObjectNode) MAPPER.readTree(r0resp.body())
@@ -91,7 +98,7 @@ public final class ConfigServiceDsl {
         String path = "/api/config/" + ns + "/" + type + "/" + key;
         String body = MAPPER.writeValueAsString(node);
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(MockConfigServer.getBaseUrl() + path))
+                .uri(URI.create(baseUrl + path))
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(body))
                 .build();
@@ -122,7 +129,7 @@ public final class ConfigServiceDsl {
     public void deleteConfig(String ns, String type, String key) throws IOException, InterruptedException {
         String path = "/api/config/" + ns + "/" + type + "/" + key;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(MockConfigServer.getBaseUrl() + path))
+                .uri(URI.create(baseUrl + path))
                 .DELETE().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).as("DELETE config should return 200").isEqualTo(200);
@@ -136,7 +143,7 @@ public final class ConfigServiceDsl {
             throws IOException, InterruptedException {
         String path = "/api/config/" + ns + "/" + type + "/" + key;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(MockConfigServer.getBaseUrl() + path))
+                .uri(URI.create(baseUrl + path))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode())
@@ -146,9 +153,9 @@ public final class ConfigServiceDsl {
 
     // ── HTTP helpers ──────────────────────────────────────────────────────────
 
-    private static String get(String path) throws IOException, InterruptedException {
+    private String get(String path) throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(MockConfigServer.getBaseUrl() + path))
+                .uri(URI.create(baseUrl + path))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode())

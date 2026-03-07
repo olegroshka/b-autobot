@@ -5,6 +5,7 @@ import com.microsoft.playwright.APIResponse;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import com.bbot.core.TickingCellHelper;
+import com.bbot.core.registry.AppContext;
 import com.microsoft.playwright.options.RequestOptions;
 
 import java.time.Duration;
@@ -28,10 +29,12 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public final class BlotterDsl {
 
-    private final Page page;
+    private final Page       page;
+    private final AppContext ctx;
 
-    public BlotterDsl(Page page) {
+    public BlotterDsl(Page page, AppContext ctx) {
         this.page = page;
+        this.ctx  = ctx;
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────────
@@ -48,9 +51,9 @@ public final class BlotterDsl {
      * @param user  e.g. {@code "trader"} or {@code "algo_trader"}
      */
     public void openBlotter(String user) {
-        String url = MockBlotterServer.getBlotterUrl()
+        String url = ctx.getWebUrl()
                 + "?user=" + user
-                + "&configUrl=" + MockConfigServer.getBaseUrl();
+                + "&configUrl=" + ctx.getOtherAppApiBase("config-service");
         page.navigate(url);
         // Wait for AG Grid to render the first data row.
         // type="module" scripts are deferred, so DOMCONTENTLOADED fires before React runs;
@@ -145,7 +148,7 @@ public final class BlotterDsl {
     public APIResponse submitInquiry(String isin, String notional, String side, String client) {
         APIRequestContext req = page.context().request();
         return req.post(
-                MockBlotterServer.getBaseUrl() + "/api/inquiry",
+                ctx.getApiBaseUrl() + "/api/inquiry",
                 RequestOptions.create().setData(Map.of(
                         "isin",     isin,
                         "notional", Long.parseLong(notional),
@@ -156,7 +159,7 @@ public final class BlotterDsl {
     public APIResponse submitInquiry(String isin) {
         APIRequestContext req = page.context().request();
         return req.post(
-                MockBlotterServer.getBaseUrl() + "/api/inquiry",
+                ctx.getApiBaseUrl() + "/api/inquiry",
                 RequestOptions.create().setData(Map.of("isin", isin)));
     }
 

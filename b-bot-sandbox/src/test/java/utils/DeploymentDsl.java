@@ -26,10 +26,13 @@ public final class DeploymentDsl {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final HttpClient   CLIENT = HttpClient.newHttpClient();
 
-    private final Page page; // null = API-only mode
+    private final Page   page;       // null = API-only mode
+    private final String apiBaseUrl;
 
-    public DeploymentDsl()           { this.page = null; }
-    public DeploymentDsl(Page page)  { this.page = page; }
+    public DeploymentDsl(Page page, String apiBaseUrl) {
+        this.page       = page;
+        this.apiBaseUrl = apiBaseUrl;
+    }
 
     // ── API assertions ────────────────────────────────────────────────────────
 
@@ -85,7 +88,7 @@ public final class DeploymentDsl {
      */
     public void openDashboard() {
         requirePage();
-        page.navigate(MockDeploymentServer.getBaseUrl() + "/deployment/");
+        page.navigate(apiBaseUrl + "/deployment/");
         // Wait for at least one grid row to appear
         page.waitForSelector(".ag-center-cols-container [row-index='0']");
     }
@@ -141,7 +144,7 @@ public final class DeploymentDsl {
     private JsonNode getService(String name) throws IOException, InterruptedException {
         String path = "/api/deployments/" + name;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(MockDeploymentServer.getBaseUrl() + path))
+                .uri(URI.create(apiBaseUrl + path))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode())
@@ -152,7 +155,7 @@ public final class DeploymentDsl {
 
     private JsonNode getAll() throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(MockDeploymentServer.getBaseUrl() + "/api/deployments"))
+                .uri(URI.create(apiBaseUrl + "/api/deployments"))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).as("GET /api/deployments should return 200").isEqualTo(200);

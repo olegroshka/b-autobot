@@ -3,8 +3,8 @@ package stepdefs;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+import com.bbot.core.registry.BBotRegistry;
 import utils.ConfigServiceDsl;
-import utils.MockConfigServer;
 
 import java.io.IOException;
 
@@ -13,12 +13,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Step definitions for ConfigService.feature.
  *
- * <p>All Playwright-free — uses the JDK HTTP client via {@link ConfigServiceDsl}
- * to talk directly to {@link MockConfigServer}.
+ * <p>All Playwright-free — uses the JDK HTTP client via {@link ConfigServiceDsl}.
+ * DSL is obtained from {@link BBotRegistry} so the base URL is environment-injected.
  */
 public class ConfigServiceSteps {
 
-    private final ConfigServiceDsl dsl = new ConfigServiceDsl();
+    private final ConfigServiceDsl dsl =
+            BBotRegistry.dsl("config-service", null, ConfigServiceDsl.class);
 
     // Shared state between When/Then steps
     private String lastNs;
@@ -29,9 +30,7 @@ public class ConfigServiceSteps {
 
     @Given("the config service is running")
     public void theConfigServiceIsRunning() {
-        assertThat(MockConfigServer.getBaseUrl())
-                .as("Config service base URL should be set")
-                .isNotBlank();
+        BBotRegistry.checkHealth("config-service");
     }
 
     // ── Namespace assertions ──────────────────────────────────────────────────

@@ -4,8 +4,9 @@ import com.microsoft.playwright.APIResponse;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import utils.BlotterDsl;
 import com.bbot.core.PlaywrightManager;
+import com.bbot.core.registry.BBotRegistry;
+import utils.BlotterDsl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -30,7 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class BondBlotterSteps {
 
-    private final BlotterDsl dsl = new BlotterDsl(PlaywrightManager.getPage());
+    private final BlotterDsl dsl =
+            BBotRegistry.dsl("blotter", PlaywrightManager.getPage(), BlotterDsl.class);
 
     // Shared state between When/Then steps within a scenario
     private APIResponse lastApiResponse;
