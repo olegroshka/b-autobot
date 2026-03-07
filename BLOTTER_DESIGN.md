@@ -61,6 +61,8 @@ ION channel / REST API
 | REST mock        | WireMock (embedded, dynamic port)                           |
 | Config Service   | JDK `com.sun.net.httpserver.HttpServer` (in-memory store)  |
 | Config UI        | React 18 + Vite (served by MockConfigServer at /config-service/) |
+| Deployment Server | JDK `com.sun.net.httpserver.HttpServer` (12 seed services) |
+| Deployment UI    | React 18 + AG Grid + Vite (served by MockDeploymentServer at /deployment/) |
 
 ---
 
@@ -75,16 +77,21 @@ src/test/
 │   │   └── Hooks.java               # @BeforeAll/@AfterAll — starts MockBlotterServer + MockConfigServer
 │   └── utils/
 │       ├── BlotterDsl.java          # All Playwright interactions for the blotter
-│       ├── BlotterDevServer.java    # Standalone launcher for manual exploration
-│       ├── ConfigServiceDsl.java   # JDK HttpClient wrapper for Config Service REST API
-│       ├── ConfigDevServer.java    # Standalone launcher for Config Service + UI
-│       ├── MockBlotterServer.java  # Embedded WireMock + PT-Blotter REST stubs
-│       └── MockConfigServer.java   # Config microservice (JDK HttpServer, in-memory)
+│       ├── BlotterDevServer.java    # Standalone launcher for manual exploration (port 9099)
+│       ├── ConfigServiceDsl.java    # JDK HttpClient wrapper for Config Service REST API
+│       ├── ConfigDevServer.java     # Standalone launcher for Config Service + UI (port 8090)
+│       ├── DeploymentDsl.java       # Deployment Dashboard DSL — API + browser
+│       ├── DeploymentDevServer.java # Standalone launcher for Deployment Dashboard (port 9098)
+│       ├── MockBlotterServer.java   # Embedded WireMock + PT-Blotter REST stubs
+│       ├── MockConfigServer.java    # Config microservice (JDK HttpServer, in-memory)
+│       └── MockDeploymentServer.java # Deployment registry (JDK HttpServer, 12 services)
 ├── resources/
 │   ├── features/
-│   │   ├── BondBlotter.feature     # M0–M8 blotter scenarios (38 scenarios)
-│   │   └── ConfigService.feature   # Config Service REST API scenarios (14 scenarios)
+│   │   ├── BondBlotter.feature     # M0–M8 + precondition blotter scenarios (39 scenarios)
+│   │   ├── ConfigService.feature   # Config Service REST API scenarios (14 scenarios)
+│   │   └── Deployment.feature      # Deployment Dashboard API + grid + filter (15 scenarios)
 │   ├── config-service-ui/          # Vite build output for Config UI (git-committed)
+│   ├── deployment-ui/              # Vite build output for Deployment Dashboard (git-committed)
 │   └── wiremock/__files/blotter/   # Vite build output for PT-Blotter (git-committed)
 ├── webapp/                          # PT-Blotter React app source
 │   └── src/
@@ -94,11 +101,16 @@ src/test/
 │       ├── filterUtils.ts           # Column-specific filter parsing ("Portfolio:..." etc.)
 │       ├── api.ts                   # releasePt(), postQuote(), fetchInquiries()
 │       └── types.ts                 # Inquiry, Status (PENDING/QUOTED/DONE/MISSED/RELEASED), AppliedConfig
-└── webapp-config/                   # Config Service React app source
+├── webapp-config/                   # Config Service React app source
+│   └── src/
+│       ├── App.tsx                  # Namespace panel + type dropdown + config entry CRUD
+│       ├── api.ts                   # fetchNamespaces, fetchTypes, fetchConfig, saveConfig, deleteConfig
+│       └── types.ts                 # ConfigValue = string | number | boolean
+└── webapp-deployment/               # Deployment Dashboard React app source
     └── src/
-        ├── App.tsx                  # Namespace panel + type dropdown + config entry CRUD
-        ├── api.ts                   # fetchNamespaces, fetchTypes, fetchConfig, saveConfig, deleteConfig
-        └── types.ts                 # ConfigValue = string | number | boolean
+        ├── App.tsx                  # AG Grid dark theme, StatusCell renderer, 10 columns, filter
+        ├── api.ts                   # fetchDeployments() — reads ?apiUrl= or same-origin
+        └── types.ts                 # ServiceStatus, Deployment interface
 ```
 
 ---
@@ -173,15 +185,23 @@ reference prices until the row reaches DONE / MISSED (not cleared by SEND).
 | M7        | End-to-end DSL re-quote workflow            | 1         | ✓ Done |
 | M8        | RELEASE PT access control + workflow        | 5         | ✓ Done |
 | Config    | Config Service REST API + CRUD              | 14        | ✓ Done |
+| Deploy    | Deployment Dashboard API + grid + filter    | 15        | ✓ Done |
+| Gate      | @precondition version-gate scenario         | 1         | ✓ Done |
 
-**Current regression total: 51 / 51 passing**
+**Current regression total: 66 / 66 passing**
 
 ```bash
 # Full suite with Vite rebuild
-mvn verify -Dblotter.build.skip=false   # → 51/51
+mvn verify -Dblotter.build.skip=false   # → 66/66
 
 # Config Service only (no build needed)
 mvn verify -Dcucumber.filter.tags="@config-service"   # → 14/14
+
+# Deployment Dashboard only
+mvn verify -Dcucumber.filter.tags="@deployment"   # → 15/15
+
+# Version gate precondition only
+mvn verify -Dcucumber.filter.tags="@precondition"   # → 1/1
 
 # M8 access control + workflow (needs Vite build)
 mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"   # → 5/5

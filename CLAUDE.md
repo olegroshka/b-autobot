@@ -113,20 +113,36 @@ This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes
 ```
 b-autobot/
 ├── CLAUDE.md
+├── BLOTTER_DESIGN.md       # Full design doc — blotter, config service, deployment dashboard
 ├── pom.xml
 └── src/test/
     ├── java/
+    │   ├── model/          # Jackson POJOs (Trade, TradePortfolio)
     │   ├── pages/          # Page Object Model classes
     │   ├── runners/        # Cucumber test runners
-    │   ├── stepdefs/       # Step definition classes
-    │   └── utils/          # Helpers (GridHarness, TickingCellHelper, ProbesLoader, …)
+    │   ├── stepdefs/       # Step definition classes (BondBlotterSteps, ConfigServiceSteps, DeploymentSteps, …)
+    │   └── utils/          # Helpers — BlotterDsl, BlotterDevServer, ConfigServiceDsl, ConfigDevServer,
+    │                       #           DeploymentDsl, DeploymentDevServer, MockBlotterServer,
+    │                       #           MockConfigServer, MockDeploymentServer, GridHarness,
+    │                       #           TickingCellHelper, ProbesLoader, PlaywrightManager
     ├── js/                 # JavaScript probe workspace (npm + Jest)
     │   ├── package.json
     │   ├── jest.config.js
     │   ├── probes/         # Individual probe modules + bundle.js
     │   └── __tests__/      # Jest unit tests (jsdom)
+    ├── webapp/             # PT-Blotter React + Vite source
+    ├── webapp-config/      # Config Service React + Vite source
+    ├── webapp-deployment/  # Deployment Dashboard React + Vite source
     └── resources/
-        ├── features/       # .feature files (Gherkin)
+        ├── features/               # .feature files (Gherkin)
+        │   ├── BondBlotter.feature      # 39 scenarios (M0–M8 + precondition)
+        │   ├── ConfigService.feature    # 14 scenarios
+        │   ├── Deployment.feature       # 15 scenarios
+        │   ├── finance_demo.feature
+        │   └── PortfolioRegression.feature
+        ├── config-service-ui/      # Vite build output (git-committed)
+        ├── deployment-ui/          # Vite build output (git-committed)
+        ├── wiremock/__files/       # WireMock stubs + blotter Vite build (git-committed)
         └── cucumber.properties
 ```
 
@@ -149,8 +165,11 @@ b-autobot/
 
 ### Java / Cucumber (Maven)
 ```bash
-# All 12 scenarios (headless Chromium)
+# All 66 scenarios (headless Chromium)
 mvn verify
+
+# Full suite with blotter Vite rebuild
+mvn verify -Dblotter.build.skip=false   # → 66/66
 
 # Headed browser — opens a real Chromium window
 mvn verify -DHEADLESS=false
@@ -160,6 +179,10 @@ mvn verify -Dcucumber.filter.tags="@ticking"
 
 # Self-contained WireMock scenarios only (no internet needed)
 mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
+
+# Deployment / config service (no browser needed)
+mvn verify -Dcucumber.filter.tags="@deployment"
+mvn verify -Dcucumber.filter.tags="@config-service"
 ```
 
 ### JavaScript probes (Jest)

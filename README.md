@@ -365,17 +365,16 @@ when `deployment.build.skip=true` (no Node build needed).
 ### Step 2 — start the Deployment server
 
 ```bash
-# Via Maven exec (runs MockDeploymentServer as standalone)
-mvn exec:java -Dexec.mainClass=utils.MockDeploymentServer -Dexec.classpathScope=test
+mvn exec:java -Dexec.mainClass=utils.DeploymentDevServer -Dexec.classpathScope=test
+# Default port: 9098
+mvn exec:java -Dexec.mainClass=utils.DeploymentDevServer -Dexec.classpathScope=test "-Dexec.args=8888"
 ```
 
 ### Step 3 — open the dashboard
 
 ```
-http://localhost:{PORT}/deployment/
+http://localhost:9098/deployment/
 ```
-
-Port is printed to stdout on startup (dynamic).
 
 ### Deployment API reference
 
@@ -451,7 +450,7 @@ mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
 # Only the external live-grid scenarios
 mvn verify -Dcucumber.filter.tags="@external"
 
-# ── PT-Blotter (M0–M8, 38 scenarios) ────────────────────────────────────────
+# ── PT-Blotter (M0–M8 + precondition, 39 scenarios) ─────────────────────────
 
 # Full blotter suite — requires Vite build (M1/M2/M4–M8 use the React app)
 mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"
