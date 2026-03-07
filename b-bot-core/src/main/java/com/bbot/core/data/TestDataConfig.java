@@ -76,11 +76,9 @@ public final class TestDataConfig {
         root.entrySet().stream()
             .filter(e -> !e.getKey().startsWith("bond-lists")
                       && !e.getKey().startsWith("templates")
-                      && !e.getKey().startsWith("api-actions")
                       && !e.getKey().startsWith("portfolios")
                       && !e.getKey().startsWith("service-versions")
-                      && !e.getKey().startsWith("users")
-                      && !e.getKey().startsWith("endpoints"))
+                      && !e.getKey().startsWith("users"))
             .forEach(e -> result.put(e.getKey(), e.getValue().unwrapped().toString()));
         return Collections.unmodifiableMap(result);
     }
@@ -175,48 +173,6 @@ public final class TestDataConfig {
                 "User role '" + role + "' not found in b-bot.test-data.users. " +
                 "Add:  users." + role + " = \"username\"");
         return cfg.getString(path);
-    }
-
-    // ── Endpoints ─────────────────────────────────────────────────────────────
-
-    /**
-     * Returns the URL for the named endpoint from {@code b-bot.test-data.endpoints}.
-     *
-     * <p>Use this for external or well-known URLs that should not be hardcoded in
-     * feature files, e.g. {@code getEndpoint("finance-demo")} → the AG Grid demo URL.
-     *
-     * @throws AssertionError if the endpoint name is not declared
-     */
-    public String getEndpoint(String name) {
-        String path = ROOT + ".endpoints." + name;
-        if (!cfg.hasPath(path))
-            throw new AssertionError(
-                "Endpoint '" + name + "' not found in b-bot.test-data.endpoints. " +
-                "Add:  endpoints." + name + " = \"https://...\"");
-        return cfg.getString(path);
-    }
-
-    // ── API actions ───────────────────────────────────────────────────────────
-
-    /**
-     * Returns the named API action from {@code b-bot.test-data.api-actions}.
-     *
-     * @throws AssertionError if the action is not declared
-     */
-    public ApiAction getApiAction(String name) {
-        String path = ROOT + ".api-actions." + name;
-        if (!cfg.hasPath(path))
-            throw new AssertionError(
-                "API action '" + name + "' not found in b-bot.test-data.api-actions. " +
-                "Declare it in your application-{env}.conf.");
-        Config c = cfg.getConfig(path);
-        return new ApiAction(
-            name,
-            c.getString("method"),
-            c.getString("app"),
-            c.getString("path"),
-            c.hasPath("template") ? c.getString("template") : null
-        );
     }
 
     // ── Portfolios ────────────────────────────────────────────────────────────

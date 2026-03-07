@@ -161,12 +161,12 @@ public class PortfolioSteps {
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * Navigates to a named endpoint from {@code b-bot.test-data.endpoints} and waits
-     * for the AG Grid to mount. Used for the external demo scenarios.
+     * Navigates to the {@code webUrl} of the named app and waits for the AG Grid to mount.
+     * Used for the external demo scenarios (e.g. app {@code "finance-demo"}).
      */
-    @And("the blotter at endpoint {string} is open")
-    public void theBlotterIsOpen(String endpointName) {
-        String url = BBotRegistry.getConfig().getTestData().getEndpoint(endpointName);
+    @And("the blotter at app {string} is open")
+    public void theBlotterIsOpen(String appName) {
+        String url = BBotRegistry.getConfig().getAppWebUrl(appName);
         Page page = PlaywrightManager.getPage();
         page.navigate(url);
         page.locator("[role='grid']")

@@ -1,5 +1,6 @@
 package com.bbot.core.config;
 
+import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.TestDataConfig;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
@@ -136,6 +137,48 @@ public final class BBotConfig {
         return Collections.unmodifiableMap(result);
     }
 
+
+    /**
+     * Looks up a named API action from any app's {@code api-actions} block.
+     *
+     * <p>Actions are declared under {@code b-bot.apps.{appName}.api-actions.{actionName}}.
+     * The {@code app} field on the returned {@link ApiAction} is populated from the parent
+     * app key, so the conf entry does not need an explicit {@code app} field.
+     *
+     * <p>Example HOCON:
+     * <pre>{@code
+     * b-bot.apps.blotter {
+     *   api-actions {
+     *     submit-rfq { method = "POST", path = "/api/inquiry", template = "credit-rfq" }
+     *     list-inquiries { method = "GET", path = "/api/inquiries" }
+     *   }
+     * }
+     * }</pre>
+     *
+     * @throws AssertionError if no app defines an action with this name
+     */
+    public ApiAction getApiAction(String actionName) {
+        String appsRoot = "b-bot.apps";
+        if (!cfg.hasPath(appsRoot))
+            throw new AssertionError("No apps configured under b-bot.apps");
+        Config apps = cfg.getConfig(appsRoot);
+        for (String appName : apps.root().keySet()) {
+            String actionPath = appName + ".api-actions." + actionName;
+            if (apps.hasPath(actionPath)) {
+                Config c = apps.getConfig(actionPath);
+                return new ApiAction(
+                    actionName,
+                    c.getString("method"),
+                    appName,
+                    c.getString("path"),
+                    c.hasPath("template") ? c.getString("template") : null
+                );
+            }
+        }
+        throw new AssertionError(
+            "API action '" + actionName + "' not found in any b-bot.apps.*.api-actions block. " +
+            "Declare it under:  b-bot.apps.{appName}.api-actions." + actionName + " { method=..., path=... }");
+    }
 
     /**
      * Returns a typed view over the {@code b-bot.test-data} config block.

@@ -222,7 +222,8 @@ public class RestApiSteps {
     // ── Named API actions ─────────────────────────────────────────────────────
 
     /**
-     * Executes the named API action declared in {@code b-bot.test-data.api-actions}.
+     * Executes the named API action declared in the owning app's
+     * {@code b-bot.apps.{appName}.api-actions} block.
      * The action supplies method, app, path, and optional template — no hardcoded values
      * in the feature file.
      *
@@ -234,7 +235,7 @@ public class RestApiSteps {
      */
     @When("I perform {string}")
     public void performAction(String actionName) {
-        ApiAction action = testData.getApiAction(actionName);
+        ApiAction action = BBotRegistry.getConfig().getApiAction(actionName);
         String apiBase = BBotRegistry.getConfig().getAppApiBase(action.app());
         String path = resolveActionPath(action.path());
         if ("GET".equalsIgnoreCase(action.method())) {
@@ -257,7 +258,7 @@ public class RestApiSteps {
      */
     @When("I perform {string} with bond list {string}")
     public void performActionWithBondList(String actionName, String bondList) {
-        ApiAction action = testData.getApiAction(actionName);
+        ApiAction action = BBotRegistry.getConfig().getApiAction(actionName);
         String apiBase = BBotRegistry.getConfig().getAppApiBase(action.app());
         String path = resolveActionPath(action.path());
         if ("GET".equalsIgnoreCase(action.method())) {

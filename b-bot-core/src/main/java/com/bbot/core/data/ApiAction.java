@@ -3,37 +3,29 @@ package com.bbot.core.data;
 /**
  * Immutable descriptor for a named REST API action.
  *
- * <p>Actions are declared in {@code b-bot.test-data.api-actions} and represent
- * the API surface of the system under test.  Declaring them in config rather
+ * <p>Actions are declared under the owning app in {@code b-bot.apps.{appName}.api-actions}
+ * and represent the API surface of the system under test.  Declaring them in config rather
  * than step definitions means:
  * <ul>
  *   <li>Feature files stay URL-free and self-documenting.</li>
  *   <li>When an endpoint path changes, update the config once — not every scenario.</li>
  *   <li>The config block becomes a living API contract: a reader can see exactly
- *       which HTTP operations the regression suite exercises.</li>
+ *       which HTTP operations the regression suite exercises against each app.</li>
  * </ul>
  *
  * <h2>HOCON declaration</h2>
  * <pre>{@code
- * b-bot.test-data.api-actions {
- *   submit-rfq {
- *     method   = POST
- *     app      = "blotter"
- *     path     = "/api/inquiry"
- *     template = "portfolio-rfq"   # optional; absent means no request body
- *   }
- *   quote-inquiry {
- *     method   = POST
- *     app      = "blotter"
- *     path     = "/api/inquiry/${inquiry_id}/quote"   # ${} resolved from ScenarioState
- *   }
- *   list-inquiries {
- *     method = GET
- *     app    = "blotter"
- *     path   = "/api/inquiries"
+ * b-bot.apps.blotter {
+ *   apiBase = "http://localhost:9099"
+ *   api-actions {
+ *     submit-rfq    { method = "POST", path = "/api/inquiry",                     template = "credit-rfq"   }
+ *     list-inquiries { method = "GET",  path = "/api/inquiries"                                              }
+ *     quote-inquiry  { method = "POST", path = "/api/inquiry/{inquiry_id}/quote", template = "quote-inquiry" }
  *   }
  * }
  * }</pre>
+ * <p>The {@code app} record component is populated at read time from the parent app key —
+ * no explicit {@code app} field is needed in the conf entry.
  *
  * <h2>Step usage</h2>
  * <pre>{@code

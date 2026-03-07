@@ -41,7 +41,7 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
 
   @external @ticking
   Scenario: Blotter grid loads and renders expected Finance Demo columns
-    Given the blotter at endpoint "finance-demo" is open
+    Given the blotter at app "finance-demo" is open
     Then the AG Grid should display the 'ticker' column
     And the AG Grid should display the 'instrument' column
     And the AG Grid should display the 'totalValue' column
@@ -49,6 +49,6 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
 
   @external @ticking
   Scenario: GridHarness can locate a row that has scrolled out of the visible viewport
-    Given the blotter at endpoint "finance-demo" is open
+    Given the blotter at app "finance-demo" is open
     When I search the grid for ticker 'MSFT'
     Then the matching row should be visible and the 'ticker' cell should contain 'MSFT'
