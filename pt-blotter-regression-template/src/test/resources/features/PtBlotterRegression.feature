@@ -180,3 +180,38 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     Then the service "credit-rfq-blotter" is "RUNNING" at version "v2.4.1"
     And the service "credit-pt-pricer" is "RUNNING" at version "v1.8.3"
     And the service "credit-pt-neg-engine" is "RUNNING" at version "v3.1.0"
+
+
+  # ── 9. REST probes with config-driven test data ──────────────────────────────
+  # These scenarios demonstrate the JSON template + bond-list pattern:
+  # - No hardcoded ISINs or dates in the feature file.
+  # - Bond lists are declared in application-mockuat.conf under b-bot.test-data.
+  # - When bonds expire, update the ISIN in the conf once -- scenarios stay stable.
+  #
+  # Philosophy:
+  #   Test data belongs in config, not in feature files.
+  #   Templates belong in resource files, not in step definitions.
+  #   Response fields captured in one step flow naturally to the next.
+
+  @rest-probe @api
+  Scenario: REST probe -- submit RFQ for HYPT_1 bond and verify inquiry created
+    When I POST template "credit-rfq" with bond list "HYPT_1" to app "blotter" path "/api/inquiry"
+    Then the response status should be 201
+    And the response field "status" should be "PENDING"
+    And the response field "inquiry_id" should not be empty
+
+  @rest-probe @api
+  Scenario: REST probe -- inquiry list contains seed data matching the HYPT_1 bond list
+    When I GET from app "blotter" path "/api/inquiries"
+    Then the response status should be 200
+    And the response field "$[0].status" should be "PENDING"
+    And the response field "$[0].isin" should equal bond "HYPT_1" field "ISIN1"
+
+  @rest-probe @api
+  Scenario: REST probe -- capture inquiry ID from POST and use in subsequent quote call
+    When I POST template "credit-rfq" with bond list "HYPT_1" to app "blotter" path "/api/inquiry"
+    Then the response status should be 201
+    And I capture the response field "inquiry_id"
+    When I POST template "quote-inquiry" to app "blotter" path "/api/inquiry/${inquiry_id}/quote"
+    Then the response status should be 200
+    And the response field "status" should be "QUOTED"

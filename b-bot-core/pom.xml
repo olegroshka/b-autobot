@@ -51,7 +51,13 @@
       <artifactId>assertj-core</artifactId>
     </dependency>
 
-    <!-- ═══════════════════════════════════════
+    <!-- JsonPath - JSON field extraction for RestProbe/RestResponse -->
+    <dependency>
+      <groupId>com.jayway.jsonpath</groupId>
+      <artifactId>json-path</artifactId>
+    </dependency>
+
+        <!-- ═══════════════════════════════════════
          Typesafe Config (HOCON) — BBotConfig layered loading
     ═══════════════════════════════════════ -->
     <dependency>

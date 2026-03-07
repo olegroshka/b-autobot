@@ -1,6 +1,7 @@
 package stepdefs;
 
 import com.bbot.core.PlaywrightManager;
+import com.bbot.core.rest.ScenarioState;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import descriptors.BlotterDescriptor;
@@ -66,6 +67,8 @@ public class Hooks {
 
     @Before
     public void openFreshContext() {
+        // Clear inter-step captured values so each scenario starts clean.
+        ScenarioState.reset();
         // Each scenario gets its own isolated BrowserContext + Page.
         // Remove if REST-only.
         PlaywrightManager.initContext();

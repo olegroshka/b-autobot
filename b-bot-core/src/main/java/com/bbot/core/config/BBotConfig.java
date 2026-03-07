@@ -1,5 +1,6 @@
 package com.bbot.core.config;
 
+import com.bbot.core.data.TestDataConfig;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
 
@@ -133,6 +134,15 @@ public final class BBotConfig {
         cfg.getConfig(key).entrySet().forEach(e ->
             result.put(e.getKey(), e.getValue().unwrapped().toString()));
         return Collections.unmodifiableMap(result);
+    }
+
+
+    /**
+     * Returns a typed view over the {@code b-bot.test-data} config block.
+     * Provides access to bond lists, global variables, and the template registry.
+     */
+    public TestDataConfig getTestData() {
+        return new TestDataConfig(cfg);
     }
 
     /** Raw HOCON access for anything not covered by the typed accessors. */

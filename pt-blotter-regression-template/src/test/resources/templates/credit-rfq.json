@@ -1,0 +1,7 @@
+{
+  "isin":           "${bond.ISIN1}",
+  "settlementDate": "${settlement-date}",
+  "quantity":       1000000,
+  "side":           "Buy",
+  "currency":       "USD"
+}

@@ -35,6 +35,7 @@
     <slf4j.version>2.0.13</slf4j.version>
     <wiremock.version>3.5.4</wiremock.version>
     <typesafe.config.version>1.4.3</typesafe.config.version>
+    <jsonpath.version>2.9.0</jsonpath.version>
 
     <!-- Plugin versions -->
     <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
@@ -126,6 +127,13 @@
             <artifactId>logback-classic</artifactId>
           </exclusion>
         </exclusions>
+      </dependency>
+
+      <!-- JsonPath — REST probe JSON field assertions -->
+      <dependency>
+        <groupId>com.jayway.jsonpath</groupId>
+        <artifactId>json-path</artifactId>
+        <version>${jsonpath.version}</version>
       </dependency>
 
       <!-- Typesafe Config (HOCON) — used by b-bot-core from M2 onward -->
