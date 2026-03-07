@@ -179,6 +179,18 @@ public final class MockBlotterServer {
                         .withHeader("Content-Type", "application/json")
                         .withBody(quoteBody())));
 
+        // POST /api/pt/{ptId}/dealer-cancel → DEALER_REJECT all line items of that PT
+        server.stubFor(post(urlPathMatching("/api/pt/.*/dealer-cancel"))
+                .willReturn(aResponse()
+                        .withTransformers(InquiryStoreTransformer.NAME)
+                        .withTransformerParameter("action", "dealer-cancel")));
+
+        // POST /api/pt/{ptId}/customer-cancel → CUSTOMER_REJECT all line items of that PT
+        server.stubFor(post(urlPathMatching("/api/pt/.*/customer-cancel"))
+                .willReturn(aResponse()
+                        .withTransformers(InquiryStoreTransformer.NAME)
+                        .withTransformerParameter("action", "customer-cancel")));
+
         // POST /api/inquiry/{id}/release → 200 RELEASED
         server.stubFor(post(urlPathMatching("/api/inquiry/.*/release"))
                 .willReturn(aResponse()

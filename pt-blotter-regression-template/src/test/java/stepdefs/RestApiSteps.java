@@ -3,6 +3,7 @@ package stepdefs;
 import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.Portfolio;
 import com.bbot.core.data.TestDataConfig;
+import com.bbot.core.rest.ScenarioState;
 import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.rest.JsonTemplateEngine;
 import com.bbot.core.rest.RestProbe;
@@ -291,6 +292,9 @@ public class RestApiSteps {
         Portfolio portfolio = testData.getPortfolio(portfolioName);
         String apiBase = BBotRegistry.getConfig().getAppApiBase("blotter");
         RestProbe probe = RestProbe.of(apiBase);
+
+        // Capture the portfolio's PT ID so cancel actions can reference it as ${pt_id}
+        ScenarioState.put("pt_id", portfolio.ptId());
 
         portfolio.bonds().forEach((lineKey, bond) -> {
             Map<String, String> vars = new LinkedHashMap<>();

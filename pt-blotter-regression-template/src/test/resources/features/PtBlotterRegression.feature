@@ -213,3 +213,32 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     And I press APPLY
     And I press SEND
     Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+
+  # ── 11. PT cancel actions ─────────────────────────────────────────────────────
+  # dealer-cancel and customer-cancel operate at PT level: all line items of the
+  # PT move to DEALER_REJECT or CUSTOMER_REJECT in a single call.
+  # {pt_id} is captured automatically by "I submit all inquiries for portfolio".
+
+  @rest-probe @api @portfolio
+  Scenario: Dealer cancel -- all HYPT_1 PT line items move to DEALER_REJECT
+    Given I submit all inquiries for portfolio "HYPT_1"
+    When I perform "dealer-cancel"
+    Then the response status should be 200
+    And the response field "status" should be "DEALER_REJECT"
+    And the response field "affected_count" should be "2"
+
+  @rest-probe @api @portfolio
+  Scenario: Customer cancel -- all HYPT_1 PT line items move to CUSTOMER_REJECT
+    Given I submit all inquiries for portfolio "HYPT_1"
+    When I perform "customer-cancel"
+    Then the response status should be 200
+    And the response field "status" should be "CUSTOMER_REJECT"
+    And the response field "affected_count" should be "2"
+
+  @rest-probe @workflow @portfolio
+  Scenario: Dealer cancel is visible in blotter -- cancelled PT lines show DEALER_REJECT
+    Given I submit all inquiries for portfolio "HYPT_1"
+    When I perform "dealer-cancel"
+    And the PT-Blotter is open
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "DEALER_REJECT"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "DEALER_REJECT"

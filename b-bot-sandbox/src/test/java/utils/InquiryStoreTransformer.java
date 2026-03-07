@@ -86,9 +86,11 @@ public final class InquiryStoreTransformer extends ResponseDefinitionTransformer
         String action = parameters != null ? parameters.getString("action", "") : "";
 
         return switch (action) {
-            case "submit" -> handleSubmit(request.getBodyAsString());
-            case "list"   -> handleList();
-            default       -> responseDefinition;   // pass-through for unknown action
+            case "submit"           -> handleSubmit(request.getBodyAsString());
+            case "list"             -> handleList();
+            case "dealer-cancel"    -> handlePtCancel(request, "DEALER_REJECT");
+            case "customer-cancel"  -> handlePtCancel(request, "CUSTOMER_REJECT");
+            default                 -> responseDefinition;   // pass-through for unknown action
         };
     }
 
@@ -151,6 +153,55 @@ public final class InquiryStoreTransformer extends ResponseDefinitionTransformer
             return responseDefinition()
                     .withStatus(500)
                     .withBody("Error serialising inquiry list: " + e.getMessage())
+                    .build();
+        }
+    }
+
+    /**
+     * Cancels all line items belonging to a PT, setting their status to {@code targetStatus}.
+     *
+     * <p>URL pattern: {@code /api/pt/{ptId}/dealer-cancel} or {@code /api/pt/{ptId}/customer-cancel}.
+     * The {@code ptId} segment is extracted from the request URL.
+     *
+     * <p>Response: {@code {"pt_id":"…","status":"DEALER_REJECT","affected_count":N}}
+     */
+    private ResponseDefinition handlePtCancel(Request request, String targetStatus) {
+        String url = request.getUrl();
+        // URL: /api/pt/{ptId}/dealer-cancel  →  ["", "api", "pt", ptId, "dealer-cancel"]
+        String[] parts = url.split("/");
+        if (parts.length < 5) {
+            return responseDefinition()
+                    .withStatus(400)
+                    .withBody("Invalid PT cancel URL: " + url)
+                    .build();
+        }
+        String ptId = parts[3];
+
+        int count = 0;
+        synchronized (STORE) {
+            for (Map<String, Object> inquiry : STORE.values()) {
+                if (ptId.equals(inquiry.get("pt_id"))) {
+                    inquiry.put("status", targetStatus);
+                    count++;
+                }
+            }
+        }
+
+        try {
+            /* Use a LinkedHashMap to preserve key order in the JSON response */
+            Map<String, Object> resp = new LinkedHashMap<>();
+            resp.put("pt_id",          ptId);
+            resp.put("status",         targetStatus);
+            resp.put("affected_count", count);
+            return responseDefinition()
+                    .withStatus(200)
+                    .withHeader("Content-Type", "application/json")
+                    .withBody(MAPPER.writeValueAsString(resp))
+                    .build();
+        } catch (JsonProcessingException e) {
+            return responseDefinition()
+                    .withStatus(500)
+                    .withBody("Error serialising cancel response: " + e.getMessage())
                     .build();
         }
     }
