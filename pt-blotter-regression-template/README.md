@@ -12,26 +12,29 @@ A **copy-and-adapt** starting point for building a real-system BDD regression su
 ## What the demo actually does
 
 Running `mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat` drives
-**15 runnable scenarios** across three mock servers that simulate a fixed-income trading platform:
+**24 runnable scenarios** across three mock servers that simulate a fixed-income trading platform:
 
 | Mock server | Port | What it simulates |
 |-------------|------|-------------------|
-| `BlotterDevServer` | 9099 | PT-Blotter React UI + WireMock REST API |
+| `BlotterDevServer` | 9099 | PT-Blotter React UI + WireMock REST API (stateful inquiry store) |
 | `ConfigDevServer` | 8090 | Config Service — permissions microservice |
 | `DeploymentDevServer` | 9098 | Deployment Dashboard — service registry |
 
-The scenarios demonstrate eight observable aspects of the system:
+The scenarios demonstrate eleven observable aspects of the system:
 
-| # | Tag | What is proved |
-|---|-----|----------------|
-| 1 | `@precondition` | Mock UAT stack is live; services are at the tested versions |
-| 2 | `@smoke` | PT-Blotter UI loads; AG Grid renders |
-| 3 | `@grid` | Column schema is intact; seed data is in PENDING status |
-| 4 | `@ticking` | Live price simulator is ticking at ~400 ms |
-| 5 | `@workflow` | APPLY → SEND pricing workflow; price/spread captured in sentPrice |
-| 6 | `@access` | RELEASE PT respects isPTAdmin from the Config Service |
-| 7 | `@config-service` | Permission namespace present; doej=false, smithj=true |
-| 8 | `@deployment` | Service registry lists all critical services at correct versions |
+| # | Scenarios | Tags | What is proved |
+|---|-----------|------|----------------|
+| 1 | 1 | `@precondition` | Mock UAT stack is live; services are at the tested versions |
+| 2 | 1 | `@smoke` | PT-Blotter UI loads; AG Grid renders |
+| 3 | 2 | `@grid` | Column schema is intact; seed data is in PENDING status |
+| 4 | 1 | `@ticking` | Live price simulator is ticking at ~400 ms |
+| 5 | 4 | `@workflow` | APPLY → SEND pricing workflow; price/spread captured in sentPrice |
+| 6 | 2 | `@access` | RELEASE PT respects isPTAdmin from the Config Service |
+| 7 | 3 | `@config-service` | Permission namespace present; role-based isPTAdmin checks |
+| 8 | 2 | `@deployment` | Service registry lists all critical services at correct versions |
+| 9 | 3 | `@rest-probe @api` | REST API contract: submit RFQ, list inquiries, capture + quote |
+| 10 | 2 | `@rest-probe @portfolio` | Dynamic portfolio submission; E2E submit → price → QUOTED |
+| 11 | 3 | `@rest-probe @portfolio` | PT-level cancel: all line items move to DEALER_REJECT / CUSTOMER_REJECT |
 
 ---
 
@@ -53,13 +56,18 @@ pt-blotter-regression-template/
 │       ├── AppPreconditionSteps.java     ← Generic health check steps (ready to use as-is)
 │       ├── BlotterSteps.java             ← Blotter step definitions (100% delegates to DSL)
 │       ├── ConfigServiceSteps.java       ← Config Service step definitions
-│       └── DeploymentSteps.java          ← Deployment step definitions
+│       ├── DeploymentSteps.java          ← Deployment step definitions
+│       └── RestApiSteps.java             ← Generic REST probe steps (named actions, bond refs, portfolio submit)
 └── src/test/resources/
     ├── features/
-    │   └── PtBlotterRegression.feature   ← 15 runnable scenarios
+    │   └── PtBlotterRegression.feature   ← 24 runnable scenarios
+    ├── templates/
+    │   ├── credit-rfq.json               ← Single-bond RFQ request body
+    │   ├── portfolio-rfq.json            ← Per-bond portfolio line body
+    │   └── quote-inquiry.json            ← Quote action request body
     ├── application.conf                  ← Base config + full commented override reference
     ├── application-devserver.conf        ← Blotter-only smoke (port 9099)
-    ├── application-mockuat.conf          ← All three mock servers (ports 9099/8090/9098)
+    ├── application-mockuat.conf          ← All three mock servers + full test-data block
     └── cucumber.properties
 ```
 
@@ -86,7 +94,7 @@ The script starts all three servers in the background and waits for them to be r
 
 ```bash
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat
-# → 15/15 scenarios pass
+# → 24/24 scenarios pass
 ```
 
 ### Step 3 — Stop the environment
@@ -113,6 +121,10 @@ mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
     -Dcucumber.filter.tags="@workflow"
 
+# Access control (2 browser scenarios — trader vs admin)
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
+    -Dcucumber.filter.tags="@access"
+
 # Config service REST checks (3 scenarios, no browser)
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
     -Dcucumber.filter.tags="@config-service"
@@ -121,9 +133,21 @@ mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
     -Dcucumber.filter.tags="@deployment"
 
+# REST API contract probes (8 scenarios, no browser)
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
+    -Dcucumber.filter.tags="@rest-probe"
+
+# Portfolio submission + cancel (5 scenarios; 4 REST-only, 1 E2E with browser)
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
+    -Dcucumber.filter.tags="@portfolio"
+
 # Everything except the slow ticking scenario
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
     -Dcucumber.filter.tags="not @ticking"
+
+# REST-only (no browser at all — fastest CI gate)
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
+    -Dcucumber.filter.tags="@rest-probe and not @workflow"
 ```
 
 ---

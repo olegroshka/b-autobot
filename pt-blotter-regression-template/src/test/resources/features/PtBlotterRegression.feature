@@ -15,11 +15,15 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   #           scripts\stop-mock-uat.bat         (Windows)
   #
   # Run a subset by tag:
-  #   -Dcucumber.filter.tags="@precondition"   -- health gate only (1 scenario)
-  #   -Dcucumber.filter.tags="@smoke"          -- connectivity only (1 scenario)
-  #   -Dcucumber.filter.tags="@workflow"       -- trading workflow (4 scenarios)
-  #   -Dcucumber.filter.tags="@config-service" -- config REST API (3 scenarios)
-  #   -Dcucumber.filter.tags="@deployment"     -- deployment API  (2 scenarios)
+  #   -Dcucumber.filter.tags="@precondition"              -- health gate only    (1 scenario)
+  #   -Dcucumber.filter.tags="@smoke"                     -- connectivity only   (1 scenario)
+  #   -Dcucumber.filter.tags="@workflow"                  -- trading workflow    (4 scenarios)
+  #   -Dcucumber.filter.tags="@access"                    -- access control      (2 scenarios)
+  #   -Dcucumber.filter.tags="@config-service"            -- config REST API     (3 scenarios)
+  #   -Dcucumber.filter.tags="@deployment"                -- deployment API      (2 scenarios)
+  #   -Dcucumber.filter.tags="@rest-probe"                -- REST API probes     (8 scenarios)
+  #   -Dcucumber.filter.tags="@portfolio"                 -- portfolio flows     (5 scenarios)
+  #   -Dcucumber.filter.tags="@rest-probe and not @workflow" -- REST-only, no browser (7 scenarios)
   # ─────────────────────────────────────────────────────────────────────────────
 
   # ── 1. Environment health gate ───────────────────────────────────────────────
