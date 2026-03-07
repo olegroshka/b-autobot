@@ -17,7 +17,7 @@ import model.TradePortfolio;
 import com.bbot.core.GridHarness;
 import com.bbot.core.NumericComparator;
 import com.bbot.core.PlaywrightManager;
-import utils.MockBlotterServer;
+import com.bbot.core.registry.BBotRegistry;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -65,12 +65,16 @@ public class PortfolioSteps {
 
     /**
      * Builds a Fixed Income portfolio payload and POSTs it via Playwright's
-     * {@link APIRequestContext}.  The endpoint is transparently remapped from the
-     * production-looking hostname to the local {@link MockBlotterServer}.
+     * {@link APIRequestContext} to the blotter's {@code /submit} endpoint.
+     *
+     * <p>The trader ID is resolved from {@code b-bot.test-data.users} by role name.
+     * The submit URL is derived from {@code b-bot.apps.blotter.apiBase} — no URLs
+     * in feature files.
      */
-    @Given("trader {string} submits a portfolio via REST API to {string}")
-    public void traderSubmitsPortfolioViaRestApi(String traderId, String endpoint)
-            throws Exception {
+    @Given("the user from role {string} submits a portfolio via REST API")
+    public void userRoleSubmitsPortfolioViaRestApi(String role) throws Exception {
+        String traderId = BBotRegistry.getConfig().getTestData().getUser(role);
+        String endpoint = BBotRegistry.getConfig().getAppApiBase("blotter") + "/submit";
 
         // ── 1. Build payload ──────────────────────────────────────────────────
         submittedPortfolio = TradePortfolio.builder()
@@ -113,15 +117,14 @@ public class PortfolioSteps {
                 ))
                 .build();
 
-        // ── 2. Remap hostname to WireMock then POST ───────────────────────────
+        // ── 2. POST via Playwright APIRequestContext ───────────────────────────
         //
         // page.request() returns an APIRequestContext bound to the browser context,
         // sharing the same cookie jar — important for SSO-protected blotters.
-        String resolvedEndpoint = MockBlotterServer.resolveUrl(endpoint);
         Page page = PlaywrightManager.getPage();
         APIRequestContext ctx = page.request();
 
-        apiResponse = ctx.post(resolvedEndpoint,
+        apiResponse = ctx.post(endpoint,
                 RequestOptions.create()
                         .setHeader("Content-Type", "application/json")
                         .setHeader("Accept", "application/json")
@@ -158,11 +161,12 @@ public class PortfolioSteps {
     // ═════════════════════════════════════════════════════════════════════════
 
     /**
-     * Navigates to an external blotter URL and waits for the AG Grid to mount.
-     * Used for the external demo scenarios.
+     * Navigates to a named endpoint from {@code b-bot.test-data.endpoints} and waits
+     * for the AG Grid to mount. Used for the external demo scenarios.
      */
-    @And("the blotter {string} is open")
-    public void theBlotterIsOpen(String url) {
+    @And("the blotter at endpoint {string} is open")
+    public void theBlotterIsOpen(String endpointName) {
+        String url = BBotRegistry.getConfig().getTestData().getEndpoint(endpointName);
         Page page = PlaywrightManager.getPage();
         page.navigate(url);
         page.locator("[role='grid']")

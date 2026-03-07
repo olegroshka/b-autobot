@@ -41,16 +41,18 @@ b-autobot/
 │           ├── config-service-ui/  # Pre-built Config Service UI (git-committed)
 │           └── deployment-ui/      # Pre-built Deployment Dashboard UI (git-committed)
 │
-├── pt-blotter-regression-template/ ← Copy-adapt starter for real-system consumers
+├── pt-blotter-regression-template/ ← Copy-adapt starter for real-system consumers (24 scenarios)
 │   └── src/test/
 │       ├── java/
-│       │   ├── descriptors/BlotterDescriptor.java   ← replace with your app
-│       │   ├── stepdefs/{Hooks,BlotterSteps,AppPreconditionSteps}.java
-│       │   └── utils/PtBlotterDsl.java              ← replace with your DSL
+│       │   ├── descriptors/{BlotterDescriptor,ConfigServiceDescriptor,DeploymentDescriptor}.java
+│       │   ├── stepdefs/{Hooks,BlotterSteps,AppPreconditionSteps,
+│       │   │            ConfigServiceSteps,DeploymentSteps,RestApiSteps}.java
+│       │   └── utils/{PtBlotterDsl,ConfigServiceDsl,DeploymentDsl}.java
 │       └── resources/
-│           ├── application.conf                     ← base config + commented overrides
-│           ├── application-devserver.conf           ← points at localhost:9099
-│           └── features/Smoke.feature               ← replace with real scenarios
+│           ├── application-mockuat.conf             ← all three mock servers + full test-data block
+│           ├── application-devserver.conf           ← blotter-only smoke (port 9099)
+│           ├── templates/{credit-rfq,portfolio-rfq,quote-inquiry}.json
+│           └── features/PtBlotterRegression.feature ← 24 runnable scenarios
 │
 ├── BLOTTER_DESIGN.md               # PT-Blotter design doc (milestones M0–M8)
 ├── MODULARISATION_DESIGN.md        # Multi-module architecture design record
@@ -77,7 +79,7 @@ b-autobot/
 | Access-controlled UI | RELEASE PT button gated by `isPTAdmin` from Config Service |
 | Deployment Dashboard | AG Grid service registry, 12 seeded services, filter |
 | Version-gated regression | `@precondition` scenario asserts deployed versions |
-| Copy-adapt template | `pt-blotter-regression-template` — 8-file starter for real-system suites |
+| Copy-adapt template | `pt-blotter-regression-template` — 24-scenario working demo; copy-adapt for real UAT systems |
 
 ---
 

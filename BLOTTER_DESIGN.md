@@ -87,9 +87,10 @@ src/test/
 │       └── MockDeploymentServer.java # Deployment registry (JDK HttpServer, 12 services)
 ├── resources/
 │   ├── features/
-│   │   ├── BondBlotter.feature     # M0–M8 + precondition blotter scenarios (39 scenarios)
-│   │   ├── ConfigService.feature   # Config Service REST API scenarios (14 scenarios)
-│   │   └── Deployment.feature      # Deployment Dashboard API + grid + filter (15 scenarios)
+│   │   ├── BondBlotter.feature       # M0–M8 + precondition blotter scenarios (39 scenarios)
+│   │   ├── ConfigService.feature     # Config Service REST API + CRUD (14 scenarios)
+│   │   ├── Deployment.feature        # Deployment Dashboard API + grid + filter (15 scenarios)
+│   │   └── PortfolioRegression.feature # Hybrid REST+grid portfolio submission (4 + 2 @external)
 │   ├── config-service-ui/          # Vite build output for Config UI (git-committed)
 │   ├── deployment-ui/              # Vite build output for Deployment Dashboard (git-committed)
 │   └── wiremock/__files/blotter/   # Vite build output for PT-Blotter (git-committed)

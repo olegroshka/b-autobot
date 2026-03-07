@@ -25,7 +25,7 @@ import java.util.stream.Collectors;
  *
  *   bond-lists {
  *     HYPT_1 { ISIN1 = "XS2346573523", ISIN2 = "US912828YJ02" }
- *     IG_1   { ISIN1 = "GB0031348658" }
+ *     IGPT_1 { ISIN1 = "GB0031348658" }
  *   }
  *
  *   templates {
@@ -79,7 +79,8 @@ public final class TestDataConfig {
                       && !e.getKey().startsWith("api-actions")
                       && !e.getKey().startsWith("portfolios")
                       && !e.getKey().startsWith("service-versions")
-                      && !e.getKey().startsWith("users"))
+                      && !e.getKey().startsWith("users")
+                      && !e.getKey().startsWith("endpoints"))
             .forEach(e -> result.put(e.getKey(), e.getValue().unwrapped().toString()));
         return Collections.unmodifiableMap(result);
     }
@@ -173,6 +174,25 @@ public final class TestDataConfig {
             throw new AssertionError(
                 "User role '" + role + "' not found in b-bot.test-data.users. " +
                 "Add:  users." + role + " = \"username\"");
+        return cfg.getString(path);
+    }
+
+    // ── Endpoints ─────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the URL for the named endpoint from {@code b-bot.test-data.endpoints}.
+     *
+     * <p>Use this for external or well-known URLs that should not be hardcoded in
+     * feature files, e.g. {@code getEndpoint("finance-demo")} → the AG Grid demo URL.
+     *
+     * @throws AssertionError if the endpoint name is not declared
+     */
+    public String getEndpoint(String name) {
+        String path = ROOT + ".endpoints." + name;
+        if (!cfg.hasPath(path))
+            throw new AssertionError(
+                "Endpoint '" + name + "' not found in b-bot.test-data.endpoints. " +
+                "Add:  endpoints." + name + " = \"https://...\"");
         return cfg.getString(path);
     }
 

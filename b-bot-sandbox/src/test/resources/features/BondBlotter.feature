@@ -219,11 +219,11 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
-    And I select the row with ISIN from "IG_1" field "ISIN1"
+    And I select the row with ISIN from "IGPT_1" field "ISIN1"
     And I set the toolbar ref source "CBBT" ref side "Bid" markup "0" units "bp"
     And I press APPLY
     Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
-    And the "spread" for ISIN from "IG_1" field "ISIN1" should be a numeric value
+    And the "spread" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M7 — DSL: end-to-end re-quote workflow
@@ -233,18 +233,18 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
   @m7 @dsl
   Scenario: Full re-quote workflow end-to-end
     Given the PT-Blotter is open
-    When I select the row with ISIN from "IG_1" field "ISIN1"
+    When I select the row with ISIN from "IGPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN from "IG_1" field "ISIN1" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "IG_1" field "ISIN1" should be a numeric value
+    Then the row with ISIN from "IGPT_1" field "ISIN1" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
     # Re-quote: change markup and re-SEND without selecting again
     When I set the toolbar ref source "CP+" ref side "Ask" markup "-0.25" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN from "IG_1" field "ISIN1" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "IG_1" field "ISIN1" should be a numeric value
+    Then the row with ISIN from "IGPT_1" field "ISIN1" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M8 — RELEASE PT access control + workflow

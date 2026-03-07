@@ -8,12 +8,12 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
   # ─────────────────────────────────────────────────────────────────────────────
 
   Scenario: Submitted portfolio ID appears in the blotter grid
-    Given trader 'doej' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given the user from role "trader" submits a portfolio via REST API
     And the blotter is populated with the API response
     Then the AG Grid should display the 'Portfolio ID' from the API response in the first row
 
   Scenario: Submitted portfolio field values match between API response and blotter grid
-    Given trader 'doej' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given the user from role "trader" submits a portfolio via REST API
     And the blotter is populated with the API response
     Then verify cell "portfolioId" in row "0" matches the API field "portfolio_id"
     And verify cell "traderId" in row "0" matches the API field "trader_id"
@@ -25,12 +25,12 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
   # ── REST contract checks ──────────────────────────────────────────────────
 
   Scenario: Submission returns HTTP 201 with a non-blank Portfolio ID
-    Given trader 'doej' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given the user from role "trader" submits a portfolio via REST API
     Then the API response status should be 201
     And the API response should contain a non-blank 'portfolio_id'
 
   Scenario: Submission payload is rejected for an unknown trader
-    Given trader 'UNKNOWN_TRADER' submits a portfolio via REST API to 'https://api.mock-blotter.com/submit'
+    Given the user from role "unknown" submits a portfolio via REST API
     Then the API response status should be 404
 
   # ─────────────────────────────────────────────────────────────────────────────
@@ -41,7 +41,7 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
 
   @external @ticking
   Scenario: Blotter grid loads and renders expected Finance Demo columns
-    Given the blotter 'https://www.ag-grid.com/example-finance/' is open
+    Given the blotter at endpoint "finance-demo" is open
     Then the AG Grid should display the 'ticker' column
     And the AG Grid should display the 'instrument' column
     And the AG Grid should display the 'totalValue' column
@@ -49,6 +49,6 @@ Feature: Portfolio Hybrid Data — REST submission verified in AG Grid blotter
 
   @external @ticking
   Scenario: GridHarness can locate a row that has scrolled out of the visible viewport
-    Given the blotter 'https://www.ag-grid.com/example-finance/' is open
+    Given the blotter at endpoint "finance-demo" is open
     When I search the grid for ticker 'MSFT'
     Then the matching row should be visible and the 'ticker' cell should contain 'MSFT'
