@@ -1,0 +1,28 @@
+package stepdefs;
+
+import com.bbot.core.registry.BBotRegistry;
+import io.cucumber.java.en.Then;
+import utils.ConfigServiceDsl;
+
+/**
+ * Step definitions for Config Service scenarios.
+ *
+ * <p>REST-only — no Playwright page needed. Every step delegates to
+ * {@link ConfigServiceDsl} which uses JDK {@code HttpClient} internally.
+ */
+public class ConfigServiceSteps {
+
+    private final ConfigServiceDsl configService =
+            BBotRegistry.dsl("config-service", null, ConfigServiceDsl.class);
+
+    @Then("the config namespace {string} should be present")
+    public void configNamespaceShouldBePresent(String namespace) {
+        configService.assertNamespacePresent(namespace);
+    }
+
+    @Then("the user {string} should have isPTAdmin {string} in config service")
+    public void userShouldHaveIsPTAdmin(String username, String expectedValue) {
+        boolean expected = Boolean.parseBoolean(expectedValue);
+        configService.assertUserIsPTAdmin(username, expected);
+    }
+}

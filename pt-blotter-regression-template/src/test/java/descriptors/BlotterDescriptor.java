@@ -41,13 +41,19 @@ public final class BlotterDescriptor implements AppDescriptor<PtBlotterDsl> {
         return (ctx, page) -> new PtBlotterDsl(page, ctx);
     }
 
-    /** Path appended to apiBase for the liveness probe, e.g. GET /api/health -> 2xx. */
+    /**
+     * GET /api/inquiries returns the list of all inquiries → 200 = blotter alive.
+     * The mock WireMock server stubs this endpoint with a static response.
+     */
     @Override public Optional<String> healthCheckPath() {
-        return Optional.of("/api/health");
+        return Optional.of("/api/inquiries");
     }
 
-    /** Path appended to apiBase for version assertion, e.g. GET /api/version -> JSON. */
+    /**
+     * Version evidence comes from the Deployment Dashboard (see DeploymentSteps),
+     * not from a per-service /version endpoint. Leave empty for the blotter.
+     */
     @Override public Optional<String> versionPath() {
-        return Optional.of("/api/version");
+        return Optional.empty();
     }
 }

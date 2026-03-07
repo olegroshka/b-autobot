@@ -4,31 +4,38 @@ import com.bbot.core.registry.BBotRegistry;
 import io.cucumber.java.en.Given;
 
 /**
- * Generic precondition steps that delegate to {@link BBotRegistry} health and
- * version probes.
+ * Generic precondition steps that delegate to {@link BBotRegistry} health probes.
  *
- * <p>These steps are ready-to-use -- no customisation needed. Simply declare the
+ * <p>These steps are ready-to-use — no customisation needed. Simply declare the
  * relevant precondition at the top of any scenario that requires a live service:
  *
  * <pre>
  *   Given the "blotter" app is healthy
- *   Given the "blotter" service is running at version "2.4.1"
+ *   Given the "config-service" app is healthy
  * </pre>
  *
  * <p>The health check calls the URL declared in
  * {@link com.bbot.core.registry.AppDescriptor#healthCheckPath()}.
- * The version check calls {@link com.bbot.core.registry.AppDescriptor#versionPath()}
- * and looks for the expected version string in the JSON response.
+ *
+ * <p>If the health check fails (connection refused or non-2xx), the error message
+ * includes instructions for starting the mock UAT environment.
  */
 public class AppPreconditionSteps {
 
+    private static final String ENV_HINT =
+            "\n\nIs the mock UAT environment running?" +
+            "\n  Unix/Mac: scripts/start-mock-uat.sh" +
+            "\n  Windows:  scripts\\start-mock-uat.bat\n";
+
     @Given("the {string} app is healthy")
     public void appIsHealthy(String appName) {
-        BBotRegistry.checkHealth(appName);
-    }
-
-    @Given("the {string} service is running at version {string}")
-    public void serviceIsRunningAtVersion(String appName, String expectedVersion) {
-        BBotRegistry.assertVersion(appName, expectedVersion);
+        try {
+            BBotRegistry.checkHealth(appName);
+        } catch (AssertionError e) {
+            throw new AssertionError(e.getMessage() + ENV_HINT, e);
+        } catch (Exception e) {
+            throw new AssertionError(
+                    "Health check failed for '" + appName + "': " + e.getMessage() + ENV_HINT, e);
+        }
     }
 }

@@ -4,13 +4,15 @@ import com.bbot.core.PlaywrightManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import descriptors.BlotterDescriptor;
+import descriptors.ConfigServiceDescriptor;
+import descriptors.DeploymentDescriptor;
 import io.cucumber.java.After;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
 
 /**
- * Cucumber lifecycle hooks -- the single entry point that wires together
+ * Cucumber lifecycle hooks — the single entry point that wires together
  * b-bot-core infrastructure for this regression suite.
  *
  * <h2>Template customisation points</h2>
@@ -28,9 +30,9 @@ import io.cucumber.java.BeforeAll;
  * <h2>Active environment</h2>
  * Controlled by the {@code b-bot.env} system property:
  * <pre>
- *   mvn verify                          -- local (default; services must be running)
- *   mvn verify -Db-bot.env=devserver    -- application-devserver.conf
- *   mvn verify -Db-bot.env=uat          -- application-uat.conf
+ *   mvn verify -Db-bot.env=mockuat     -- application-mockuat.conf (mock UAT stack)
+ *   mvn verify -Db-bot.env=devserver   -- application-devserver.conf (blotter only)
+ *   mvn verify -Db-bot.env=uat         -- application-uat.conf (real UAT, not committed)
  * </pre>
  *
  * <h2>Browser settings</h2>
@@ -48,11 +50,14 @@ public class Hooks {
         // Load HOCON config -- picks up application-{env}.conf automatically.
         BBotConfig cfg = BBotConfig.load();
 
-        // Register descriptors -- one AppDescriptor per application under test.
-        // Each descriptor declares the app name, DSL factory, and health-check path.
+        // Register one descriptor per application under test.
+        // Each descriptor declares: app name, DSL factory, health-check path.
         BBotRegistry.register(new BlotterDescriptor());
+        BBotRegistry.register(new ConfigServiceDescriptor());
+        BBotRegistry.register(new DeploymentDescriptor());
         // BBotRegistry.register(new MyOtherServiceDescriptor());
 
+        // Resolve AppContexts from config (URLs, users, timeouts).
         BBotRegistry.initialize(cfg);
 
         // Browser lifecycle -- remove these lines if your suite is REST-only.
