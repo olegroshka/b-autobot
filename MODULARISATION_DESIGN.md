@@ -119,7 +119,7 @@ runtime override mechanism layered on top of the HOCON config.
 ### Module Structure
 
 ```
-b-bot/                                 ← parent POM (aggregator, no sources)
+b-autobot/                             ← parent POM (aggregator, no sources)
 ├── pom.xml                            ← dependencyManagement, pluginManagement
 │
 ├── b-bot-core/                        ← publishable library; no Cucumber dependency
@@ -143,21 +143,38 @@ b-bot/                                 ← parent POM (aggregator, no sources)
 │           ├── js/probes/bundle.js       ← on classpath for ProbesLoader
 │           └── reference.conf           ← lowest-priority core defaults (browser, timeouts)
 │
-└── b-bot-sandbox/                     ← this repo's current content, restructured
-    ├── pom.xml                        ← depends on b-bot-core
+├── b-bot-sandbox/                     ← demo & regression suite (66 scenarios)
+│   ├── pom.xml                        ← depends on b-bot-core
+│   └── src/test/
+│       ├── java/
+│       │   ├── descriptors/           ← one AppDescriptor impl per app
+│       │   │   ├── BlotterAppDescriptor.java
+│       │   │   ├── ConfigServiceDescriptor.java
+│       │   │   └── DeploymentDescriptor.java
+│       │   ├── stepdefs/              ← domain steps + Hooks
+│       │   ├── utils/                 ← Mock*Server, *Dsl (URL-injected via AppContext)
+│       │   └── runners/TestRunner.java
+│       ├── js/                        ← JavaScript probe workspace (npm + Jest)
+│       │   ├── probes/                ← source probe modules + bundle.js
+│       │   └── __tests__/             ← Jest unit tests (jsdom)
+│       └── resources/
+│           ├── features/
+│           ├── application.conf       ← sandbox non-URL settings (users, timeouts)
+│           ├── wiremock/              ← WireMock stubs + blotter Vite build
+│           ├── config-service-ui/     ← pre-built Config Service UI
+│           └── deployment-ui/         ← pre-built Deployment Dashboard UI
+│
+└── pt-blotter-regression-template/   ← copy-adapt starter for real-system consumers
+    ├── pom.xml                        ← depends on b-bot-core; skipTests=true by default
     └── src/test/
         ├── java/
-        │   ├── descriptors/           ← NEW: one AppDescriptor impl per app
-        │   │   ├── BlotterAppDescriptor.java
-        │   │   ├── ConfigServiceDescriptor.java
-        │   │   └── DeploymentDescriptor.java
-        │   ├── stepdefs/              ← unchanged domain steps + revised Hooks
-        │   ├── utils/                 ← Mock*Server, *Dsl (URL-injected via AppContext)
-        │   └── runners/TestRunner.java
+        │   ├── descriptors/BlotterDescriptor.java
+        │   ├── stepdefs/{Hooks,BlotterSteps,AppPreconditionSteps}.java
+        │   └── utils/PtBlotterDsl.java
         └── resources/
-            ├── features/
-            ├── application.conf       ← sandbox non-URL settings (users, timeouts)
-            └── wiremock/
+            ├── application.conf             ← base config + commented override examples
+            ├── application-devserver.conf   ← points at localhost:9099
+            └── features/Smoke.feature
 ```
 
 ---
@@ -598,11 +615,24 @@ b-bot {
     viewport { width = 1920, height = 1080 }
   }
   timeouts {
-    navigation  = 30s
-    cellFlash   = 3s
-    gridRender  = 10s
-    apiResponse = 10s
+    navigation     = 30s    # page.navigate() / waitForLoadState() budget
+    cellFlash      = 3s     # wait for ag-cell-data-changed CSS class to appear
+    gridRender     = 10s    # wait for AG Grid to show at least one row
+    apiResponse    = 10s    # HTTP budget for DSL REST calls
+    gridFastPath   = 500ms  # phase-1: fast DOM scan timeout
+    gridRowInDom   = 5s     # phase-2: confirm row in DOM after ensureIndexVisible
+    gridHasRows    = 5s     # phase-3: wait for any row before scroll-probe starts
+    gridScrollStep = 2s     # phase-3: per-step scroll wait
+    healthCheck    = 10s    # connect + response timeout for BBotRegistry probes
   }
+  grid {
+    renderPollMs   = 100    # waitForFunction poll interval (ms) in GridHarness
+    maxScrollSteps = 200    # max scroll iterations before GridHarness gives up
+  }
+  ticking {
+    pollMs = 150            # waitForFunction poll interval (ms) for ticking cells
+  }
+  apps {}
 }
 ```
 
@@ -631,7 +661,7 @@ b-bot {
 }
 ```
 
-#### `application-uat.conf` — `pt-blotter-regression/src/test/resources/`
+#### `application-uat.conf` — `pt-blotter-regression-template/src/test/resources/`
 
 ```hocon
 # UAT environment — real system endpoints.
@@ -669,7 +699,7 @@ b-bot {
 }
 ```
 
-#### `application-preprod.conf` — `pt-blotter-regression/src/test/resources/`
+#### `application-preprod.conf` — `pt-blotter-regression-template/src/test/resources/`
 
 ```hocon
 # Pre-prod — inherits all UAT settings, only URLs differ.
@@ -958,18 +988,18 @@ Scenario: Credit RFQ stack is live at expected versions
 
 ---
 
-### Real Consumer: `pt-blotter-regression` (Future)
+### Real Consumer: `pt-blotter-regression-template` (delivered in M5)
 
 ```java
-// pt-blotter-regression/Hooks.java — 8 lines of boilerplate, zero mock servers
+// pt-blotter-regression-template/src/test/java/stepdefs/Hooks.java
+// Zero mock servers — all URLs come from application-{env}.conf
 public class Hooks {
 
     @BeforeAll
     public static void setup() {
         BBotConfig cfg = BBotConfig.load();   // picks up application-{env}.conf automatically
-        BBotRegistry.register(new BlotterAppDescriptor());
-        BBotRegistry.register(new ConfigServiceDescriptor());
-        BBotRegistry.register(new DeploymentDescriptor());
+        BBotRegistry.register(new BlotterDescriptor());
+        // Add more AppDescriptors here for additional apps under test
         BBotRegistry.initialize(cfg);
         PlaywrightManager.initBrowser();
     }
@@ -1043,9 +1073,11 @@ Each milestone builds on the previous one. The invariant is simple:
 **66/66 tests must pass at the end of every milestone without exception.**
 No milestone is "done" until all its quality gates are green and a clean git commit is made.
 
+**Status: M1–M5 COMPLETE. 66/66 passing. `pt-blotter-regression-template` module shipped.**
+
 ---
 
-## M1 — Module Separation (structural move only, zero logic changes)
+## M1 — Module Separation ✅ DONE
 
 **Goal:** Two Maven modules exist and compile. Core infrastructure files live in `b-bot-core/src/main/java`. All tests still pass. No logic changed — only package declarations and build configuration.
 
@@ -1111,7 +1143,7 @@ mvn verify -pl b-bot-sandbox -DHEADLESS=false -Dcucumber.filter.tags="@smoke"
 
 ---
 
-## M2 — Configuration Layer (`BBotConfig`)
+## M2 — Configuration Layer (`BBotConfig`) ✅ DONE
 
 **Goal:** `BBotConfig` exists in core, loads `reference.conf` defaults, supports layered
 environment overrides and `withOverrides()` for runtime URL injection. Unit-tested in
@@ -1170,7 +1202,7 @@ mvn verify -pl b-bot-core -Db-bot.env=someenv-that-does-not-exist 2>&1 | grep "M
 
 ---
 
-## M3 — Registry + Descriptor Interfaces
+## M3 — Registry + Descriptor Interfaces ✅ DONE
 
 **Goal:** `AppDescriptor`, `AppContext`, `DslFactory`, `ComponentType`, `BBotRegistry` exist in core
 and are fully unit-tested. Not yet wired into the sandbox — the existing Hooks, DSLs, and step defs are
@@ -1228,7 +1260,7 @@ ls -lh b-bot-core/target/b-bot-core-1.0.0-SNAPSHOT.jar
 
 ---
 
-## M4 — DSL Decoupling + End-to-End Wiring (Critical Milestone)
+## M4 — DSL Decoupling + End-to-End Wiring ✅ DONE
 
 **Goal:** Sever every static mock-server call from every DSL. Wire `BBotRegistry` into
 `Hooks.java` and step definitions. 66/66 must pass **after every sub-step** — do not
@@ -1347,67 +1379,65 @@ B_BOT_ENV=local mvn verify -pl b-bot-sandbox -Dcucumber.filter.tags="@smoke"
 
 ---
 
-## M5 — Core Published + Consumer Skeleton Compiles
+## M5 — Core Published + Consumer Template ✅ DONE
 
-**Goal:** `b-bot-core` is a standalone, installable JAR. A skeleton `pt-blotter-regression` project
-compiles against it from the local Maven repository without needing the reactor.
+**Goal:** `b-bot-core` is a standalone, installable JAR. `pt-blotter-regression-template` is a
+fully-documented copy-adapt starter for real-system consumers, living as a peer Maven module
+in the reactor. `mvn verify` passes 66/66 in the sandbox; the template smoke scenario passes
+when BlotterDevServer is running.
 
-### Tasks
+### What was delivered
 
-1. `mvn install -pl b-bot-core` — installs JAR + POM to local `.m2`
+1. **`b-bot-core`** installed to local `.m2` — consumers can depend on it from any project.
 
-2. Verify sandbox works against the installed JAR (detached from reactor):
+2. **`pt-blotter-regression-template/`** — added to the reactor as a third Maven module:
+   - `pom.xml` inherits parent; `skipTests=true` by default; activates `real-env` profile
+     automatically when `-Db-bot.env=<anything>` is passed (no manual profile activation needed)
+   - `Hooks.java` — no mock servers; `BBotConfig.load()` + register + initialize + initBrowser
+   - `BlotterDescriptor.java`, `BlotterSteps.java`, `AppPreconditionSteps.java`, `PtBlotterDsl.java`
+   - `application.conf` — all b-bot-core HOCON keys shown with defaults and comments
+   - `application-devserver.conf` — points at `localhost:9099` (BlotterDevServer)
+   - `features/Smoke.feature` — one `@smoke` scenario
+   - `README.md` — developer quick-start guide (prerequisites, 3-step smoke run, how to adapt)
+
+3. **Smoke test** against `BlotterDevServer`:
    ```bash
-   cd b-bot-sandbox
-   mvn verify --offline   # must use installed JAR, not reactor
+   # Terminal 1 — start mock blotter server
+   mvn exec:java -pl b-bot-sandbox \
+       -Dexec.mainClass=utils.BlotterDevServer \
+       -Dexec.classpathScope=test
+
+   # Terminal 2 — run template smoke
+   mvn verify -pl pt-blotter-regression-template -Db-bot.env=devserver
+   # → Tests run: 1, Failures: 0
    ```
-
-3. Create `pt-blotter-regression/` (new directory or repository):
-   - `pom.xml` with `<dependency>com.bbot:b-bot-core:1.0.0-SNAPSHOT</dependency>`
-   - Empty `src/test/java/descriptors/`, `stepdefs/`, `runners/`
-   - `TestRunner.java` — standard `@Suite @IncludeEngines("cucumber")`
-   - `Hooks.java` — no mock servers, just `BBotConfig.load()` + 3 registers + `initialize` + `initBrowser`
-   - `application.conf` placeholder (empty `b-bot {}` block)
-   - `src/test/resources/features/` — empty directory (0 scenarios)
-
-4. Verify the consumer compiles and runs with 0 scenarios:
-   ```bash
-   cd pt-blotter-regression
-   mvn verify   # BUILD SUCCESS, 0 scenarios
-   ```
-
-5. Add one `@smoke` scenario targeting `BlotterDevServer` (local URL from `application-devserver.conf`):
-   - Start `BlotterDevServer` in one terminal
-   - Run: `mvn verify -Db-bot.env=devserver -Dcucumber.filter.tags="@smoke"` → 1/1
 
 ### Quality Gates
 
 ```bash
-# G5.1 — Core JAR in local .m2
-mvn install -pl b-bot-core
+# G5.1 — Core JAR installable
+mvn install -pl b-bot-core -DskipTests
 ls ~/.m2/repository/com/bbot/b-bot-core/1.0.0-SNAPSHOT/b-bot-core-1.0.0-SNAPSHOT.jar
 # File must exist
 
-# G5.2 — Consumer compiles offline (reactor not needed)
-cd pt-blotter-regression && mvn compile --offline
-# Must print: BUILD SUCCESS
+# G5.2 — Template compiles in reactor (skipTests by default)
+mvn verify -pl pt-blotter-regression-template
+# Must print: BUILD SUCCESS (0 tests run — skipTests=true)
 
-# G5.3 — Consumer test compile + 0-scenario run
-cd pt-blotter-regression && mvn verify
-# Must print: Tests run: 0, Failures: 0, Errors: 0, Skipped: 0; BUILD SUCCESS
+# G5.3 — Smoke against DevServer
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=devserver
+# Must print: Tests run: 1, Failures: 0
 
-# G5.4 — Smoke against DevServer (integration gate)
-# Terminal 1: cd b-bot-sandbox && mvn exec:java -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test
-# Terminal 2:
-cd pt-blotter-regression && mvn verify -Db-bot.env=devserver -Dcucumber.filter.tags="@smoke"
-# Must print: Tests run: 1, Failures: 0 — real browser, real WireMock, config-driven URL
-
-# G5.5 — Sandbox regression still clean
+# G5.4 — Sandbox regression unaffected
 mvn verify -pl b-bot-sandbox
 # Must print: Tests run: 66, Failures: 0, Errors: 0
+
+# G5.5 — Full reactor build clean
+mvn verify
+# Must print: BUILD SUCCESS across all modules
 ```
 
-**Commit message:** `M5: b-bot-core installable; pt-blotter-regression skeleton compiles; smoke vs DevServer passes`
+**Commit message:** `M5: b-bot-core installable; pt-blotter-regression-template module + README + devserver smoke`
 
 ---
 
@@ -1421,7 +1451,7 @@ assertions — works end-to-end against a real system.
 
 1. Obtain UAT service URLs and any auth tokens from infra/ops team
 
-2. Write `pt-blotter-regression/src/test/resources/application-uat.conf` with real values
+2. Write `pt-blotter-regression-template/src/test/resources/application-uat.conf` with real values
 
 3. Write (or adapt) `BlotterAppDescriptor` for any UAT-specific quirks (different URL query params, auth headers, etc.)
 
@@ -1436,7 +1466,7 @@ assertions — works end-to-end against a real system.
 
 ```bash
 # G6.1 — UAT smoke: 3 scenarios green against live system
-cd pt-blotter-regression
+cd pt-blotter-regression-template
 B_BOT_ENV=uat mvn verify -Dcucumber.filter.tags="@smoke"
 # Must print: Tests run: 3, Failures: 0, Errors: 0
 
@@ -1444,9 +1474,9 @@ B_BOT_ENV=uat mvn verify -Dcucumber.filter.tags="@smoke"
 B_BOT_ENV=uat mvn verify -Dcucumber.filter.tags="@precondition"
 # Must print: Tests run: 1+, Failures: 0
 
-# G6.3 — No mock-server classes anywhere in pt-blotter-regression
+# G6.3 — No mock-server classes anywhere in pt-blotter-regression-template
 grep -r "MockBlotterServer\|MockConfigServer\|MockDeploymentServer\|WireMockServer\|wiremock" \
-  pt-blotter-regression/src/
+  pt-blotter-regression-template/src/
 # Must print: (no output)
 
 # G6.4 — Headed browser confirms real UAT blotter (manual, once)

@@ -1,28 +1,83 @@
 # b-autobot
 
-> **Playwright-based BDD test automation suite** targeting the
-> [AG Grid React Finance Demo](https://www.ag-grid.com/example-finance/) —
-> a live-price-feed grid with virtualisation, ticking cells, REST API integration,
-> and a WireMock-backed blotter.
+> **Playwright-based BDD test automation framework** — a multi-module Maven project
+> demonstrating enterprise-grade browser automation against AG Grid React applications,
+> with a publishable core library and a copy-adapt template for real-system consumers.
 
 ---
 
-## What this project demonstrates
+## Repository layout
 
-| Capability | How it's implemented |
+```
+b-autobot/
+├── b-bot-core/                     ← Publishable library (no Cucumber dependency)
+│   └── src/main/java/com/bbot/core/
+│       ├── PlaywrightManager       # Thread-local Playwright lifecycle
+│       ├── GridHarness             # 3-phase virtualisation-safe row finder
+│       ├── TickingCellHelper       # Live-ticking cell wait/assert helpers
+│       ├── ProbesLoader            # Injects window.agGridProbes bundle
+│       ├── NumericComparator       # UI vs API value comparison (BigDecimal)
+│       ├── config/BBotConfig       # HOCON layered config (5-layer loading)
+│       └── registry/               # AppDescriptor / AppContext / BBotRegistry
+│
+├── b-bot-sandbox/                  ← Demo & regression suite (all 66 scenarios)
+│   └── src/test/
+│       ├── java/
+│       │   ├── descriptors/        # BlotterAppDescriptor, ConfigServiceDescriptor, DeploymentDescriptor
+│       │   ├── model/              # Jackson POJOs (Trade, TradePortfolio)
+│       │   ├── pages/              # FinanceDemoPage (AG Grid Finance Demo POM)
+│       │   ├── runners/            # JUnit 5 @Suite runner
+│       │   ├── stepdefs/           # BondBlotterSteps, ConfigServiceSteps, DeploymentSteps, …
+│       │   └── utils/              # BlotterDsl, ConfigServiceDsl, DeploymentDsl,
+│       │                           # MockBlotterServer, MockConfigServer, MockDeploymentServer,
+│       │                           # BlotterDevServer, ConfigDevServer, DeploymentDevServer
+│       ├── js/                     # JavaScript probe workspace (npm + Jest)
+│       │   ├── probes/             # api-discovery, dom-probes, grid-api-probes, …
+│       │   └── __tests__/          # Jest unit tests (jsdom)
+│       └── resources/
+│           ├── features/           # BondBlotter (39), ConfigService (14), Deployment (15),
+│           │                       # finance_demo, PortfolioRegression
+│           ├── wiremock/__files/   # Pre-built blotter Vite assets (git-committed)
+│           ├── config-service-ui/  # Pre-built Config Service UI (git-committed)
+│           └── deployment-ui/      # Pre-built Deployment Dashboard UI (git-committed)
+│
+├── pt-blotter-regression-template/ ← Copy-adapt starter for real-system consumers
+│   └── src/test/
+│       ├── java/
+│       │   ├── descriptors/BlotterDescriptor.java   ← replace with your app
+│       │   ├── stepdefs/{Hooks,BlotterSteps,AppPreconditionSteps}.java
+│       │   └── utils/PtBlotterDsl.java              ← replace with your DSL
+│       └── resources/
+│           ├── application.conf                     ← base config + commented overrides
+│           ├── application-devserver.conf           ← points at localhost:9099
+│           └── features/Smoke.feature               ← replace with real scenarios
+│
+├── BLOTTER_DESIGN.md               # PT-Blotter design doc (milestones M0–M8)
+├── MODULARISATION_DESIGN.md        # Multi-module architecture design record
+├── CLAUDE.md                       # AI assistant rules (AG Grid patterns, probe arch)
+└── pom.xml                         # Parent aggregator — version management for all modules
+```
+
+---
+
+## What this demonstrates
+
+| Capability | Implementation |
 |---|---|
-| BDD with living documentation | Cucumber 7 feature files as the source of truth |
-| Playwright + Java for browser automation | Page Object Model, role-based locators, no `Thread.sleep` |
+| Publishable core library | `b-bot-core` — zero Cucumber dependency; consumers add it as a single `<dependency>` |
+| HOCON layered config | `BBotConfig` — 5-layer loading; all timeouts/browser settings overridable per environment |
+| Component registry | `BBotRegistry` + `AppDescriptor` — register apps, resolve contexts, create DSLs |
+| BDD with living documentation | Cucumber 7 feature files as acceptance criteria |
+| Playwright + Java browser automation | Page Object Model, role-based locators, no `Thread.sleep` |
 | Live-ticking cell handling | `TickingCellHelper` — `waitForFunction` polling, flash-class detection |
 | AG Grid virtualisation | `GridHarness` — 3-phase scroll strategy (DOM → JS API → scroll-probe) |
-| Hybrid REST + UI testing | WireMock mock server + Playwright `APIRequestContext` + mock DOM |
-| React app introspection | React fibre traversal to locate the AG Grid API when it isn't on `window` |
-| Industrial-grade JS probes | Named, single-responsibility probe modules tested independently with Jest + jsdom |
-| Config Service microservice | JDK `HttpServer` mock — in-memory config store with full REST CRUD API |
-| Access-controlled UI actions | RELEASE PT button enabled/disabled by `isPTAdmin` fetched from Config Service |
-| Deployment Dashboard | AG Grid service registry — 12 processes, status/version/host/team columns, filter |
-| Version-gated regression reports | @precondition scenario asserts deployed versions match tested versions |
-| Regression evidence | `maven-cucumber-reporting` HTML report generated by `mvn verify` |
+| Industrial JS probes | Named probe modules in `b-bot-sandbox/src/test/js/` tested with Jest + jsdom |
+| WireMock mock server | Embedded, classpath-based file serving, dynamic port |
+| Config Service microservice | JDK `HttpServer` mock, in-memory CRUD, CORS headers |
+| Access-controlled UI | RELEASE PT button gated by `isPTAdmin` from Config Service |
+| Deployment Dashboard | AG Grid service registry, 12 seeded services, filter |
+| Version-gated regression | `@precondition` scenario asserts deployed versions |
+| Copy-adapt template | `pt-blotter-regression-template` — 8-file starter for real-system suites |
 
 ---
 
@@ -34,6 +89,7 @@
 | Browser automation | Playwright for Java | 1.49.0 |
 | BDD framework | Cucumber | 7.18.1 |
 | Test runner | JUnit 5 Platform Suite | 5.10.3 / 1.10.3 |
+| Config | Typesafe Config (HOCON) | 1.4.3 |
 | REST mock | WireMock | 3.5.4 |
 | JSON parsing | Jackson Databind | 2.17.2 |
 | Assertions | AssertJ | 3.26.3 |
@@ -42,586 +98,166 @@
 
 ---
 
-## Project structure
-
-```
-b-autobot/
-├── pom.xml                          # Dependencies, Surefire config, reporting plugin
-├── CLAUDE.md                        # AI assistant project rules (AG Grid patterns, probe architecture)
-└── src/test/
-    ├── java/
-    │   ├── model/
-    │   │   ├── Trade.java           # Jackson POJO — individual trade in a portfolio
-    │   │   └── TradePortfolio.java  # Jackson POJO — full portfolio payload
-    │   ├── pages/
-    │   │   └── FinanceDemoPage.java # Page Object for the AG Grid Finance Demo
-    │   ├── runners/
-    │   │   └── TestRunner.java      # @Suite JUnit 5 runner (discovers Cucumber scenarios)
-    │   ├── stepdefs/
-    │   │   ├── BondBlotterSteps.java   # Step defs for BondBlotter.feature (delegates to BlotterDsl)
-    │   │   ├── ConfigServiceSteps.java # Step defs for ConfigService.feature (Playwright-free)
-    │   │   ├── DeploymentSteps.java    # Step defs for Deployment.feature (API + browser)
-    │   │   ├── FinanceDemoSteps.java   # Step defs for finance_demo.feature
-    │   │   ├── Hooks.java              # @BeforeAll / @Before / @After lifecycle
-    │   │   └── PortfolioSteps.java     # Step defs for PortfolioRegression.feature
-    │   └── utils/
-    │       ├── BlotterDevServer.java   # Standalone launcher — start WireMock for manual browsing
-    │       ├── BlotterDsl.java         # PT-Blotter DSL — all Playwright interactions
-    │       ├── ConfigDevServer.java    # Standalone launcher — start Config Service + UI
-    │       ├── ConfigServiceDsl.java   # JDK HttpClient wrapper for Config Service REST API
-    │       ├── GridHarness.java        # Virtualisation-aware row finder (3-phase)
-    │       ├── MockBlotterServer.java  # Embedded WireMock + PT-Blotter stubs
-    │       ├── MockConfigServer.java   # Config microservice (JDK HttpServer, in-memory)
-    │       ├── MockDeploymentServer.java # Deployment registry (JDK HttpServer, 12 services)
-    │       ├── DeploymentDsl.java      # Deployment Dashboard DSL — API + browser
-    │       ├── NumericComparator.java  # BigDecimal-based UI vs API value comparison
-    │       ├── PlaywrightManager.java  # Thread-local Playwright lifecycle manager
-    │       ├── ProbesLoader.java       # Loads bundle.js from classpath, injects via addInitScript
-    │       └── TickingCellHelper.java  # Strategies for live-ticking cell assertions
-    ├── js/                          # JavaScript probe workspace (npm + Jest)
-    │   ├── package.json
-    │   ├── jest.config.js
-    │   ├── README.md
-    │   ├── probes/
-    │   │   ├── api-discovery.js     # React fibre traversal to locate the AG Grid API
-    │   │   ├── dom-probes.js        # Pure DOM queries — cells, row indices, flash state
-    │   │   ├── grid-api-probes.js   # AG Grid API: forEachNode, ensureIndexVisible
-    │   │   ├── filter-probes.js     # setFilterModel (text + set filter)
-    │   │   ├── scroll-probes.js     # Viewport scroll operations
-    │   │   ├── ticking-probes.js    # Live cell update detection
-    │   │   └── bundle.js            # Browser IIFE — registers window.agGridProbes
-    │   └── __tests__/
-    │       ├── api-discovery.test.js
-    │       ├── dom-probes.test.js
-    │       ├── grid-api-probes.test.js
-    │       ├── filter-probes.test.js
-    │       ├── scroll-probes.test.js
-    │       └── ticking-probes.test.js
-    └── resources/
-        ├── cucumber.properties      # strict mode, quiet publish
-        ├── config-service-ui/       # Vite build output for Config Service UI (git-committed)
-        ├── deployment-ui/           # Vite build output for Deployment Dashboard (git-committed)
-        └── features/
-            ├── BondBlotter.feature          # PT-Blotter M0–M8 + precondition (39 scenarios)
-            ├── ConfigService.feature        # Config Service REST API + CRUD (14 scenarios)
-            ├── Deployment.feature           # Deployment Dashboard API + grid + filter (15 scenarios)
-            ├── finance_demo.feature         # Grid structure, ticking, sort, filter
-            └── PortfolioRegression.feature  # REST + blotter UI (WireMock + external)
-```
-
----
-
-## Features covered
-
-### `finance_demo.feature` — AG Grid Finance Demo (`@finance`)
-
-| Scenario | Tags |
-|---|---|
-| Grid renders with expected columns (ticker, instrument, totalValue, quantity) | `@finance` |
-| Total Value cell updates within the live feed window | `@finance @ticking` |
-| Cell flashes to indicate a live data update | `@finance @ticking` |
-| Sorting by ticker column reorders the grid | `@finance` |
-| Filtering by Instrument column shows only matching rows | `@finance` |
-| Clearing the Instrument filter restores all instrument types | `@finance` |
-
-### `PortfolioRegression.feature` — REST + Blotter (`@portfolio @regression`)
-
-| Scenario | Tags |
-|---|---|
-| Submitted portfolio ID appears in the blotter grid | `@portfolio @regression` |
-| All portfolio field values match between API response and blotter | `@portfolio @regression` |
-| Submission returns HTTP 201 with a non-blank Portfolio ID | `@portfolio @regression` |
-| Unknown trader payload is rejected with HTTP 404 | `@portfolio @regression` |
-| Blotter grid loads and renders expected Finance Demo columns | `@portfolio @regression @external @ticking` |
-| GridHarness locates a row scrolled out of the visible viewport | `@portfolio @regression @external @ticking` |
-
-### `BondBlotter.feature` — PT-Blotter fixed income UI (`@blotter`)
-
-| Milestone | Scenarios | Tags | Status |
-|---|---|---|---|
-| M0 — page loads | 1 | `@smoke` | ✓ Done |
-| M1 — grid columns + seed rows | 2 | `@m1` | ✓ Done |
-| M2 — ticking reference prices | 3 | `@m2 @ticking` | ✓ Done |
-| M3 — REST inquiry API | 2 | `@m3 @api` | ✓ Done |
-| M4 — Toolbar APPLY (source/side/markup/units) | 6 | `@m4 @workflow` | ✓ Done |
-| M5 — SEND → QUOTED, sentPrice snapshot | 3 | `@m5 @workflow` | ✓ Done |
-| M6 — multi-row APPLY / SEND | 3 | `@m6 @multi` | ✓ Done |
-| M7 — end-to-end DSL re-quote workflow | 1 | `@m7 @dsl` | ✓ Done |
-| M8 — RELEASE PT access control + workflow | 5 | `@m8 @access @workflow` | ✓ Done |
-| Precondition — version gate | 1 | `@precondition @deployment` | ✓ Done |
-
-### `Deployment.feature` — Deployment Dashboard (`@deployment`)
-
-| Category | Scenarios | Tags | Status |
-|---|---|---|---|
-| Registry reachable, critical services registered | 2 | `@smoke` | ✓ Done |
-| Exact version checks (rfq-blotter, pricer, neg-engine) | 3 | `@api @versions` | ✓ Done |
-| Status counts (10 RUNNING, 1 STOPPED, 1 FAILED) | 3 | `@api @status` | ✓ Done |
-| Individual service status (regulatory-reporting, limit-monitor) | 2 | `@api @status` | ✓ Done |
-| Grid columns visible, 12+ rows rendered | 2 | `@grid` | ✓ Done |
-| Filter by "credit-pt" narrows rows; clear restores all | 2 | `@filter` | ✓ Done |
-| Individual service lookup (registered + unknown → 404) | 1 | `@api` | ✓ Done |
-
-### `ConfigService.feature` — Config Service REST API (`@config-service`)
-
-| Category | Scenarios | Tags | Status |
-|---|---|---|---|
-| Namespace + type discovery | 2 | `@smoke` | ✓ Done |
-| All 4 seed users (Permissions) | 5 | `@api` | ✓ Done |
-| Booking, Risk, Market configs | 3 | `@api` | ✓ Done |
-| Mutable config (update + reset) | 1 | `@api` | ✓ Done |
-| Create + delete entry | 1 | `@api` | ✓ Done |
-| 404 for missing entry | 1 | `@api` | ✓ Done |
-
-**Current status: 66 / 66 passing (39 blotter + 15 deployment + 14 config-service + 12 legacy + 6 finance demo).
-Blotter scenarios M1/M2/M4–M8 require the Vite build:**
-
-```bash
-mvn verify -Dblotter.build.skip=false   # → 66/66
-```
-
----
-
-## PT-Blotter — running the mock UI interactively
-
-The PT-Blotter is a React + AG Grid app served by an embedded WireMock server.
-You can open it in a browser and click through the full APPLY / SEND workflow
-without running any tests.
+## Running the sandbox suite (66 scenarios)
 
 ### Prerequisites
 
-- **Java 21+** on your PATH
-- **Node.js 20+** — only needed if you want the Vite dev server (hot-reload).
-  The Maven build downloads Node automatically via `frontend-maven-plugin`.
-
-### Step 1 — build the React app (once)
-
-```bash
-mvn test-compile -Dblotter.build.skip=false
-```
-
-This downloads Node 20 into `.node/`, runs `npm install`, and builds the React app
-into `src/test/resources/wiremock/__files/blotter/`.  Takes ~60 s on first run,
-~10 s after Node is cached.
-
-### Step 2 — start the mock server
-
-```bash
-mvn exec:java -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test
-```
-
-The server starts on **port 9099** by default and prints the URL.
-To use a different port, pass it as an argument:
-
-```bash
-mvn exec:java -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test "-Dexec.args=8765"
-```
-
-### Step 3 — open the blotter
-
-**Option A — pre-built page (no Node needed after Step 1):**
-
-```
-http://localhost:9099/blotter/
-```
-
-**Option B — Vite dev server (live hot-module-reload for UI development):**
-
-```bash
-# macOS / Linux / Git Bash
-cd src/test/webapp
-VITE_WIREMOCK_PORT=9099 npm run dev
-# → open http://localhost:5173/blotter/
-
-# Windows Command Prompt
-cd src\test\webapp
-set VITE_WIREMOCK_PORT=9099 && npm run dev
-
-# Windows PowerShell
-cd src\test\webapp
-$env:VITE_WIREMOCK_PORT=9099; npm run dev
-```
-
-### What you can click through
-
-| Action | How |
-|---|---|
-| See 5 seed inquiries | They load automatically with ticking TW / CP+ / CBBT prices |
-| Select rows | Click any row to select it; Ctrl+click to add more rows to the selection |
-| Apply a price | Set Source, Side, Markup, Units → **APPLY** → `Price` column fills in |
-| Apply a spread | Change Units to `bp` → **APPLY** → `Spread` column fills in |
-| Adjust markup | Click **−** or **+** next to the markup input; or type directly |
-| Send a quote | After APPLY, press **SEND** → status → `QUOTED`, `Sent Price` captures the snapshot |
-| Re-quote | While still QUOTED, change markup, APPLY, SEND again → `Sent Price` updates |
-| Filter rows | Type in the **Filter** box (right of toolbar): `Portfolio:"PT_BBG_"` for column-specific, or plain text for quick-filter |
-| Double-click filter | Double-click a stable cell (Portfolio, ISIN, Side, Client, Status, Maturity) to auto-populate the Filter box |
-| Edit price / spread | Double-click the **Price** or **Spread** cell and type a value; `Pricing Action` shows "Price input" / "Spread input" |
-| Post an inquiry via API | `POST http://localhost:9099/api/inquiry` (Postman / curl) |
-
-### Mock API reference
-
-| Method | URL | Response |
-|---|---|---|
-| `GET` | `/api/inquiries` | 200 — 5 seed inquiries (PENDING) |
-| `POST` | `/api/inquiry` | 201 — new inquiry with generated `inquiry_id` |
-| `POST` | `/api/inquiry` with `"UNKNOWN-ISIN-XYZ"` | 404 — ISIN not found |
-| `POST` | `/api/inquiry/{id}/quote` | 200 — QUOTED with sent snapshot |
-
-```bash
-# Example: submit an inquiry via curl
-curl -s -X POST http://localhost:9099/api/inquiry \
-  -H "Content-Type: application/json" \
-  -d '{"isin":"US912828YJ02","notional":5000000,"side":"BUY","client":"TEST"}'
-```
-
-Press **ENTER** in the terminal running `BlotterDevServer` to stop the server.
-
----
-
-## Config Service UI — running interactively
-
-The Config Service is a separate mock microservice with its own React UI.
-It stores per-user configuration (e.g. `isPTAdmin`) and is queried by the blotter
-on startup to decide whether to enable the **RELEASE PT** button.
-
-### Step 1 — build the React UI (once)
-
-```bash
-mvn test-compile -Dconfig.build.skip=false
-```
-
-### Step 2 — start the Config Service backend
-
-```bash
-mvn exec:java -Dexec.mainClass=utils.ConfigDevServer -Dexec.classpathScope=test
-# Default port: 8090
-mvn exec:java -Dexec.mainClass=utils.ConfigDevServer -Dexec.classpathScope=test "-Dexec.args=8091"
-```
-
-### Step 3 — open the Config UI
-
-**Option A — pre-built page:**
-
-```
-http://localhost:8090/config-service/
-```
-
-**Option B — Vite dev server (live hot-module-reload):**
-
-```bash
-cd src/test/webapp-config
-VITE_CONFIG_PORT=8090 npm run dev
-# → http://localhost:5174/config-service/
-```
-
-### What you can do in the Config UI
-
-| Action | How |
-|---|---|
-| Browse namespaces | Click a namespace in the left panel |
-| Switch config type | Use the dropdown at the top of the right panel |
-| Edit a value | Change the input and click **SAVE** |
-| Add a new entry | Click **+ Add** at the top, enter the key, fill fields, SAVE |
-| Clone an entry | Click **Clone** on any entry, enter a new key, SAVE |
-| Remove an entry | Click **Remove** on any entry |
-
-### Config Service API reference
-
-| Method | URL | Description |
-|---|---|---|
-| `GET` | `/api/config` | List all namespaces |
-| `GET` | `/api/config/{ns}` | List types under namespace |
-| `GET` | `/api/config/{ns}/{type}` | All keys + values under type |
-| `GET` | `/api/config/{ns}/{type}/{key}` | Single config entry |
-| `PUT` | `/api/config/{ns}/{type}/{key}` | Create or update entry |
-| `DELETE` | `/api/config/{ns}/{type}/{key}` | Remove entry |
-
-```bash
-# Example: grant doej PT admin access
-curl -s -X PUT http://localhost:8090/api/config/credit.pt.access/Permissions/doej \
-  -H "Content-Type: application/json" \
-  -d '{"isPTAdmin": true}'
-```
-
-Press **Ctrl+C** in the terminal running `ConfigDevServer` to stop.
-
----
-
-## Deployment Dashboard — running interactively
-
-The Deployment Dashboard is an AG Grid React app showing 12 mock services
-typical of a financial institution (including `credit-rfq-blotter`, `credit-pt-pricer`,
-`credit-pt-neg-engine`).  It is served by `MockDeploymentServer` on its own port.
-
-### Step 1 — build the React UI (once, optional)
-
-```bash
-mvn test-compile -Ddeployment.build.skip=false
-```
-
-The committed `src/test/resources/deployment-ui/` assets are used by default
-when `deployment.build.skip=true` (no Node build needed).
-
-### Step 2 — start the Deployment server
-
-```bash
-mvn exec:java -Dexec.mainClass=utils.DeploymentDevServer -Dexec.classpathScope=test
-# Default port: 9098
-mvn exec:java -Dexec.mainClass=utils.DeploymentDevServer -Dexec.classpathScope=test "-Dexec.args=8888"
-```
-
-### Step 3 — open the dashboard
-
-```
-http://localhost:9098/deployment/
-```
-
-### Deployment API reference
-
-| Method | URL | Description |
-|---|---|---|
-| `GET` | `/api/deployments` | All 12 services (sorted by name) |
-| `GET` | `/api/deployments/{name}` | Single service (404 if not found) |
-
-```bash
-# Example: check credit-rfq-blotter version
-curl -s http://localhost:{PORT}/api/deployments/credit-rfq-blotter | jq .
-```
-
-### Seed data — 12 services
-
-| Service | Status | Version | Team |
-|---|---|---|---|
-| credit-rfq-blotter | RUNNING | v2.4.1 | Credit Trading Tech |
-| credit-pt-pricer | RUNNING | v1.8.3 | Credit Trading Tech |
-| credit-pt-neg-engine | RUNNING | v3.1.0 | Credit Trading Tech |
-| credit-risk-engine | RUNNING | v2.0.5 | Risk Technology |
-| market-data-gateway | RUNNING | v4.2.1 | Market Data |
-| trade-booking-service | RUNNING | v1.5.2 | Operations Tech |
-| position-aggregator | RUNNING | v2.3.4 | Risk Technology |
-| rate-curve-builder | RUNNING | v3.0.1 | Market Data |
-| collateral-manager | RUNNING | v2.8.0 | Treasury Tech |
-| p-and-l-calculator | RUNNING | v2.1.7 | Finance Tech |
-| regulatory-reporting | STOPPED | v1.1.0 | Compliance Tech |
-| limit-monitor | FAILED | v1.9.2 | Risk Technology |
-
----
-
-## Running the tests
-
-### Prerequisites
-
-1. **Java 21+** on your `PATH` (or set `JAVA_HOME`).
-2. **Maven 3.x** on your `PATH`.
-3. **Playwright browsers** installed once:
+1. **Java 21+** (`JAVA_HOME` set).
+2. **Maven 3.x** on your PATH.
+3. **Playwright browsers** — download once:
    ```bash
-   mvn test-compile -Dplaywright.install.skip=false
+   mvn test-compile -pl b-bot-sandbox -Dplaywright.install.skip=false
    ```
-   After that, `playwright.install.skip=true` is the default so browsers are not
-   re-downloaded on every run.
 
-### Run all scenarios
+### Run all 66 scenarios
 
 ```bash
-mvn verify
+mvn verify                           # uses committed Vite assets — no Node needed
+mvn verify -Dblotter.build.skip=false  # rebuild the React app too (requires Node 20+)
 ```
 
-Generates test results **and** the HTML report in one command.
-
-### Run headless (default) vs headed
+### Headed browser
 
 ```bash
-# Headless (CI default)
-mvn verify
-
-# Headed — opens a real Chromium window (useful for debugging)
-mvn verify -DHEADLESS=false
+mvn verify -Db-bot.browser.headless=false    # preferred (HOCON config)
+mvn verify -DHEADLESS=false                  # legacy alias (still works)
 ```
 
 ### Filter by tag
 
 ```bash
-# Only ticking scenarios (require internet to ag-grid.com)
-mvn verify -Dcucumber.filter.tags="@ticking"
+# PT-Blotter (39 scenarios)
+mvn verify -Dcucumber.filter.tags="@blotter and @smoke"   # 1/1 — no Vite build needed
+mvn verify -Dcucumber.filter.tags="@blotter and @api"     # 2/2
+mvn verify -Dcucumber.filter.tags="@blotter and @ticking" # 3/3
+mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"  # 5/5
 
-# Only self-contained WireMock scenarios (no internet needed)
-mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
-
-# Only the external live-grid scenarios
-mvn verify -Dcucumber.filter.tags="@external"
-
-# ── PT-Blotter (M0–M8 + precondition, 39 scenarios) ─────────────────────────
-
-# Full blotter suite — requires Vite build (M1/M2/M4–M8 use the React app)
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@blotter"
-
-# Smoke + API — no Vite build needed (uses committed assets)
-mvn verify -Dcucumber.filter.tags="@blotter and @smoke"
-mvn verify -Dcucumber.filter.tags="@blotter and @api"
-
-# Non-ticking blotter scenarios (fast — no live-price wait)
-mvn verify -Dcucumber.filter.tags="@blotter and not @ticking"
-
-# All ticking scenarios across all features
-mvn verify -Dcucumber.filter.tags="@ticking"
-
-# Individual milestones (M1/M2/M4–M8 require Vite build)
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m4"
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m5"
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m6"
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m7"
-mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"
-
-# ── Config Service (14 scenarios, no browser needed) ─────────────────────────
-
-# Full Config Service suite
+# Config Service (14 scenarios — REST only, no browser)
 mvn verify -Dcucumber.filter.tags="@config-service"
 
-# Only smoke (namespace + type discovery)
-mvn verify -Dcucumber.filter.tags="@config-service and @smoke"
+# Deployment Dashboard (15 scenarios)
+mvn verify -Dcucumber.filter.tags="@deployment"
+mvn verify -Dcucumber.filter.tags="@precondition"         # 1/1 — version gate
 
-# Only REST API tests
-mvn verify -Dcucumber.filter.tags="@config-service and @api"
-
-# ── Deployment Dashboard (15 scenarios, mostly API) ──────────────────────────
-
-mvn verify -Dcucumber.filter.tags="@deployment"                  # → 15/15
-mvn verify -Dcucumber.filter.tags="@deployment and @smoke"       # → 2/2
-mvn verify -Dcucumber.filter.tags="@deployment and @versions"    # → 3/3
-mvn verify -Dcucumber.filter.tags="@precondition"                # → 1/1
-
-# ── Full regression (66/66) ───────────────────────────────────────────────────
-
-mvn verify -Dblotter.build.skip=false   # → 66/66
+# Finance Demo / Portfolio (live internet required for @external)
+mvn verify -Dcucumber.filter.tags="@ticking"
+mvn verify -Dcucumber.filter.tags="@portfolio and not @external"
 ```
 
-### Run JavaScript probe unit tests (Jest)
+### JavaScript probe unit tests
 
 ```bash
-cd src/test/js
+cd b-bot-sandbox/src/test/js
 npm install        # once — requires Node.js 18+
 npm test           # ~60 unit tests across 5 probe modules
-npm run test:coverage
 ```
 
-### Reports
-
-After `mvn verify` the following reports are written to `target/`:
+### Reports (after `mvn verify`)
 
 | Path | Description |
 |---|---|
-| `target/cucumber-html-reports/overview-features.html` | Rich HTML report with pass/fail charts, step-level detail, tags |
-| `target/cucumber-html-reports/overview-tags.html` | Tag-level breakdown |
-| `target/cucumber-reports/report.html` | Built-in Cucumber HTML report |
-| `target/cucumber-reports/report.json` | Raw JSON (for CI pipeline ingestion) |
+| `b-bot-sandbox/target/cucumber-html-reports/overview-features.html` | Rich HTML dashboard |
+| `b-bot-sandbox/target/cucumber-reports/report.json` | Raw JSON for CI ingestion |
 
-Open `target/cucumber-html-reports/overview-features.html` in a browser for the
-full regression evidence dashboard.
+---
+
+## Running the PT-Blotter interactively
+
+Start the WireMock-backed mock server and open the React blotter in a browser:
+
+```bash
+# Step 1 — build the React app once (downloads Node automatically)
+mvn test-compile -pl b-bot-sandbox -Dblotter.build.skip=false
+
+# Step 2 — start the mock server (from project root)
+mvn exec:java -pl b-bot-sandbox \
+    -Dexec.mainClass=utils.BlotterDevServer \
+    -Dexec.classpathScope=test
+
+# Step 3 — open in browser
+# http://localhost:9099/blotter/
+```
+
+Press **ENTER** in the terminal to stop the server.
+
+Similarly for the Config Service (`utils.ConfigDevServer`, port 8090) and
+Deployment Dashboard (`utils.DeploymentDevServer`, port 9098).
+
+---
+
+## Using pt-blotter-regression-template
+
+Copy the directory, rename it, and adapt it for your real system.
+See [`pt-blotter-regression-template/README.md`](pt-blotter-regression-template/README.md) for the step-by-step guide.
+
+```bash
+# Quick smoke against the DevServer (after starting BlotterDevServer above)
+mvn verify -pl pt-blotter-regression-template \
+    -Db-bot.env=devserver \
+    -Dcucumber.filter.tags="@smoke"
+```
 
 ---
 
 ## Key design decisions
 
+### Configurable via HOCON — no magic constants in code
+
+All browser settings and timeouts are declared in `b-bot-core`'s `reference.conf`
+with sensible defaults. Override any value without code changes:
+
+```hocon
+# application-uat.conf
+b-bot {
+  browser    { headless = false }
+  timeouts   { navigation = 60s, gridRender = 20s }
+  apps.blotter {
+    webUrl  = "https://blotter.uat.example.com/blotter/"
+    apiBase = "https://blotter.uat.example.com"
+  }
+}
+```
+
 ### No `Thread.sleep()` — ever
 
-All waits use one of:
-- `assertThat(locator).isVisible()` — Playwright's built-in auto-retry assertions
-- `page.waitForFunction(js)` — polls a JS predicate until truthy
-- `locator.waitFor(options)` — waits for a specific element state
+All waits use Playwright's built-in retry mechanism:
+`page.waitForFunction()`, `assertThat(locator).isVisible()`, `locator.waitFor()`.
 
-The only permitted exception is `page.waitForTimeout(ms)` with a `// TODO` comment,
-used exclusively when asserting the **absence** of change.
+### Industrial JS probe architecture
 
-### Industrial-grade JS probe architecture
+All JavaScript is in named, testable modules under `b-bot-sandbox/src/test/js/probes/`.
+The bundle is injected into every Playwright context via `addInitScript()` so
+`window.agGridProbes.*` is always available before page scripts run.
 
-All JavaScript logic is extracted from Java string literals into named, single-responsibility
-modules in `src/test/js/probes/`.  Each module uses a **factory/DI pattern**:
+### AG Grid virtualisation — three-phase strategy
 
-```js
-// Node.js / Jest — inject jsdom document
-const { createDomProbes } = require('./probes/dom-probes');
-const probes = createDomProbes(document);
-probes.getVisibleCellTexts('ticker');   // → ['AAPL', 'MSFT', …]
+`GridHarness.findRowByCellValue()` handles rows that have scrolled out of view:
+1. **Fast-path** — DOM scan (configurable timeout, default 500 ms).
+2. **Grid API** — `agGridProbes.gridApi.findRowIndexByDataValue()` against the data model,
+   then `ensureRowVisible()`.
+3. **Scroll-probe** — reset to top, page down, `waitForFunction` for new rows.
 
-// Browser — available after addInitScript injection
-window.agGridProbes.dom.getVisibleCellTexts('ticker');
-```
+### WireMock — classpath-based file serving
 
-The `bundle.js` IIFE is injected into every Playwright browser context via
-`BrowserContext.addInitScript()` (wired in `PlaywrightManager.initContext()`).
-Java `waitForFunction` predicates become clean one-liners:
-
-```java
-// Before refactor — 30-line embedded React fibre traversal
-private static final String JS_FIND_API_SNIPPET = "  let _api = window.gridApi ... ";
-
-// After refactor — single probe call
-page.waitForFunction(
-    "args => window.agGridProbes.ticking.hasCellValueChanged(args[0], args[1])",
-    List.of(selector, initialValue), options);
-```
-
-### AG Grid locator strategy
-
-```java
-// Data cell — survives row re-ordering
-page.locator(".ag-center-cols-container [row-index='0'] [col-id='price']")
-
-// Header cell
-page.locator(".ag-header-cell[col-id='symbol']")
-```
-
-CSS `nth-child` selectors are never used for grid rows.
-
-### Virtualisation — GridHarness three-phase strategy
-
-AG Grid only renders rows in the current scroll viewport.  `GridHarness.findRowByCellValue()` handles this transparently:
-
-1. **Fast-path** — check the current DOM (500 ms budget).
-2. **Grid API** — call `agGridProbes.gridApi.findRowIndexByDataValue()` against the *data model* (not the DOM),
-   then `agGridProbes.gridApi.ensureRowVisible()` to scroll the row into view.
-3. **Scroll-probe fallback** — reset to top, page down incrementally, checking the
-   DOM at each step without any sleep.
-
-Because the AG Grid React Finance Demo does not expose `window.gridApi`,
-the API is located via React fibre traversal encapsulated in `api-discovery.js`.
-
-### WireMock — self-contained REST mock
-
-`MockBlotterServer` starts an embedded WireMock server on a dynamic port and
-registers two stubs:
-
-- **Priority 1** — `POST /submit` with trader `UNKNOWN_TRADER` → 404
-- **Priority 5** — `POST /submit` (all others) → 201 with a generated `portfolio_id`
-
-`MockBlotterServer.resolveUrl()` rewrites the production-looking hostname
-(`api.mock-blotter.com`) to `localhost:PORT` so the feature files read naturally.
-
-### Hybrid data pattern
-
-The portfolio scenarios combine:
-1. A **REST call** via Playwright's `APIRequestContext` (shares browser context
-   cookies — ready for SSO-protected environments).
-2. An **AG Grid mock DOM** injected via `page.setContent()` — avoids CDN timeouts,
-   gives fully deterministic grid state.
+`MockBlotterServer` uses `usingFilesUnderClasspath("wiremock")` so it works from
+any working directory (Maven reactor root or module directory).
 
 ---
 
-## CI / CD integration
+## CI/CD integration
 
-The test output is standard JUnit XML (`target/surefire-reports/`) and Cucumber
-JSON (`target/cucumber-reports/report.json`), compatible with Jenkins, GitHub
-Actions, GitLab CI, and any CI system that consumes these formats.
-
-Example GitHub Actions step:
+Test output is standard JUnit XML (`target/surefire-reports/`) and Cucumber JSON
+(`target/cucumber-reports/report.json`), compatible with Jenkins, GitHub Actions,
+GitLab CI, and any CI system that consumes these formats.
 
 ```yaml
-- name: Run regression suite
+# GitHub Actions example
+- name: Run sandbox regression suite
   run: mvn verify
 
 - name: Publish Cucumber report
   uses: actions/upload-artifact@v4
   with:
     name: cucumber-report
-    path: target/cucumber-html-reports/
+    path: b-bot-sandbox/target/cucumber-html-reports/
 ```

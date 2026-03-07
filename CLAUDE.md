@@ -20,7 +20,7 @@ Stack: Java 21 · Playwright for Java · Cucumber 7 · Jackson · JUnit 5 · Mav
    - Use `page.waitForTimeout(ms)` only as an absolute last resort (log a TODO comment).
 
 3. **Page Object Model (POM) for all page interactions.**
-   - One class per logical page/component under `src/test/java/pages/`.
+   - One class per logical page/component under `b-bot-sandbox/src/test/java/pages/`.
    - Keep locator definitions in the Page class; keep assertions in step definitions.
 
 4. **Feature files are the source of truth for acceptance criteria.**
@@ -28,7 +28,7 @@ Stack: Java 21 · Playwright for Java · Cucumber 7 · Jackson · JUnit 5 · Mav
    - Tag slow/flaky scenarios with `@ticking` so they can be isolated.
 
 5. **All JavaScript runs through `window.agGridProbes` — never inline JS strings.**
-   - Add new browser-side logic to the appropriate probe module in `src/test/js/probes/`.
+   - Add new browser-side logic to the appropriate probe module in `b-bot-sandbox/src/test/js/probes/`.
    - Regenerate (or manually update) `bundle.js` so the change is picked up by Playwright.
    - Write a Jest unit test for the new probe function before wiring it into Java.
    - Never use `//` single-line comments inside Java string literals that contain JS
@@ -73,7 +73,7 @@ AG Grid only renders visible rows. If a row scrolls out of view its DOM node is 
 
 ### AG Grid API Discovery (React Finance Demo)
 `window.gridApi` is **not** set by the Finance Demo's React app.
-The API is discovered via React fibre traversal — see `src/test/js/probes/api-discovery.js`.
+The API is discovered via React fibre traversal — see `b-bot-sandbox/src/test/js/probes/api-discovery.js`.
 This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes.gridApi.*`.
 
 ### Filter model formats (AG Grid v33)
@@ -86,7 +86,7 @@ This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes
 ## Probe Architecture
 
 ### How it works
-1. `src/test/js/probes/bundle.js` is an IIFE that registers `window.agGridProbes`.
+1. `b-bot-core/src/main/resources/js/probes/bundle.js` is an IIFE that registers `window.agGridProbes`.
 2. `ProbesLoader.java` reads `bundle.js` from the classpath (lazy, cached).
 3. `PlaywrightManager.initContext()` injects it via `ctx.addInitScript(ProbesLoader.load())`.
 4. Every page opened in that context has `window.agGridProbes` available before navigation.
@@ -101,10 +101,10 @@ This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes
 | `agGridProbes.ticking` | `isCellFlashing`, `isCellStable`, `hasCellValueChanged`, `getCellText` |
 
 ### Modifying probes
-1. Edit the relevant module in `src/test/js/probes/` (e.g. `dom-probes.js`).
+1. Edit the relevant module in `b-bot-sandbox/src/test/js/probes/` (e.g. `dom-probes.js`).
 2. Mirror the change in `bundle.js` (the IIFE must stay in sync).
-3. Add/update the Jest test in `src/test/js/__tests__/`.
-4. Verify with `cd src/test/js && npm test` (requires Node.js 18+).
+3. Add/update the Jest test in `b-bot-sandbox/src/test/js/__tests__/`.
+4. Verify with `cd b-bot-sandbox/src/test/js && npm test` (requires Node.js 18+).
 5. No Java changes needed — the new function is immediately available as `window.agGridProbes.*`.
 
 ---
@@ -113,37 +113,54 @@ This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes
 ```
 b-autobot/
 ├── CLAUDE.md
-├── BLOTTER_DESIGN.md       # Full design doc — blotter, config service, deployment dashboard
-├── pom.xml
-└── src/test/
-    ├── java/
-    │   ├── model/          # Jackson POJOs (Trade, TradePortfolio)
-    │   ├── pages/          # Page Object Model classes
-    │   ├── runners/        # Cucumber test runners
-    │   ├── stepdefs/       # Step definition classes (BondBlotterSteps, ConfigServiceSteps, DeploymentSteps, …)
-    │   └── utils/          # Helpers — BlotterDsl, BlotterDevServer, ConfigServiceDsl, ConfigDevServer,
-    │                       #           DeploymentDsl, DeploymentDevServer, MockBlotterServer,
-    │                       #           MockConfigServer, MockDeploymentServer, GridHarness,
-    │                       #           TickingCellHelper, ProbesLoader, PlaywrightManager
-    ├── js/                 # JavaScript probe workspace (npm + Jest)
-    │   ├── package.json
-    │   ├── jest.config.js
-    │   ├── probes/         # Individual probe modules + bundle.js
-    │   └── __tests__/      # Jest unit tests (jsdom)
-    ├── webapp/             # PT-Blotter React + Vite source
-    ├── webapp-config/      # Config Service React + Vite source
-    ├── webapp-deployment/  # Deployment Dashboard React + Vite source
-    └── resources/
-        ├── features/               # .feature files (Gherkin)
-        │   ├── BondBlotter.feature      # 39 scenarios (M0–M8 + precondition)
-        │   ├── ConfigService.feature    # 14 scenarios
-        │   ├── Deployment.feature       # 15 scenarios
-        │   ├── finance_demo.feature
-        │   └── PortfolioRegression.feature
-        ├── config-service-ui/      # Vite build output (git-committed)
-        ├── deployment-ui/          # Vite build output (git-committed)
-        ├── wiremock/__files/       # WireMock stubs + blotter Vite build (git-committed)
-        └── cucumber.properties
+├── BLOTTER_DESIGN.md               # Full design doc — blotter, config service, deployment dashboard
+├── MODULARISATION_DESIGN.md        # Multi-module architecture design record
+├── pom.xml                         # Parent aggregator — version management for all modules
+│
+├── b-bot-core/                     # Publishable library (no Cucumber dependency)
+│   └── src/main/
+│       ├── java/com/bbot/core/
+│       │   ├── PlaywrightManager
+│       │   ├── GridHarness
+│       │   ├── TickingCellHelper
+│       │   ├── ProbesLoader
+│       │   ├── NumericComparator
+│       │   ├── config/BBotConfig   # HOCON layered config (5-layer loading)
+│       │   └── registry/           # AppDescriptor / AppContext / BBotRegistry
+│       └── resources/
+│           ├── js/probes/bundle.js # JS probe bundle (on classpath for ProbesLoader)
+│           └── reference.conf      # Core defaults (browser, timeouts, grid settings)
+│
+├── b-bot-sandbox/                  # Demo & regression suite (all 66 scenarios)
+│   └── src/test/
+│       ├── java/
+│       │   ├── descriptors/        # BlotterAppDescriptor, ConfigServiceDescriptor, DeploymentDescriptor
+│       │   ├── model/              # Jackson POJOs (Trade, TradePortfolio)
+│       │   ├── pages/              # FinanceDemoPage (AG Grid Finance Demo POM)
+│       │   ├── runners/            # JUnit 5 @Suite runner
+│       │   ├── stepdefs/           # BondBlotterSteps, ConfigServiceSteps, DeploymentSteps, …
+│       │   └── utils/              # BlotterDsl, ConfigServiceDsl, DeploymentDsl,
+│       │                           # MockBlotterServer, MockConfigServer, MockDeploymentServer,
+│       │                           # BlotterDevServer, ConfigDevServer, DeploymentDevServer
+│       ├── js/                     # JavaScript probe workspace (npm + Jest)
+│       │   ├── probes/             # Individual probe modules + bundle.js (source)
+│       │   └── __tests__/          # Jest unit tests (jsdom)
+│       └── resources/
+│           ├── features/           # BondBlotter (39), ConfigService (14), Deployment (15), …
+│           ├── wiremock/__files/   # Pre-built blotter Vite assets (git-committed)
+│           ├── config-service-ui/  # Pre-built Config Service UI (git-committed)
+│           └── deployment-ui/      # Pre-built Deployment Dashboard UI (git-committed)
+│
+└── pt-blotter-regression-template/ # Copy-adapt starter for real-system consumers
+    └── src/test/
+        ├── java/
+        │   ├── descriptors/BlotterDescriptor.java
+        │   ├── stepdefs/{Hooks,BlotterSteps,AppPreconditionSteps}.java
+        │   └── utils/PtBlotterDsl.java
+        └── resources/
+            ├── application.conf             # Base config + commented overrides
+            ├── application-devserver.conf   # Points at localhost:9099
+            └── features/Smoke.feature
 ```
 
 ---
@@ -165,14 +182,15 @@ b-autobot/
 
 ### Java / Cucumber (Maven)
 ```bash
-# All 66 scenarios (headless Chromium)
+# All 66 scenarios (headless Chromium, committed assets — no Node needed)
 mvn verify
 
 # Full suite with blotter Vite rebuild
 mvn verify -Dblotter.build.skip=false   # → 66/66
 
 # Headed browser — opens a real Chromium window
-mvn verify -DHEADLESS=false
+mvn verify -Db-bot.browser.headless=false    # preferred (HOCON config)
+mvn verify -DHEADLESS=false                  # legacy alias (still works)
 
 # Only ticking scenarios
 mvn verify -Dcucumber.filter.tags="@ticking"
@@ -187,7 +205,7 @@ mvn verify -Dcucumber.filter.tags="@config-service"
 
 ### JavaScript probes (Jest)
 ```bash
-cd src/test/js
+cd b-bot-sandbox/src/test/js
 npm install        # once — requires Node.js 18+
 npm test           # run all probe unit tests
 npm run test:coverage
