@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.bbot</groupId>
+    <artifactId>b-bot</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../pom.xml</relativePath>
+  </parent>
+
+  <artifactId>b-bot-core</artifactId>
+  <packaging>jar</packaging>
+  <name>b-bot-core — BDD Regression Framework Core Library</name>
+  <description>
+    Publishable library providing Playwright lifecycle management, AG Grid probe bundle,
+    virtualisation-aware grid utilities, and the app-descriptor registry.
+    Zero Cucumber dependency — lifecycle hooks stay in the consuming module.
+  </description>
+
+  <dependencies>
+
+    <!-- ═══════════════════════════════════════
+         Playwright for Java (compile: exported to consumers)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>com.microsoft.playwright</groupId>
+      <artifactId>playwright</artifactId>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         Jackson (JSON for API response parsing utilities)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         AssertJ (compile: TickingCellHelper / GridHarness use assertThat)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         Logging
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- ═══════════════════════════════════════
+         JUnit Jupiter (test scope — for core unit tests only)
+    ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <!-- Include bundle.js and reference.conf from src/main/resources -->
+        <directory>src/main/resources</directory>
+      </resource>
+    </resources>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <!-- Core uses standard JUnit 5 runner (no Cucumber) -->
+          <includes>
+            <include>**/*Test.java</include>
+          </includes>
+        </configuration>
+      </plugin>
+    </plugins>
+  </build>
+
+</project>

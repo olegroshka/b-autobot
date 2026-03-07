@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.bbot</groupId>
+    <artifactId>b-bot</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <artifactId>b-bot-sandbox</artifactId>
+  <packaging>jar</packaging>
+
+  <name>b-bot-sandbox — Demo &amp; Reference Test Suite</name>
+  <description>
+    Sample BDD suite demonstrating b-bot-core against mock web apps
+    (PT-Blotter, Config Service, Deployment Dashboard).
+    Also serves as the regression harness for b-bot-core itself.
+  </description>
+
+  <properties>
+    <!-- Runtime flags (override on CLI) -->
+    <HEADLESS>true</HEADLESS>
+    <BROWSER>chromium</BROWSER>
+    <BASE_URL>https://www.ag-grid.com/example-finance/</BASE_URL>
+
+    <!--
+      blotter.build.skip — set to 'false' to run 'npm run build' for the PT-Blotter
+      React webapp during test-compile.  Requires Node.js on PATH.
+      Defaults to true so normal 'mvn verify' runs work without Node.js installed.
+    -->
+    <blotter.build.skip>true</blotter.build.skip>
+
+    <!--
+      playwright.install.skip — set to 'false' ONCE to download browsers:
+        mvn test-compile -Dplaywright.install.skip=false
+    -->
+    <playwright.install.skip>true</playwright.install.skip>
+
+    <!--
+      config.build.skip — set to 'false' to rebuild the Config Service React UI.
+    -->
+    <config.build.skip>true</config.build.skip>
+
+    <!--
+      deployment.build.skip — set to 'false' to rebuild the Deployment Dashboard UI.
+    -->
+    <deployment.build.skip>true</deployment.build.skip>
+  </properties>
+
+  <dependencies>
+
+    <!-- b-bot-core: PlaywrightManager, GridHarness, TickingCellHelper, etc. + bundle.js -->
+    <dependency>
+      <groupId>com.bbot</groupId>
+      <artifactId>b-bot-core</artifactId>
+    </dependency>
+
+    <!-- Playwright (transitive via core, but explicit for IDE tooling) -->
+    <dependency>
+      <groupId>com.microsoft.playwright</groupId>
+      <artifactId>playwright</artifactId>
+    </dependency>
+
+    <!-- Cucumber 7 -->
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit-platform-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- JUnit 5 -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- Jackson (API model POJOs) -->
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-databind</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.fasterxml.jackson.core</groupId>
+      <artifactId>jackson-annotations</artifactId>
+    </dependency>
+
+    <!-- AssertJ -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- SLF4J simple backend -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- WireMock — embedded REST mock server -->
+    <dependency>
+      <groupId>org.wiremock</groupId>
+      <artifactId>wiremock</artifactId>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>ch.qos.logback</groupId>
+          <artifactId>logback-classic</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+
+    <testResources>
+      <testResource>
+        <directory>src/test/resources</directory>
+      </testResource>
+      <!--
+        bundle.js is now supplied by the b-bot-core JAR at /js/probes/bundle.js.
+        No extra testResource entry needed here.
+      -->
+    </testResources>
+
+    <plugins>
+
+      <!-- Maven Compiler: Java 21 -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <release>${java.version}</release>
+        </configuration>
+      </plugin>
+
+      <!--
+        Maven Surefire: run Cucumber via JUnit Platform.
+        Passes HEADLESS and BROWSER as system properties so PlaywrightManager can read them.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <systemPropertyVariables>
+            <HEADLESS>${HEADLESS}</HEADLESS>
+            <BROWSER>${BROWSER}</BROWSER>
+            <BASE_URL>${BASE_URL}</BASE_URL>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+
+      <!--
+        Playwright browser install (exec:exec subprocess so System.exit() from
+        the Playwright CLI does not kill the Maven JVM before Surefire runs).
+        Skipped by default (playwright.install.skip=true).
+        Run once: mvn test-compile -Dplaywright.install.skip=false
+      -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>install-playwright-browsers</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>exec</goal>
+            </goals>
+            <configuration>
+              <skip>${playwright.install.skip}</skip>
+              <executable>java</executable>
+              <arguments>
+                <argument>-classpath</argument>
+                <classpath/>
+                <argument>com.microsoft.playwright.CLI</argument>
+                <argument>install</argument>
+                <argument>--with-deps</argument>
+                <argument>${BROWSER}</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--
+        frontend-maven-plugin: builds the three React SPAs.
+        Each build is independently skippable via its -D flag.
+        Node binaries land in ${project.basedir}/.node (gitignored).
+      -->
+      <plugin>
+        <groupId>com.github.eirslett</groupId>
+        <artifactId>frontend-maven-plugin</artifactId>
+        <configuration>
+          <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+          <installDirectory>${project.basedir}/.node</installDirectory>
+          <nodeVersion>v20.18.1</nodeVersion>
+        </configuration>
+        <executions>
+
+          <!-- ── PT-Blotter SPA ───────────────────────────────────────── -->
+          <execution>
+            <id>install-node-and-npm</id>
+            <goals><goal>install-node-and-npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+              <skip>${blotter.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-install-blotter</id>
+            <goals><goal>npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+              <arguments>install</arguments>
+              <skip>${blotter.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-build-blotter</id>
+            <goals><goal>npm</goal></goals>
+            <phase>test-compile</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp</workingDirectory>
+              <arguments>run build</arguments>
+              <skip>${blotter.build.skip}</skip>
+            </configuration>
+          </execution>
+
+          <!-- ── Deployment Dashboard UI ─────────────────────────────── -->
+          <execution>
+            <id>install-node-and-npm-deployment</id>
+            <goals><goal>install-node-and-npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-deployment</workingDirectory>
+              <skip>${deployment.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-install-deployment</id>
+            <goals><goal>npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-deployment</workingDirectory>
+              <arguments>install</arguments>
+              <skip>${deployment.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-build-deployment</id>
+            <goals><goal>npm</goal></goals>
+            <phase>test-compile</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-deployment</workingDirectory>
+              <arguments>run build</arguments>
+              <skip>${deployment.build.skip}</skip>
+            </configuration>
+          </execution>
+
+          <!-- ── Config Service UI ───────────────────────────────────── -->
+          <execution>
+            <id>install-node-and-npm-config</id>
+            <goals><goal>install-node-and-npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-config</workingDirectory>
+              <skip>${config.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-install-config</id>
+            <goals><goal>npm</goal></goals>
+            <phase>generate-test-resources</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-config</workingDirectory>
+              <arguments>install</arguments>
+              <skip>${config.build.skip}</skip>
+            </configuration>
+          </execution>
+          <execution>
+            <id>npm-build-config</id>
+            <goals><goal>npm</goal></goals>
+            <phase>test-compile</phase>
+            <configuration>
+              <workingDirectory>${project.basedir}/src/test/webapp-config</workingDirectory>
+              <arguments>run build</arguments>
+              <skip>${config.build.skip}</skip>
+            </configuration>
+          </execution>
+
+        </executions>
+      </plugin>
+
+      <!--
+        maven-cucumber-reporting: rich HTML report from Cucumber JSON output.
+        Report: target/cucumber-html-reports/overview-features.html
+      -->
+      <plugin>
+        <groupId>net.masterthought</groupId>
+        <artifactId>maven-cucumber-reporting</artifactId>
+        <version>${cucumber.reporting.version}</version>
+        <executions>
+          <execution>
+            <id>cucumber-reporting</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>generate</goal>
+            </goals>
+            <configuration>
+              <projectName>b-bot-sandbox — AG Grid Finance Demo</projectName>
+              <outputDirectory>${project.build.directory}/cucumber-html-reports</outputDirectory>
+              <inputDirectory>${project.build.directory}/cucumber-reports</inputDirectory>
+              <jsonFiles>
+                <param>**/*.json</param>
+              </jsonFiles>
+              <checkBuildResult>false</checkBuildResult>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

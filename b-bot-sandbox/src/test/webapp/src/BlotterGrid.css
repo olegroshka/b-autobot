@@ -1,0 +1,72 @@
+/* ── Grid container — fills the flex parent ──────────────────────────────────── */
+.blotter-grid {
+  width: 100%;
+  height: 100%;
+}
+
+/* ── Monospace font for price and numeric cells ───────────────────────────────── */
+.blotter-grid .ag-cell[col-id="twPrice"],
+.blotter-grid .ag-cell[col-id="twSpread"],
+.blotter-grid .ag-cell[col-id="cpPrice"],
+.blotter-grid .ag-cell[col-id="cpSpread"],
+.blotter-grid .ag-cell[col-id="cbbPrice"],
+.blotter-grid .ag-cell[col-id="cbbSpread"],
+.blotter-grid .ag-cell[col-id="price"],
+.blotter-grid .ag-cell[col-id="spread"],
+.blotter-grid .ag-cell[col-id="sentPrice"],
+.blotter-grid .ag-cell[col-id="sentSpread"],
+.blotter-grid .ag-cell[col-id="coupon"],
+.blotter-grid .ag-cell[col-id="notional"] {
+  font-family: 'Roboto Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11.5px;
+}
+
+/* ── Portfolio ID columns — dimmed monospace ──────────────────────────────────── */
+.blotter-grid .ag-cell[col-id="ptId"],
+.blotter-grid .ag-cell[col-id="ptLineId"] {
+  font-family: 'Roboto Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  color: #3a6080;
+}
+
+/* Line number column: centred */
+.blotter-grid .ag-cell[col-id="ptLineId"] {
+  text-align: center;
+}
+
+/* ── Selected row: left accent bar via inset box-shadow ──────────────────────── */
+.blotter-grid .ag-row-selected {
+  box-shadow: inset 3px 0 0 #1e90ff;
+}
+
+/* ── Pricing action column ────────────────────────────────────────────────────── */
+.blotter-grid .ag-cell[col-id="pricingAction"] {
+  font-family: 'Roboto Mono', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  letter-spacing: 0.02em;
+}
+.blotter-grid .pricing-label { color: #7ab3cc; }
+.blotter-grid .pricing-pos   { color: #00c896; }
+.blotter-grid .pricing-neg   { color: #ff7f5c; }
+
+/* ── Status badge colours ─────────────────────────────────────────────────────── */
+.blotter-grid .status-pending { color: #d4a017; font-weight: 600; }
+.blotter-grid .status-quoted  { color: #00a878; font-weight: 600; }
+.blotter-grid .status-done    { color: #1e90ff; font-weight: 600; }
+.blotter-grid .status-missed  { color: #d63031; font-weight: 600; }
+
+/* ── Side colours ─────────────────────────────────────────────────────────────── */
+.blotter-grid .side-buy  { color: #00a878; font-weight: 600; }
+.blotter-grid .side-sell { color: #d63031; font-weight: 600; }
+
+/* ── Editable price / spread — dashed underline hint ─────────────────────────── */
+.blotter-grid .ag-cell[col-id="price"],
+.blotter-grid .ag-cell[col-id="spread"] {
+  border-bottom: 1px dashed #1e3a5f;
+  cursor: text;
+}
+.blotter-grid .ag-cell[col-id="price"]:hover,
+.blotter-grid .ag-cell[col-id="spread"]:hover {
+  border-bottom-color: #2a5fc0;
+  background: rgba(30, 80, 192, 0.07);
+}
