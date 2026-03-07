@@ -1,8 +1,65 @@
 # b-autobot
 
-> **Playwright-based BDD test automation framework** — a multi-module Maven project
-> demonstrating enterprise-grade browser automation against AG Grid React applications,
-> with a publishable core library and a copy-adapt template for real-system consumers.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-21-blue.svg)](https://adoptium.net/)
+[![Playwright](https://img.shields.io/badge/Playwright-1.49.0-green.svg)](https://playwright.dev/java/)
+[![Cucumber](https://img.shields.io/badge/Cucumber-7.18.1-brightgreen.svg)](https://cucumber.io/)
+
+> **Playwright + Cucumber BDD test automation framework for financial trading UIs.**
+> Enterprise-grade browser automation against AG Grid React applications, with a
+> publishable core library and a copy-adapt template for real-system UAT consumers.
+
+---
+
+## At a glance
+
+Feature files read like business requirements. Here is a complete end-to-end test
+that submits a bond portfolio, prices it on a live ticking grid, and confirms the
+QUOTED status — with **no hardcoded URLs, ISINs, or user names** anywhere in the
+scenario:
+
+```gherkin
+@showcase
+Scenario: Full credit portfolio lifecycle — REST submission through to QUOTED
+  # 1. REST: POST both portfolio bonds through the blotter inquiry API
+  Given I submit all inquiries for portfolio "HYPT_1"
+
+  # 2. Grid: open the blotter — both bonds are visible as PENDING inquiries
+  And the PT-Blotter is open
+  Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
+  And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
+
+  # 3. Pricing: select both bonds, apply TradeWeb Mid reference price
+  When I select the row with ISIN from "HYPT_1" field "ISIN1"
+  And I select the row with ISIN from "HYPT_1" field "ISIN2"
+  And I set the toolbar source "TW" side "Mid" markup "0" units "c"
+  And I press APPLY
+  Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+  And the "price" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+
+  # 4. Quote: SEND — live prices are snapshotted; both inquiries move to QUOTED
+  When I press SEND
+  Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+  And the row with ISIN from "HYPT_1" field "ISIN2" should have status "QUOTED"
+  And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+  And the "sentPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+```
+
+All data — ISINs, API paths, template bodies, service versions — is declared once
+in `application-mockuat.conf`. When a bond matures or an endpoint changes, update
+the config; the feature files stay stable.
+
+```gherkin
+# Config service integration — role-based access control in two lines:
+@access
+Scenario: Trader cannot access the RELEASE PT button
+  Given the PT-Blotter is open as the trader
+  Then the RELEASE PT button should be disabled
+
+@config-service
+Scenario: Admin has PT admin access
+  Then the user from role "admin" should have isPTAdmin "true" in config service
+```
 
 ---
 
@@ -41,7 +98,7 @@ b-autobot/
 │           ├── config-service-ui/  # Pre-built Config Service UI (git-committed)
 │           └── deployment-ui/      # Pre-built Deployment Dashboard UI (git-committed)
 │
-├── pt-blotter-regression-template/ ← Copy-adapt starter for real-system consumers (24 scenarios)
+├── pt-blotter-regression-template/ ← Copy-adapt starter for real-system consumers (25 scenarios)
 │   └── src/test/
 │       ├── java/
 │       │   ├── descriptors/{BlotterDescriptor,ConfigServiceDescriptor,DeploymentDescriptor}.java
@@ -52,7 +109,7 @@ b-autobot/
 │           ├── application-mockuat.conf             ← all three mock servers + full test-data block
 │           ├── application-devserver.conf           ← blotter-only smoke (port 9099)
 │           ├── templates/{credit-rfq,portfolio-rfq,quote-inquiry}.json
-│           └── features/PtBlotterRegression.feature ← 24 runnable scenarios
+│           └── features/PtBlotterRegression.feature ← 25 runnable scenarios
 │
 ├── BLOTTER_DESIGN.md               # PT-Blotter design doc (milestones M0–M8)
 ├── MODULARISATION_DESIGN.md        # Multi-module architecture design record
@@ -79,7 +136,7 @@ b-autobot/
 | Access-controlled UI | RELEASE PT button gated by `isPTAdmin` from Config Service |
 | Deployment Dashboard | AG Grid service registry, 12 seeded services, filter |
 | Version-gated regression | `@precondition` scenario asserts deployed versions |
-| Copy-adapt template | `pt-blotter-regression-template` — 24-scenario working demo; copy-adapt for real UAT systems |
+| Copy-adapt template | `pt-blotter-regression-template` — 25-scenario working demo; copy-adapt for real UAT systems |
 
 ---
 

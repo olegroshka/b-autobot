@@ -12,7 +12,7 @@ A **copy-and-adapt** starting point for building a real-system BDD regression su
 ## What the demo actually does
 
 Running `mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat` drives
-**24 runnable scenarios** across three mock servers that simulate a fixed-income trading platform:
+**25 runnable scenarios** across three mock servers that simulate a fixed-income trading platform:
 
 | Mock server | Port | What it simulates |
 |-------------|------|-------------------|
@@ -20,10 +20,11 @@ Running `mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat` driv
 | `ConfigDevServer` | 8090 | Config Service — permissions microservice |
 | `DeploymentDevServer` | 9098 | Deployment Dashboard — service registry |
 
-The scenarios demonstrate eleven observable aspects of the system:
+The scenarios demonstrate twelve observable aspects of the system:
 
 | # | Scenarios | Tags | What is proved |
 |---|-----------|------|----------------|
+| 0 | 1 | `@showcase` | Full lifecycle: REST → grid → price → QUOTED (start here) |
 | 1 | 1 | `@precondition` | Mock UAT stack is live; services are at the tested versions |
 | 2 | 1 | `@smoke` | PT-Blotter UI loads; AG Grid renders |
 | 3 | 2 | `@grid` | Column schema is intact; seed data is in PENDING status |
@@ -60,7 +61,7 @@ pt-blotter-regression-template/
 │       └── RestApiSteps.java             ← Generic REST probe steps (named actions, bond refs, portfolio submit)
 └── src/test/resources/
     ├── features/
-    │   └── PtBlotterRegression.feature   ← 24 runnable scenarios
+    │   └── PtBlotterRegression.feature   ← 25 runnable scenarios
     ├── templates/
     │   ├── credit-rfq.json               ← Single-bond RFQ request body
     │   ├── portfolio-rfq.json            ← Per-bond portfolio line body
@@ -140,6 +141,10 @@ mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
 # Portfolio submission + cancel (5 scenarios; 4 REST-only, 1 E2E with browser)
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
     -Dcucumber.filter.tags="@portfolio"
+
+# Full lifecycle showcase only (start here to understand the framework)
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \
+    -Dcucumber.filter.tags="@showcase"
 
 # Everything except the slow ticking scenario
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat \

@@ -23,8 +23,46 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   #   -Dcucumber.filter.tags="@deployment"                -- deployment API      (2 scenarios)
   #   -Dcucumber.filter.tags="@rest-probe"                -- REST API probes     (8 scenarios)
   #   -Dcucumber.filter.tags="@portfolio"                 -- portfolio flows     (5 scenarios)
+  #   -Dcucumber.filter.tags="@showcase"                    -- full lifecycle demo  (1 scenario)
   #   -Dcucumber.filter.tags="@rest-probe and not @workflow" -- REST-only, no browser (7 scenarios)
   # ─────────────────────────────────────────────────────────────────────────────
+
+  # ── 0. Full lifecycle showcase ───────────────────────────────────────────────
+  # A single scenario that walks the complete credit portfolio workflow end-to-end,
+  # touching every layer of the framework in one readable narrative:
+  #
+  #   REST layer   — portfolio bonds POSTed via a conf-declared named action
+  #   Grid layer   — submitted bonds appear as live PENDING rows in the AG Grid blotter
+  #   Pricing      — TradeWeb Mid reference price applied to both bonds in one pass
+  #   Quote        — SEND snapshots the live price; rows transition to QUOTED
+  #
+  # All ISINs, user roles, API paths, and request bodies are declared in
+  # application-mockuat.conf — this scenario contains no hardcoded values.
+
+  @showcase @rest-probe @workflow @portfolio
+  Scenario: Full credit portfolio lifecycle — REST submission through to QUOTED
+    # 1. REST: POST both portfolio bonds through the blotter inquiry API
+    Given I submit all inquiries for portfolio "HYPT_1"
+
+    # 2. Grid: open the blotter — both bonds are visible as PENDING inquiries
+    And the PT-Blotter is open
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
+
+    # 3. Pricing: select both bonds, set TW Mid + 0 markup, press APPLY
+    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    And I select the row with ISIN from "HYPT_1" field "ISIN2"
+    And I set the toolbar source "TW" side "Mid" markup "0" units "c"
+    And I press APPLY
+    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "price" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+
+    # 4. Quote: SEND — live prices are snapshotted; both inquiries move to QUOTED
+    When I press SEND
+    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "QUOTED"
+    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 
   # ── 1. Environment health gate ───────────────────────────────────────────────
   # This scenario runs first. If ANY step fails, the mock UAT environment is not
