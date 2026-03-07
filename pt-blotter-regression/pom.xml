@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <!--
+    Standalone consumer of b-bot-core.
+    This project does NOT inherit from com.bbot:b-bot — it represents a real
+    regression project that simply depends on the published core library.
+  -->
+  <groupId>com.bbot.consumer</groupId>
+  <artifactId>pt-blotter-regression</artifactId>
+  <version>1.0.0-SNAPSHOT</version>
+  <packaging>jar</packaging>
+  <name>pt-blotter-regression — Real PT-Blotter Regression Suite</name>
+
+  <properties>
+    <java.version>21</java.version>
+    <maven.compiler.source>${java.version}</maven.compiler.source>
+    <maven.compiler.target>${java.version}</maven.compiler.target>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+    <!-- Pinned to same versions as b-bot-core for compatibility -->
+    <b-bot-core.version>1.0.0-SNAPSHOT</b-bot-core.version>
+    <playwright.version>1.49.0</playwright.version>
+    <cucumber.version>7.18.1</cucumber.version>
+    <junit.jupiter.version>5.10.3</junit.jupiter.version>
+    <junit.platform.version>1.10.3</junit.platform.version>
+    <assertj.version>3.26.3</assertj.version>
+
+    <maven.surefire.version>3.5.0</maven.surefire.version>
+    <HEADLESS>true</HEADLESS>
+    <playwright.install.skip>true</playwright.install.skip>
+  </properties>
+
+  <dependencies>
+
+    <!-- b-bot-core: PlaywrightManager, GridHarness, TickingCellHelper,
+         BBotConfig, BBotRegistry, AppDescriptor, AppContext, etc.
+         Also brings in: playwright, jackson, assertj, typesafe-config transitively. -->
+    <dependency>
+      <groupId>com.bbot</groupId>
+      <artifactId>b-bot-core</artifactId>
+      <version>${b-bot-core.version}</version>
+    </dependency>
+
+    <!-- Cucumber -->
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+      <version>${cucumber.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit-platform-engine</artifactId>
+      <version>${cucumber.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- JUnit 5 -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <version>${junit.jupiter.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <version>${junit.platform.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- AssertJ (also transitive via core, but explicit for IDE tooling) -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <version>${assertj.version}</version>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- SLF4J simple backend -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <version>2.0.13</version>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.13.0</version>
+        <configuration>
+          <release>${java.version}</release>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <version>${maven.surefire.version}</version>
+        <configuration>
+          <systemPropertyVariables>
+            <HEADLESS>${HEADLESS}</HEADLESS>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+
+      <!--
+        Playwright browser install — run once before first test run:
+          mvn test-compile -Dplaywright.install.skip=false
+        Skipped by default to avoid killing the Maven JVM via System.exit().
+      -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.4.1</version>
+        <executions>
+          <execution>
+            <id>install-playwright-browsers</id>
+            <phase>test-compile</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <skip>${playwright.install.skip}</skip>
+              <executable>java</executable>
+              <arguments>
+                <argument>-classpath</argument>
+                <classpath/>
+                <argument>com.microsoft.playwright.CLI</argument>
+                <argument>install</argument>
+                <argument>--with-deps</argument>
+                <argument>chromium</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>
