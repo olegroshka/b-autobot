@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+             https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.bbot</groupId>
+    <artifactId>b-bot</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+  </parent>
+
+  <!--
+    ┌──────────────────────────────────────────────────────────────────────────┐
+    │  pt-blotter-regression-template                                          │
+    │                                                                          │
+    │  A COPY-AND-ADAPT starting point for any team that wants to build a      │
+    │  real-system BDD regression suite on top of b-bot-core.                  │
+    │                                                                          │
+    │  How to use this template:                                               │
+    │    1. Copy this entire directory into your own repo.                     │
+    │    2. Change groupId / artifactId to match your project.                 │
+    │    3. Add your environment config files (application-uat.conf, etc.).    │
+    │    4. Replace PtBlotterDsl / BlotterDescriptor with your own DSL.        │
+    │    5. Replace Smoke.feature with real acceptance scenarios.              │
+    │                                                                          │
+    │  Running scenarios:                                                      │
+    │    DevServer smoke:  mvn verify -Db-bot.env=devserver                    │
+    │    UAT smoke:        mvn verify -Db-bot.env=uat                          │
+    │    Headed browser:   mvn verify -Db-bot.env=devserver                    │
+    │                           -Db-bot.browser.headless=false                 │
+    └──────────────────────────────────────────────────────────────────────────┘
+  -->
+  <groupId>com.bbot.consumer</groupId>
+  <artifactId>pt-blotter-regression-template</artifactId>
+  <packaging>jar</packaging>
+  <name>pt-blotter-regression-template — Copy-Adapt Template for b-bot-core Consumers</name>
+
+  <properties>
+    <playwright.install.skip>true</playwright.install.skip>
+    <!--
+      Tests require a live server — skipped by default.
+      Automatically enabled when b-bot.env is supplied (real-env profile below).
+      To run manually:  mvn verify -Db-bot.env=devserver -DskipTests=false
+    -->
+    <skipTests>true</skipTests>
+  </properties>
+
+  <profiles>
+    <profile>
+      <!-- Activated automatically whenever -Db-bot.env=<anything> is passed -->
+      <id>real-env</id>
+      <activation>
+        <property><name>b-bot.env</name></property>
+      </activation>
+      <properties>
+        <skipTests>false</skipTests>
+      </properties>
+    </profile>
+  </profiles>
+
+  <dependencies>
+
+    <!--
+      b-bot-core brings in everything the template needs transitively:
+        - PlaywrightManager, GridHarness, TickingCellHelper
+        - BBotConfig (HOCON layered config), BBotRegistry, AppContext
+        - Playwright for Java, Jackson, AssertJ, Typesafe Config
+    -->
+    <dependency>
+      <groupId>com.bbot</groupId>
+      <artifactId>b-bot-core</artifactId>
+    </dependency>
+
+    <!-- Cucumber — Gherkin BDD engine -->
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-java</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-junit-platform-engine</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- JUnit 5 Platform — discovers and runs Cucumber via @Suite -->
+    <dependency>
+      <groupId>org.junit.jupiter</groupId>
+      <artifactId>junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-suite</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- AssertJ — fluent assertions (also transitive via b-bot-core) -->
+    <dependency>
+      <groupId>org.assertj</groupId>
+      <artifactId>assertj-core</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+    <!-- SLF4J simple binding — avoids "no logger found" warnings -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-simple</artifactId>
+      <scope>test</scope>
+    </dependency>
+
+  </dependencies>
+
+  <build>
+    <plugins>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <!-- No extra system properties needed: browser/timeout settings are
+             all controlled via b-bot.* HOCON keys in application-{env}.conf -->
+      </plugin>
+
+      <!--
+        Playwright browser install.
+        Run ONCE before first test execution:
+          mvn test-compile -pl pt-blotter-regression-template \
+                           -Dplaywright.install.skip=false
+        Skipped by default to avoid Playwright CLI's System.exit() killing Maven.
+      -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>install-playwright-browsers</id>
+            <phase>test-compile</phase>
+            <goals><goal>exec</goal></goals>
+            <configuration>
+              <skip>${playwright.install.skip}</skip>
+              <executable>java</executable>
+              <arguments>
+                <argument>-classpath</argument>
+                <classpath/>
+                <argument>com.microsoft.playwright.CLI</argument>
+                <argument>install</argument>
+                <argument>--with-deps</argument>
+                <argument>chromium</argument>
+              </arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+    </plugins>
+  </build>
+
+</project>

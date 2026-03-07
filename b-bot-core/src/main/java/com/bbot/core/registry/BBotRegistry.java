@@ -7,6 +7,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -26,8 +27,9 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class BBotRegistry {
 
-    private static final Map<String, AppDescriptor<?>> DESCRIPTORS = new LinkedHashMap<>();
-    private static final Map<String, AppContext>        CONTEXTS    = new ConcurrentHashMap<>();
+    private static final Map<String, AppDescriptor<?>> DESCRIPTORS    = new LinkedHashMap<>();
+    private static final Map<String, AppContext>        CONTEXTS       = new ConcurrentHashMap<>();
+    private static volatile BBotConfig                  CURRENT_CONFIG = null;
 
     private BBotRegistry() {}
 
@@ -44,8 +46,21 @@ public final class BBotRegistry {
      * any runtime URL overrides have been applied via {@link BBotConfig#withOverrides}.
      */
     public static void initialize(BBotConfig cfg) {
+        CURRENT_CONFIG = cfg;
         DESCRIPTORS.forEach((name, desc) ->
             CONTEXTS.put(name, AppContext.fromConfig(name, cfg)));
+    }
+
+    /**
+     * Returns the {@link BBotConfig} supplied to {@link #initialize(BBotConfig)},
+     * or {@code null} if the registry has not yet been initialised.
+     *
+     * <p>Core utilities ({@code PlaywrightManager}, {@code GridHarness},
+     * {@code TickingCellHelper}) call this to read configurable timeouts and
+     * browser settings without requiring callers to pass config explicitly.
+     */
+    public static BBotConfig getConfig() {
+        return CURRENT_CONFIG;
     }
 
     // ── DSL factory ───────────────────────────────────────────────────────────
@@ -113,6 +128,7 @@ public final class BBotRegistry {
     public static void reset() {
         DESCRIPTORS.clear();
         CONTEXTS.clear();
+        CURRENT_CONFIG = null;
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
@@ -134,11 +150,15 @@ public final class BBotRegistry {
         return ctx;
     }
 
+    private static HttpClient httpClient() {
+        Duration timeout = configMs("b-bot.timeouts.healthCheck", 10_000);
+        return HttpClient.newBuilder().connectTimeout(timeout).build();
+    }
+
     private static int httpGetStatus(String url) {
         try {
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-            return client.send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
+            return httpClient().send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
         } catch (Exception e) {
             throw new AssertionError("Health check HTTP request failed for: " + url, e);
         }
@@ -146,11 +166,20 @@ public final class BBotRegistry {
 
     private static String httpGetBody(String url) {
         try {
-            HttpClient client = HttpClient.newHttpClient();
             HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-            return client.send(req, HttpResponse.BodyHandlers.ofString()).body();
+            return httpClient().send(req, HttpResponse.BodyHandlers.ofString()).body();
         } catch (Exception e) {
             throw new AssertionError("Version check HTTP request failed for: " + url, e);
         }
+    }
+
+    /**
+     * Reads a timeout from the active config, falling back to {@code defaultMs} if
+     * the registry is not yet initialised or the key is absent.
+     */
+    private static Duration configMs(String key, long defaultMs) {
+        BBotConfig cfg = CURRENT_CONFIG;
+        if (cfg != null && cfg.hasPath(key)) return cfg.getTimeout(key);
+        return Duration.ofMillis(defaultMs);
     }
 }

@@ -1,5 +1,7 @@
 package com.bbot.core;
 
+import com.bbot.core.config.BBotConfig;
+import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
@@ -32,12 +34,22 @@ import java.util.regex.Pattern;
  * {@link Page#waitForFunction} to yield only when new rows are actually rendered.
  * All JavaScript is delegated to {@code window.agGridProbes} which is injected
  * into every page via {@link PlaywrightManager#initContext()}.
+ *
+ * <h2>Configuration</h2>
+ * All timeouts and poll intervals are read from {@link BBotRegistry#getConfig()}
+ * so they can be tuned per environment without code changes:
+ * <pre>
+ *   b-bot.timeouts.gridFastPath   = 500ms   # phase-1 fast DOM scan
+ *   b-bot.timeouts.gridRowInDom   = 5s      # phase-2 post-scroll row confirmation
+ *   b-bot.timeouts.gridHasRows    = 5s      # phase-3 wait for any row before scrolling
+ *   b-bot.timeouts.gridScrollStep = 2s      # phase-3 per-step scroll wait
+ *   b-bot.grid.renderPollMs       = 100     # waitForFunction polling interval
+ *   b-bot.grid.maxScrollSteps     = 200     # maximum scroll iterations
+ * </pre>
  */
 public class GridHarness {
 
     private static final String ROWS_CONTAINER = ".ag-center-cols-container";
-    private static final int    RENDER_POLL_MS = 100;
-    private static final int    MAX_SCROLL_STEPS = 200;
 
     private static final String JS_FIND_ROW_INDEX =
             "([col, val]) => window.agGridProbes.gridApi.findRowIndexByDataValue(col, val)";
@@ -91,7 +103,7 @@ public class GridHarness {
             int rowIdx = num.intValue();
             if (rowIdx >= 0) {
                 page.evaluate(JS_ENSURE_VISIBLE, rowIdx);
-                waitForRowInDom(rowIdx, Duration.ofSeconds(5));
+                waitForRowInDom(rowIdx, Duration.ofMillis(cfgMs("b-bot.timeouts.gridRowInDom", 5_000)));
                 Locator cell = cellLocator(colId, rowIdx);
                 cell.scrollIntoViewIfNeeded();
                 return cell;
@@ -153,7 +165,8 @@ public class GridHarness {
                     .locator(String.format("%s [col-id='%s']", ROWS_CONTAINER, colId))
                     .filter(new Locator.FilterOptions()
                             .setHasText(Pattern.compile("^" + Pattern.quote(cellText) + "$")));
-            locator.first().waitFor(new Locator.WaitForOptions().setTimeout(500));
+            locator.first().waitFor(new Locator.WaitForOptions()
+                    .setTimeout(cfgMs("b-bot.timeouts.gridFastPath", 500)));
             return locator.first();
         } catch (Exception e) {
             return null;
@@ -165,15 +178,21 @@ public class GridHarness {
                 JS_ROW_IN_DOM, rowIdx,
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(RENDER_POLL_MS));
+                        .setPollingInterval(cfgInt("b-bot.grid.renderPollMs", 100)));
     }
 
     private Locator scrollProbe(String colId, String cellText, Instant deadline) {
         page.evaluate(JS_SCROLL_TOP);
         page.waitForFunction(JS_HAS_ROWS, null,
-                new Page.WaitForFunctionOptions().setTimeout(5000).setPollingInterval(RENDER_POLL_MS));
+                new Page.WaitForFunctionOptions()
+                        .setTimeout(cfgMs("b-bot.timeouts.gridHasRows", 5_000))
+                        .setPollingInterval(cfgInt("b-bot.grid.renderPollMs", 100)));
 
-        for (int step = 0; step < MAX_SCROLL_STEPS; step++) {
+        int maxSteps = cfgInt("b-bot.grid.maxScrollSteps", 200);
+        long stepTimeoutMs = cfgMs("b-bot.timeouts.gridScrollStep", 2_000);
+        int pollMs = cfgInt("b-bot.grid.renderPollMs", 100);
+
+        for (int step = 0; step < maxSteps; step++) {
             Locator found = fastFind(colId, cellText);
             if (found != null) { found.scrollIntoViewIfNeeded(); return found; }
             if (Instant.now().isAfter(deadline)) break;
@@ -186,12 +205,35 @@ public class GridHarness {
             try {
                 page.waitForFunction(JS_NEW_ROWS_OR_BOTTOM, List.of(lastBeforeIdx),
                         new Page.WaitForFunctionOptions()
-                                .setTimeout(2000).setPollingInterval(RENDER_POLL_MS));
+                                .setTimeout(stepTimeoutMs)
+                                .setPollingInterval(pollMs));
             } catch (Exception ignored) { /* at bottom or grid stalled — check next iter */ }
         }
 
         throw new RuntimeException(String.format(
                 "GridHarness: no row found where [col-id='%s'] has text '%s' " +
                 "after exhaustive scroll search.", colId, cellText));
+    }
+
+    // ── Config helpers ────────────────────────────────────────────────────────
+
+    /**
+     * Reads a duration (in ms) from the active config.
+     * Falls back to {@code defaultMs} if the registry is uninitialised or key is absent.
+     */
+    private static long cfgMs(String key, long defaultMs) {
+        BBotConfig cfg = BBotRegistry.getConfig();
+        if (cfg != null && cfg.hasPath(key)) return cfg.getTimeout(key).toMillis();
+        return defaultMs;
+    }
+
+    /**
+     * Reads an integer from the active config.
+     * Falls back to {@code defaultVal} if the registry is uninitialised or key is absent.
+     */
+    private static int cfgInt(String key, int defaultVal) {
+        BBotConfig cfg = BBotRegistry.getConfig();
+        if (cfg != null && cfg.hasPath(key)) return cfg.raw().getInt(key);
+        return defaultVal;
     }
 }

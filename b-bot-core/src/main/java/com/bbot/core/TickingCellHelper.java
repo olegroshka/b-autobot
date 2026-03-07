@@ -1,5 +1,7 @@
 package com.bbot.core;
 
+import com.bbot.core.config.BBotConfig;
+import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 
@@ -30,8 +32,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public final class TickingCellHelper {
 
-    /** Polling interval used inside waitForFunction — short enough to catch a tick. */
-    private static final int POLL_MS = 150;
+    /**
+     * Returns the polling interval (ms) for {@code waitForFunction} calls.
+     * Read from {@code b-bot.ticking.pollMs} in the active config;
+     * falls back to 150 ms if the registry is not yet initialised.
+     */
+    private static int pollMs() {
+        BBotConfig cfg = BBotRegistry.getConfig();
+        if (cfg != null && cfg.hasPath("b-bot.ticking.pollMs"))
+            return cfg.raw().getInt("b-bot.ticking.pollMs");
+        return 150;
+    }
 
     private TickingCellHelper() {}
 
@@ -54,7 +65,7 @@ public final class TickingCellHelper {
                 List.of(selector, initialValue),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(POLL_MS)
+                        .setPollingInterval(pollMs())
         );
         return cell.textContent().trim();
     }
@@ -99,7 +110,7 @@ public final class TickingCellHelper {
                 List.of(selector),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(POLL_MS)
+                        .setPollingInterval(pollMs())
         );
     }
 
@@ -116,7 +127,7 @@ public final class TickingCellHelper {
                 List.of(selector),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(POLL_MS)
+                        .setPollingInterval(pollMs())
         );
     }
 
