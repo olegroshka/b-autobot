@@ -1,6 +1,9 @@
 # Maven build output
 target/
 
+# Root src/ was removed during modularisation (M1); only empty OS-locked dirs may remain.
+/src/
+
 # IDE files
 .idea/
 *.iml
@@ -22,14 +25,14 @@ playwright/
 .node/
 
 # Webapp dependencies (installed by frontend-maven-plugin or npm install)
-src/test/webapp/node_modules/
-src/test/webapp-config/node_modules/
-src/test/webapp-deployment/node_modules/
+b-bot-sandbox/src/test/webapp/node_modules/
+b-bot-sandbox/src/test/webapp-config/node_modules/
+b-bot-sandbox/src/test/webapp-deployment/node_modules/
 
 # PT-Blotter Vite build output — assets/index.js and assets/index.css are git-tracked
 # (committed as pre-built fallback so tests run without a Node build).
 # The directory-level gitignore prevents accidentally committing chunked/hashed outputs.
-src/test/resources/wiremock/__files/blotter/assets/
+b-bot-sandbox/src/test/resources/wiremock/__files/blotter/assets/
 
 # Test evidence generated at runtime — not source-controlled
 test-evidence/

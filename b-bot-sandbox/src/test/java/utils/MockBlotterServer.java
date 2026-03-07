@@ -3,7 +3,6 @@ package utils;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
-import java.io.File;
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -63,9 +62,8 @@ public final class MockBlotterServer {
      * Called directly by {@code BlotterDevServer} with a well-known port.
      */
     public static void start(int port) {
-        String wireMockRoot = "src/test/resources/wiremock";
         WireMockConfiguration config = WireMockConfiguration.options()
-                .withRootDirectory(wireMockRoot);
+                .usingFilesUnderClasspath("wiremock");
         if (port > 0) {
             config = config.port(port);
         } else {
@@ -118,7 +116,6 @@ public final class MockBlotterServer {
         return "http://localhost:" + server.port() + "/blotter/";
     }
 
-    private static final String WIREMOCK_ROOT = "src/test/resources/wiremock";
 
     private static void registerStubs() {
         // ── PT-Blotter SPA: HTML ──────────────────────────────────────────────
@@ -250,8 +247,9 @@ public final class MockBlotterServer {
      */
     private static void registerAssetStubIfBuilt(
             String bodyFile, String urlPattern, String contentType) {
-        File asset = new File(WIREMOCK_ROOT + "/__files/" + bodyFile);
-        if (asset.exists()) {
+        boolean exists = MockBlotterServer.class.getClassLoader()
+                .getResource("wiremock/__files/" + bodyFile) != null;
+        if (exists) {
             server.stubFor(get(urlPathMatching(urlPattern))
                     .willReturn(aResponse()
                             .withStatus(200)

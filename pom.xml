@@ -16,6 +16,7 @@
   <modules>
     <module>b-bot-core</module>
     <module>b-bot-sandbox</module>
+    <module>pt-blotter-regression</module>
   </modules>
 
   <properties>
