@@ -3,6 +3,11 @@ package utils;
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
 import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.*;
@@ -63,7 +68,8 @@ public final class MockBlotterServer {
      */
     public static void start(int port) {
         WireMockConfiguration config = WireMockConfiguration.options()
-                .usingFilesUnderClasspath("wiremock");
+                .usingFilesUnderClasspath("wiremock")
+                .extensions(new InquiryStoreTransformer());
         if (port > 0) {
             config = config.port(port);
         } else {
@@ -71,6 +77,7 @@ public final class MockBlotterServer {
         }
         server = new WireMockServer(config);
         server.start();
+        InquiryStoreTransformer.resetAndSeed(buildSeedInquiries());
         registerStubs();
     }
 
@@ -152,20 +159,18 @@ public final class MockBlotterServer {
                         .withHeader("Content-Type", "application/json")
                         .withBody("{\"error\":\"ISIN not found\"}")));
 
-        // POST /api/inquiry — all other ISINs → 201 with generated inquiry_id
+        // POST /api/inquiry — all other ISINs → 201 (stored in InquiryStoreTransformer)
         server.stubFor(post(urlEqualTo("/api/inquiry"))
                 .atPriority(5)
                 .willReturn(aResponse()
-                        .withStatus(201)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(inquiryBody())));
+                        .withTransformers(InquiryStoreTransformer.NAME)
+                        .withTransformerParameter("action", "submit")));
 
-        // GET /api/inquiries → 200 with seeded list
+        // GET /api/inquiries → 200 from InquiryStoreTransformer (seed + dynamic)
         server.stubFor(get(urlEqualTo("/api/inquiries"))
                 .willReturn(aResponse()
-                        .withStatus(200)
-                        .withHeader("Content-Type", "application/json")
-                        .withBody(seedInquiriesBody())));
+                        .withTransformers(InquiryStoreTransformer.NAME)
+                        .withTransformerParameter("action", "list")));
 
         // POST /api/inquiry/{id}/quote → 200 QUOTED
         server.stubFor(post(urlPathMatching("/api/inquiry/.*/quote"))
@@ -221,20 +226,29 @@ public final class MockBlotterServer {
     private static final String PT1 = "PT_BBG_20260306_3F7A";
     private static final String PT2 = "PT_BBG_20260306_9C2E";
 
-    private static String seedInquiriesBody() {
-        // Minimal seed list — matches the five design-contract ISINs across two portfolios.
-        return "[" +
-                "{\"inquiry_id\":\"INQ-001\",\"isin\":\"US912828YJ02\",\"status\":\"PENDING\"," +
-                "\"pt_id\":\"" + PT1 + "\",\"pt_line_id\":\"" + PT1 + "_1\"}," +
-                "{\"inquiry_id\":\"INQ-002\",\"isin\":\"XS2346573523\",\"status\":\"PENDING\"," +
-                "\"pt_id\":\"" + PT1 + "\",\"pt_line_id\":\"" + PT1 + "_2\"}," +
-                "{\"inquiry_id\":\"INQ-003\",\"isin\":\"US38141GXZ20\",\"status\":\"PENDING\"," +
-                "\"pt_id\":\"" + PT1 + "\",\"pt_line_id\":\"" + PT1 + "_3\"}," +
-                "{\"inquiry_id\":\"INQ-004\",\"isin\":\"GB0031348658\",\"status\":\"PENDING\"," +
-                "\"pt_id\":\"" + PT2 + "\",\"pt_line_id\":\"" + PT2 + "_1\"}," +
-                "{\"inquiry_id\":\"INQ-005\",\"isin\":\"FR0014004L86\",\"status\":\"PENDING\"," +
-                "\"pt_id\":\"" + PT2 + "\",\"pt_line_id\":\"" + PT2 + "_2\"}" +
-                "]";
+    /**
+     * Builds the list of seed inquiries that pre-populate the store on server start.
+     * These mirror the design-contract ISINs from {@code seedData.ts} so the blotter
+     * renders them with live-ticking prices.
+     */
+    private static List<Map<String, Object>> buildSeedInquiries() {
+        List<Map<String, Object>> seed = new ArrayList<>();
+        seed.add(inquiry("INQ-001", "US912828YJ02", PT1, PT1 + "_1"));
+        seed.add(inquiry("INQ-002", "XS2346573523", PT1, PT1 + "_2"));
+        seed.add(inquiry("INQ-003", "US38141GXZ20", PT1, PT1 + "_3"));
+        seed.add(inquiry("INQ-004", "GB0031348658", PT2, PT2 + "_1"));
+        seed.add(inquiry("INQ-005", "FR0014004L86", PT2, PT2 + "_2"));
+        return seed;
+    }
+
+    private static Map<String, Object> inquiry(String id, String isin, String ptId, String ptLineId) {
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("inquiry_id", id);
+        m.put("isin",       isin);
+        m.put("status",     "PENDING");
+        m.put("pt_id",      ptId);
+        m.put("pt_line_id", ptLineId);
+        return m;
     }
 
     /**

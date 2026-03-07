@@ -215,3 +215,39 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     When I POST template "quote-inquiry" to app "blotter" path "/api/inquiry/${inquiry_id}/quote"
     Then the response status should be 200
     And the response field "status" should be "QUOTED"
+
+  # ── 10. Dynamic portfolio submission via named API actions ───────────────────
+  # The conf file is the API contract: action names, methods, paths, and templates
+  # are all declared in application-mockuat.conf under b-bot.test-data.api-actions.
+  # Portfolio structures (ISINs, quantities, PT IDs) live in b-bot.test-data.portfolios.
+  # Feature files reference names only — no URLs, no ISINs, no dates hardcoded here.
+
+  @rest-probe @api
+  Scenario: Named actions -- submit and quote an RFQ using action names defined in conf
+    When I perform "submit-rfq" with bond list "HYPT_1"
+    Then the response status should be 201
+    And the response field "status" should be "PENDING"
+    And I capture the response field "inquiry_id"
+    When I perform "quote-inquiry"
+    Then the response status should be 200
+    And the response field "status" should be "QUOTED"
+
+  @rest-probe @api @portfolio
+  Scenario: Portfolio submission -- HYPT_1 bonds accepted and seed data intact in inquiry list
+    Given I submit all inquiries for portfolio "HYPT_1"
+    When I perform "list-inquiries"
+    Then the response status should be 200
+    And the response field "$[0].inquiry_id" should be "INQ-001"
+    And the response field "$[0].isin" should equal bond "HYPT_1" field "ISIN1"
+
+  @rest-probe @workflow @portfolio
+  Scenario: Dynamic portfolio -- HYPT_1 bonds submitted via API, priced and quoted in blotter
+    Given I submit all inquiries for portfolio "HYPT_1"
+    And the PT-Blotter is open
+    Then the row with ISIN "US912828YJ02" should have status "PENDING"
+    And the row with ISIN "XS2346573523" should have status "PENDING"
+    When I select the row with ISIN "US912828YJ02"
+    And I set the toolbar source "TW" side "Mid" markup "0" units "c"
+    And I press APPLY
+    And I press SEND
+    Then the row with ISIN "US912828YJ02" should have status "QUOTED"

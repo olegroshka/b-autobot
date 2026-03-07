@@ -69,6 +69,23 @@ public final class JsonTemplateEngine {
         return substitute(raw, Map.of(), testData.getAllGlobals());
     }
 
+    /**
+     * Renders the named template substituting tokens directly from the supplied
+     * variable map, ScenarioState, and global test-data.
+     *
+     * <p>Use this for portfolio-level submission where each bond provides its
+     * own variable context ({@code isin}, {@code quantity}, {@code side}, etc.)
+     * rather than referencing a named bond list.
+     *
+     * @param templateName registered template name (e.g. {@code "portfolio-rfq"})
+     * @param vars         additional variables that override globals; values are
+     *                     substituted as {@code ${key}} tokens in the template
+     */
+    public String renderWithContext(String templateName, Map<String, String> vars) {
+        String raw = load(testData.getTemplatePath(templateName));
+        return substituteWithContext(raw, vars, testData.getAllGlobals());
+    }
+
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private String load(String classpathPath) {
@@ -102,4 +119,24 @@ public final class JsonTemplateEngine {
 
         return result;
     }
+    private String substituteWithContext(String raw, Map<String, String> vars,
+                                          Map<String, String> globals) {
+        String result = raw;
+
+        // 1. Scenario state — ${key}
+        result = ScenarioState.resolve(result);
+
+        // 2. Caller-supplied vars — ${key} (override globals)
+        for (Map.Entry<String, String> e : vars.entrySet()) {
+            result = result.replace("${" + e.getKey() + "}", e.getValue());
+        }
+
+        // 3. Global test-data scalars — ${key}
+        for (Map.Entry<String, String> e : globals.entrySet()) {
+            result = result.replace("${" + e.getKey() + "}", e.getValue());
+        }
+
+        return result;
+    }
+
 }

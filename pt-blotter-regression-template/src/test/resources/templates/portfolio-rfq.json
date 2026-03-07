@@ -1,0 +1,8 @@
+{
+  "isin":           "${isin}",
+  "pt_id":          "${pt-id}",
+  "quantity":       ${quantity},
+  "side":           "${side}",
+  "currency":       "${currency}",
+  "settlementDate": "${settlement-date}"
+}

@@ -1,13 +1,19 @@
 package stepdefs;
 
+import com.bbot.core.data.ApiAction;
+import com.bbot.core.data.Portfolio;
 import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.rest.JsonTemplateEngine;
 import com.bbot.core.rest.RestProbe;
 import com.bbot.core.rest.RestResponse;
 import io.cucumber.java.en.And;
+import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Generic REST API step definitions powered by {@link RestProbe}, {@link JsonTemplateEngine},
@@ -212,6 +218,96 @@ public class RestApiSteps {
         lastResponse.capture(jsonPath, alias);
     }
 
+    // ── Named API actions ─────────────────────────────────────────────────────
+
+    /**
+     * Executes the named API action declared in {@code b-bot.test-data.api-actions}.
+     * The action supplies method, app, path, and optional template — no hardcoded values
+     * in the feature file.
+     *
+     * <p>Path tokens in curly-brace form ({@code {inquiry_id}}) are resolved at runtime
+     * from captured scenario state, e.g.:
+     * <pre>{@code
+     * When I perform "quote-inquiry"   # path: /api/inquiry/{inquiry_id}/quote
+     * }</pre>
+     */
+    @When("I perform {string}")
+    public void performAction(String actionName) {
+        ApiAction action = testData.getApiAction(actionName);
+        String apiBase = BBotRegistry.getConfig().getAppApiBase(action.app());
+        String path = resolveActionPath(action.path());
+        if ("GET".equalsIgnoreCase(action.method())) {
+            lastResponse = RestProbe.of(apiBase).get(path);
+        } else {
+            String body = action.template() != null
+                    ? templateEngine.render(action.template())
+                    : "{}";
+            lastResponse = RestProbe.of(apiBase).post(path, body);
+        }
+    }
+
+    /**
+     * Executes the named API action with a bond list for template token substitution.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * When I perform "submit-rfq" with bond list "HYPT_1"
+     * }</pre>
+     */
+    @When("I perform {string} with bond list {string}")
+    public void performActionWithBondList(String actionName, String bondList) {
+        ApiAction action = testData.getApiAction(actionName);
+        String apiBase = BBotRegistry.getConfig().getAppApiBase(action.app());
+        String path = resolveActionPath(action.path());
+        if ("GET".equalsIgnoreCase(action.method())) {
+            lastResponse = RestProbe.of(apiBase).get(path);
+        } else {
+            String body = action.template() != null
+                    ? templateEngine.render(action.template(), bondList)
+                    : "{}";
+            lastResponse = RestProbe.of(apiBase).post(path, body);
+        }
+    }
+
+    /**
+     * Submits every bond in the named portfolio as an individual {@code POST /api/inquiry}
+     * using the {@code "portfolio-rfq"} template.
+     *
+     * <p>Each bond's {@code isin}, {@code quantity}, {@code side}, {@code currency} plus
+     * the portfolio's {@code pt-id} and {@code settlement-date} are passed as template
+     * variables. The returned {@code inquiry_id} is captured as
+     * {@code inquiry_id_<lineKey>} (e.g. {@code inquiry_id_line_1}) in scenario state.
+     *
+     * <p>Asserts status 201 for every bond — the step fails immediately if any submission
+     * is rejected.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * Given I submit all inquiries for portfolio "HYPT_1"
+     * }</pre>
+     */
+    @Given("I submit all inquiries for portfolio {string}")
+    public void submitAllInquiriesForPortfolio(String portfolioName) {
+        Portfolio portfolio = testData.getPortfolio(portfolioName);
+        String apiBase = BBotRegistry.getConfig().getAppApiBase("blotter");
+        RestProbe probe = RestProbe.of(apiBase);
+
+        portfolio.bonds().forEach((lineKey, bond) -> {
+            Map<String, String> vars = new LinkedHashMap<>();
+            vars.put("isin",            bond.isin());
+            vars.put("quantity",        String.valueOf(bond.quantity()));
+            vars.put("side",            bond.side());
+            vars.put("currency",        bond.currency());
+            vars.put("pt-id",           portfolio.ptId());
+            vars.put("settlement-date", portfolio.settlementDate());
+
+            String body = templateEngine.renderWithContext("portfolio-rfq", vars);
+            RestResponse resp = probe.post("/api/inquiry", body);
+            resp.assertStatus(201);
+            resp.capture("inquiry_id", "inquiry_id_" + lineKey.replace("-", "_"));
+        });
+    }
+
     // ── Internal ──────────────────────────────────────────────────────────────
 
     private void requireLastResponse(String stepName) {
@@ -219,5 +315,13 @@ public class RestApiSteps {
             throw new AssertionError(
                 "No REST response available for step '" + stepName + "'. " +
                 "Ensure a GET or POST step runs before this assertion.");
+    }
+
+    /**
+     * Converts {@code {key}} tokens (used in api-actions conf to avoid HOCON substitution
+     * conflicts) to {@code ${key}} so {@link RestProbe} can resolve them from scenario state.
+     */
+    private static String resolveActionPath(String pathTemplate) {
+        return pathTemplate.replaceAll("\\{(\\w[\\w-]*?)}", "\\${$1}");
     }
 }

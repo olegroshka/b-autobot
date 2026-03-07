@@ -3,6 +3,7 @@ package com.bbot.core.data;
 import com.typesafe.config.Config;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * Typed view over the {@code b-bot.test-data} HOCON block.
@@ -133,4 +134,64 @@ public final class TestDataConfig {
                 "Add:  templates." + templateName + " = \"path/to/file.json\"");
         return cfg.getString(path);
     }
+    // ── API actions ───────────────────────────────────────────────────────────
+
+    /**
+     * Returns the named API action from {@code b-bot.test-data.api-actions}.
+     *
+     * @throws AssertionError if the action is not declared
+     */
+    public ApiAction getApiAction(String name) {
+        String path = ROOT + ".api-actions." + name;
+        if (!cfg.hasPath(path))
+            throw new AssertionError(
+                "API action '" + name + "' not found in b-bot.test-data.api-actions. " +
+                "Declare it in your application-{env}.conf.");
+        Config c = cfg.getConfig(path);
+        return new ApiAction(
+            name,
+            c.getString("method"),
+            c.getString("app"),
+            c.getString("path"),
+            c.hasPath("template") ? c.getString("template") : null
+        );
+    }
+
+    // ── Portfolios ────────────────────────────────────────────────────────────
+
+    /**
+     * Returns the named portfolio from {@code b-bot.test-data.portfolios}.
+     * Bond entries are returned in declaration order (HOCON key-sort order).
+     *
+     * @throws AssertionError if the portfolio is not declared
+     */
+    public Portfolio getPortfolio(String name) {
+        String root = ROOT + ".portfolios." + name;
+        if (!cfg.hasPath(root))
+            throw new AssertionError(
+                "Portfolio '" + name + "' not found in b-bot.test-data.portfolios. " +
+                "Declare it in your application-{env}.conf.");
+        Config pc = cfg.getConfig(root);
+
+        String ptId = pc.getString("pt-id");
+        String settlementDate = pc.hasPath("settlement-date")
+                ? pc.getString("settlement-date")
+                : getGlobal("settlement-date").orElse("");
+
+        LinkedHashMap<String, PortfolioBond> bonds = new LinkedHashMap<>();
+        if (pc.hasPath("bonds")) {
+            Config bc = pc.getConfig("bonds");
+            bc.root().keySet().stream().sorted().forEach(key -> {
+                Config b = bc.getConfig(key);
+                bonds.put(key, new PortfolioBond(
+                    b.getString("isin"),
+                    b.getLong("quantity"),
+                    b.getString("side"),
+                    b.hasPath("currency") ? b.getString("currency") : "USD"
+                ));
+            });
+        }
+        return new Portfolio(name, ptId, settlementDate, bonds);
+    }
+
 }
