@@ -41,9 +41,8 @@ public final class TickingCellHelper {
      * Read from {@code b-bot.ticking.pollMs} in the active config;
      * falls back to 150 ms if the registry is not yet initialised.
      */
-    @SuppressWarnings("deprecation")
     private static int pollMs() {
-        return pollMs(BBotRegistry.getConfig());
+        return pollMs(BBotRegistry.configOrNull());
     }
 
     /**

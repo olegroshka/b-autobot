@@ -69,7 +69,7 @@ public final class HttpClientFactory {
 
     private static Duration resolveTimeout() {
         try {
-            BBotConfig cfg = BBotRegistry.getConfig();
+            BBotConfig cfg = BBotRegistry.configOrNull();
             if (cfg != null && cfg.hasPath("b-bot.timeouts.apiResponse"))
                 return cfg.getTimeout("b-bot.timeouts.apiResponse");
         } catch (Exception ignored) { /* registry not yet initialised */ }

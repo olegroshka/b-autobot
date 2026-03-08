@@ -81,6 +81,7 @@ b-autobot/
 │       ├── NumericComparator       # UI vs API value comparison (BigDecimal)
 │       ├── config/BBotConfig       # HOCON layered config (5-layer loading)
 │       ├── exception/              # BBotException hierarchy (6 typed exceptions)
+│       ├── auth/                   # SsoAuthConfig, SsoAuthManager, ClientCredentialsAuth (M13)
 │       ├── registry/BBotSession    # Immutable session (M11 instance-based API)
 │       ├── registry/BBotRegistry   # Static registry delegates to BBotSession (@Deprecated)
 │       └── rest/                   # RestClient, RestProbe, RestResponse, ScenarioContext, …
@@ -320,13 +321,53 @@ any working directory (Maven reactor root or module directory).
 
 ---
 
+## Authentication (Enterprise SSO / MFA)
+
+b-bot-core provides built-in support for enterprise SSO authentication, including
+environments with mandatory MFA (MS Authenticator, TOTP, hardware tokens). See
+[`SSO_AUTH_PLAN.md`](SSO_AUTH_PLAN.md) for the full design.
+
+| Mode | Config Value | Use Case | Human Required? |
+|------|-------------|----------|-----------------|
+| **none** | `b-bot.auth.mode=none` | Mock environments (default) | No |
+| **interactive** | `b-bot.auth.mode=interactive` | First run — user logs in via real browser | Yes (once) |
+| **storageState** | `b-bot.auth.mode=storageState` | Subsequent runs — reuse cached session | No |
+| **auto** | `b-bot.auth.mode=auto` | Try cache first; fall back to interactive | Only when expired |
+| **clientCredentials** | `b-bot.auth.mode=clientCredentials` | CI pipelines — OAuth2 grant | No |
+
+### Developer workflow (UAT with SSO)
+
+```bash
+# First run — interactive login (opens browser, user completes SSO + MFA)
+mvn verify -pl pt-blotter-regression-template \
+    -Db-bot.env=uat -Db-bot.auth.mode=interactive -Db-bot.browser.headless=false
+
+# Subsequent runs — auto mode reuses cached session (no browser popup)
+mvn verify -pl pt-blotter-regression-template \
+    -Db-bot.env=uat -Db-bot.auth.mode=auto
+```
+
+### CI pipeline (service principal)
+
+```bash
+# OAuth2 client_credentials — no human, no browser for token acquisition
+export B_BOT_CLIENT_ID="your-client-id"
+export B_BOT_CLIENT_SECRET="your-client-secret"
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=ci
+```
+
+See `application-uat.conf.example` and `application-ci.conf.example` in the template
+module for complete configuration examples.
+
+---
+
 ## CI/CD integration
 
 A ready-to-use GitHub Actions workflow lives at `.github/workflows/ci.yml`.
 
 | Job | When | What |
 |-----|------|------|
-| `core-tests` | every push / PR | `mvn verify -pl b-bot-core` — 184 unit tests, JaCoCo, Javadoc JAR |
+| `core-tests` | every push / PR | `mvn verify -pl b-bot-core` — 252 unit tests, JaCoCo, Javadoc JAR |
 | `sandbox-tests` | every push / PR | `mvn verify -pl b-bot-sandbox` — 66 integration scenarios, Cucumber HTML report |
 | `template-nightly` | nightly 02:00 UTC + `workflow_dispatch` | starts mock UAT servers, runs 24 template scenarios |
 

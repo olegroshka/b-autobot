@@ -1,0 +1,42 @@
+# pt-blotter-regression-template — CI environment config.
+#
+# This file shows how to configure b-bot for a CI pipeline with
+# service-principal OAuth2 authentication (no human interaction needed).
+#
+# Client ID and secret are injected via environment variables —
+# NEVER commit secrets in this file.
+#
+# Activate: mvn verify -Db-bot.env=ci
+
+b-bot {
+
+  # ── OAuth2 Client Credentials (no browser, no human) ────────────────────
+  auth {
+    mode = clientCredentials
+    tokenUrl = "https://login.microsoftonline.com/TENANT_ID/oauth2/v2.0/token"
+    clientId = ${?B_BOT_CLIENT_ID}
+    clientSecret = ${?B_BOT_CLIENT_SECRET}
+    scope = "api://blotter-api/.default"
+    storageStatePath = "target/auth/ci-token-state.json"
+  }
+
+  browser {
+    headless = true
+  }
+
+  # ── Application URLs ────────────────────────────────────────────────────
+  apps {
+    blotter {
+      webUrl  = "https://blotter-ci.example.com/"
+      apiBase = "https://blotter-api-ci.example.com"
+    }
+    config-service {
+      apiBase = "https://config-api-ci.example.com"
+    }
+    deployment {
+      webUrl  = "https://deployment-ci.example.com/deployment/"
+      apiBase = "https://deployment-ci.example.com"
+    }
+  }
+}
+

@@ -104,8 +104,6 @@ public final class JsonTemplateEngine {
                     "Ensure the file is under src/test/resources/ in your module.",
                     classpathPath);
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (BBotTemplateException e) {
-            throw e;  // re-throw without wrapping
         } catch (IOException e) {
             throw new BBotTemplateException(
                     "Failed to load template: " + classpathPath, classpathPath, e);
@@ -117,7 +115,7 @@ public final class JsonTemplateEngine {
         String result = raw;
 
         // 1. Scenario state — ${key} for any captured value
-        result = ScenarioState.resolve(result);
+        result = ScenarioState.current().resolve(result);
 
         // 2. Active bond list — ${bond.FIELD}
         for (Map.Entry<String, String> e : bondList.entrySet()) {
@@ -136,7 +134,7 @@ public final class JsonTemplateEngine {
         String result = raw;
 
         // 1. Scenario state — ${key}
-        result = ScenarioState.resolve(result);
+        result = ScenarioState.current().resolve(result);
 
         // 2. Caller-supplied vars — ${key} (override globals)
         for (Map.Entry<String, String> e : vars.entrySet()) {

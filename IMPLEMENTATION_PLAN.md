@@ -15,6 +15,7 @@
 | **M10** | ✅ COMPLETE | Interface extraction — BrowserLifecycle, GridQuery, CellAssertions, RestClient |
 | **M11** | ✅ COMPLETE | Instance-based architecture — BBotSession, PicoContainer DI, deprecated statics |
 | **M12** | ✅ COMPLETE | CI + docs + Javadoc — `.github/workflows/ci.yml`, Javadoc JAR (0 warnings), MD sync |
+| **M13** | ✅ COMPLETE | Enterprise SSO / MFA authentication — see [`SSO_AUTH_PLAN.md`](SSO_AUTH_PLAN.md) |
 
 ### Resolved in M8e
 All `new AssertionError(...)` replaced with typed `BBotException` across all core classes.

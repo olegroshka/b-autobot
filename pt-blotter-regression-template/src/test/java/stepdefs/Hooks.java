@@ -1,8 +1,11 @@
 package stepdefs;
 
 import com.bbot.core.PlaywrightManager;
+import com.bbot.core.auth.SsoAuthConfig;
+import com.bbot.core.auth.SsoAuthManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
+import com.bbot.core.registry.BBotSession;
 import com.bbot.core.rest.ScenarioState;
 import descriptors.BlotterDescriptor;
 import descriptors.ConfigServiceDescriptor;
@@ -22,8 +25,8 @@ import io.cucumber.java.BeforeAll;
  *       for every application your suite tests (one descriptor per app).</li>
  *   <li>If you need environment-specific overrides that are only known at
  *       runtime (e.g. dynamic ports from test containers), apply them via
- *       {@link BBotConfig#withOverrides(java.util.Map)} before calling
- *       {@link BBotRegistry#initialize(BBotConfig)}.</li>
+ *       {@code BBotConfig.withOverrides(Map)} before calling
+ *       {@code BBotSession.builder().initialize(cfg)}.</li>
  *   <li>If your suite does not use a browser (REST-only), remove the
  *       {@link PlaywrightManager} calls.</li>
  * </ul>
@@ -46,45 +49,55 @@ import io.cucumber.java.BeforeAll;
  */
 public class Hooks {
 
+    private static PlaywrightManager browser;
+
     @BeforeAll
+    @SuppressWarnings("unused")
     public static void launchBrowser() {
         // Load HOCON config -- picks up application-{env}.conf automatically.
         BBotConfig cfg = BBotConfig.load();
 
-        // Register one descriptor per application under test.
+        // Build an immutable BBotSession with one descriptor per application under test.
         // Each descriptor declares: app name, DSL factory, health-check path.
-        BBotRegistry.register(new BlotterDescriptor());
-        BBotRegistry.register(new ConfigServiceDescriptor());
-        BBotRegistry.register(new DeploymentDescriptor());
-        // BBotRegistry.register(new MyOtherServiceDescriptor());
+        BBotSession session = BBotSession.builder()
+                .register(new BlotterDescriptor())
+                .register(new ConfigServiceDescriptor())
+                .register(new DeploymentDescriptor())
+                // .register(new MyOtherServiceDescriptor())
+                .initialize(cfg)
+                .build();
+        BBotRegistry.setSession(session);
 
-        // Resolve AppContexts from config (URLs, users, timeouts).
-        BBotRegistry.initialize(cfg);
+        // SSO authentication — ensures a valid session before launching the browser.
+        // mode=none (default) is a no-op; mode=auto/interactive prompts for login.
+        SsoAuthConfig authConfig = SsoAuthConfig.from(cfg);
+        SsoAuthManager.ensureAuthenticated(authConfig);
 
         // Browser lifecycle -- remove these lines if your suite is REST-only.
-        PlaywrightManager.initBrowser();
+        browser = new PlaywrightManager();
+        browser.initBrowser();
     }
 
     @Before
-    @SuppressWarnings("deprecation")
     public void openFreshContext() {
         // Each scenario gets its own isolated BrowserContext + Page.
         // PicoContainer provides a fresh ScenarioContext per scenario automatically.
         // Also reset ScenarioState so RestProbe path resolution starts clean.
         // Remove if REST-only.
-        ScenarioState.reset();
-        PlaywrightManager.initContext();
+        ScenarioState.current().reset();
+        browser.initContext();
     }
 
     @After
     public void closeContext() {
         // Remove if REST-only.
-        PlaywrightManager.closeContext();
+        browser.closeContext();
     }
 
     @AfterAll
+    @SuppressWarnings("unused")
     public static void shutdownBrowser() {
-        PlaywrightManager.closeBrowser();
-        BBotRegistry.reset();
+        browser.closeBrowser();
+        BBotRegistry.clearSession();
     }
 }

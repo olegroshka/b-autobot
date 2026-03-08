@@ -1576,3 +1576,59 @@ public class BondBlotterSteps {
     }
 }
 ```
+
+---
+
+## M13 — Enterprise SSO / MFA Authentication
+
+### Summary
+Added enterprise SSO authentication support to `b-bot-core`, enabling regression suites
+to run against real UAT environments protected by Azure AD / ADFS / Ping Federate with
+mandatory MFA.
+
+### New Packages & Classes
+
+| Class | Package | Role |
+|-------|---------|------|
+| `SsoAuthConfig` | `com.bbot.core.auth` | Immutable record — parses `b-bot.auth` HOCON block; validates per mode |
+| `SsoAuthManager` | `com.bbot.core.auth` | Orchestrator — interactive login, storageState reuse, OAuth client_credentials |
+| `ClientCredentialsAuth` | `com.bbot.core.auth` | `AuthStrategy` impl — OAuth2 token with auto-refresh |
+| `StorageStateAuth` | `com.bbot.core.rest` | `AuthStrategy` impl — extracts cookies/tokens from Playwright storageState |
+| `BBotAuthException` | `com.bbot.core.exception` | Typed exception for auth failures with actionable hints |
+
+### Config Schema (`reference.conf`)
+```hocon
+b-bot.auth {
+  mode = none                         # none | interactive | storageState | auto | clientCredentials
+  storageStatePath = "target/auth/storage-state.json"
+  sessionTtl = 4h
+  loginUrl = ""
+  loginTimeout = 120s
+  loginSuccessIndicator = "pause"     # pause | urlContains:<pattern> | element:<selector>
+  tokenUrl = ""
+  clientId = ""
+  clientSecret = ""
+  scope = ""
+  refreshOn401 = true
+}
+```
+
+### Integration Points
+- `PlaywrightManager.initContext()` — injects storageState into new browser contexts
+- `RestProbe.execute()` — 401/403 with active auth throws `BBotAuthException`
+- `AuthStrategy.fromStorageState(Path)` — factory for REST auth from storageState
+- Template `Hooks.java` — calls `SsoAuthManager.ensureAuthenticated()` before browser launch
+
+### Test Coverage
+252 unit tests, including 57 new auth-related tests across 4 test classes:
+- `SsoAuthConfigTest` (32 tests)
+- `SsoAuthManagerTest` (17 tests)
+- `ClientCredentialsAuthTest` (7 tests)
+- `StorageStateAuthTest` (7 tests)
+
+### Quality Gates Passed
+- JaCoCo ≥ 65% ✅
+- Javadoc 0 warnings ✅
+- All 252 tests green ✅
+- Template compiles with SSO wiring ✅
+

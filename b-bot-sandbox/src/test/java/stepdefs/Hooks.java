@@ -3,6 +3,7 @@ package stepdefs;
 import com.bbot.core.PlaywrightManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
+import com.bbot.core.registry.BBotSession;
 import com.bbot.core.rest.ScenarioState;
 import descriptors.BlotterAppDescriptor;
 import descriptors.ConfigServiceDescriptor;
@@ -23,10 +24,10 @@ import java.util.Map;
  * <p>Execution order:
  * <ol>
  *   <li>{@code @BeforeAll} — start mock servers, build {@link BBotConfig} with dynamic port
- *       overrides, register descriptors, initialize {@link BBotRegistry}, launch browser</li>
+ *       overrides, build {@link BBotSession}, launch browser</li>
  *   <li>{@code @Before}    — open a fresh browser context + page per scenario</li>
  *   <li>{@code @After}     — close context + page</li>
- *   <li>{@code @AfterAll}  — close browser, reset registry, stop mock servers</li>
+ *   <li>{@code @AfterAll}  — close browser, clear session, stop mock servers</li>
  * </ol>
  *
  * <p>Real consumers (e.g. {@code pt-blotter-regression}) omit the mock server block and
@@ -35,7 +36,10 @@ import java.util.Map;
  */
 public class Hooks {
 
+    private static PlaywrightManager browser;
+
     @BeforeAll
+    @SuppressWarnings("unused")
     public static void launchBrowser() {
         // 1. Start mock servers (sandbox-only — real consumers omit this block)
         MockConfigServer.start();
@@ -53,33 +57,37 @@ public class Hooks {
                 "b-bot.apps.deployment.apiBase",      MockDeploymentServer.getBaseUrl()
             ));
 
-        // 3. Register descriptors + resolve AppContexts from config.
-        BBotRegistry.register(new BlotterAppDescriptor());
-        BBotRegistry.register(new ConfigServiceDescriptor());
-        BBotRegistry.register(new DeploymentDescriptor());
-        BBotRegistry.initialize(cfg);
+        // 3. Build BBotSession and register it with BBotRegistry.
+        BBotSession session = BBotSession.builder()
+                .register(new BlotterAppDescriptor())
+                .register(new ConfigServiceDescriptor())
+                .register(new DeploymentDescriptor())
+                .initialize(cfg)
+                .build();
+        BBotRegistry.setSession(session);
 
         // 4. Launch Playwright browser.
-        PlaywrightManager.initBrowser();
+        browser = new PlaywrightManager();
+        browser.initBrowser();
     }
 
     @Before
-    @SuppressWarnings("deprecation")
     public void openFreshContext() {
         // Reset ScenarioState so RestProbe path resolution starts clean for each scenario.
-        ScenarioState.reset();
-        PlaywrightManager.initContext();
+        ScenarioState.current().reset();
+        browser.initContext();
     }
 
     @After
     public void closeContext() {
-        PlaywrightManager.closeContext();
+        browser.closeContext();
     }
 
     @AfterAll
+    @SuppressWarnings("unused")
     public static void shutdownBrowser() {
-        PlaywrightManager.closeBrowser();
-        BBotRegistry.reset();
+        browser.closeBrowser();
+        BBotRegistry.clearSession();
         MockBlotterServer.stop();
         MockDeploymentServer.stop();
         MockConfigServer.stop();

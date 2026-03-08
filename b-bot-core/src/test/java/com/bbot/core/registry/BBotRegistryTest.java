@@ -20,7 +20,7 @@ class BBotRegistryTest {
 
     @AfterEach
     void cleanup() {
-        BBotRegistry.reset();
+        BBotRegistry.clearSession();
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -49,56 +49,58 @@ class BBotRegistryTest {
         ));
     }
 
+    private static BBotSession sessionFor(String name) {
+        return BBotSession.builder()
+                .register(descriptor(name))
+                .initialize(BBotConfig.load())
+                .build();
+    }
+
     // ── Tests ─────────────────────────────────────────────────────────────────
 
     @Test
     void registerAndDslCallsFactory() {
-        BBotRegistry.register(descriptor("myapp"));
-        BBotRegistry.initialize(BBotConfig.load());
+        BBotRegistry.setSession(sessionFor("myapp"));
 
-        String result = BBotRegistry.dsl("myapp", null, String.class);
+        String result = BBotRegistry.session().dsl("myapp", null, String.class);
         assertThat(result).isEqualTo("dsl-for-myapp");
     }
 
     @Test
     void unknownAppNameThrows() {
-        BBotRegistry.register(descriptor("known"));
-        BBotRegistry.initialize(BBotConfig.load());
+        BBotRegistry.setSession(sessionFor("known"));
 
-        assertThatThrownBy(() -> BBotRegistry.dsl("nonexistent", null, String.class))
+        assertThatThrownBy(() -> BBotRegistry.session().dsl("nonexistent", null, String.class))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("nonexistent")
             .hasMessageContaining("known");
     }
 
     @Test
-    void dslBeforeInitializeThrows() {
-        BBotRegistry.register(descriptor("myapp"));
-        // initialize() NOT called
-
-        assertThatThrownBy(() -> BBotRegistry.dsl("myapp", null, String.class))
+    void sessionBeforeSetSessionThrows() {
+        // session never set → session() throws with actionable message
+        assertThatThrownBy(BBotRegistry::session)
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("initialize");
     }
 
     @Test
-    void resetClearsAll() {
-        BBotRegistry.register(descriptor("myapp"));
-        BBotRegistry.initialize(BBotConfig.load());
+    void clearSessionClearsAll() {
+        BBotRegistry.setSession(sessionFor("myapp"));
 
-        BBotRegistry.reset();
+        BBotRegistry.clearSession();
 
-        // After reset, both descriptor and context are gone
-        assertThatThrownBy(() -> BBotRegistry.dsl("myapp", null, String.class))
+        assertThatThrownBy(BBotRegistry::session)
             .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
     void checkHealthNoOpWhenNoPath() {
-        // Descriptor with no healthCheckPath — should not make any HTTP call
-        // (if it did it would fail because there is no server running)
-        BBotRegistry.register(descriptor("no-health"));
-        BBotRegistry.initialize(configWithApp("no-health", "http://localhost:1"));
+        BBotSession session = BBotSession.builder()
+                .register(descriptor("no-health"))
+                .initialize(configWithApp("no-health", "http://localhost:1"))
+                .build();
+        BBotRegistry.setSession(session);
 
         // Must complete without exception
         BBotRegistry.checkHealth("no-health");
@@ -106,7 +108,6 @@ class BBotRegistryTest {
 
     @Test
     void checkHealthCallsEndpointAndSucceedsOn2xx() throws IOException {
-        // Start a minimal JDK HTTP server that returns 200
         HttpServer server = HttpServer.create(new InetSocketAddress(0), 0);
         AtomicInteger callCount = new AtomicInteger(0);
         server.createContext("/health", exchange -> {
@@ -120,8 +121,11 @@ class BBotRegistryTest {
         int port = server.getAddress().getPort();
 
         try {
-            BBotRegistry.register(descriptor("svc", Optional.of("/health"), Optional.empty()));
-            BBotRegistry.initialize(configWithApp("svc", "http://localhost:" + port));
+            BBotSession session = BBotSession.builder()
+                    .register(descriptor("svc", Optional.of("/health"), Optional.empty()))
+                    .initialize(configWithApp("svc", "http://localhost:" + port))
+                    .build();
+            BBotRegistry.setSession(session);
 
             BBotRegistry.checkHealth("svc");
 
@@ -142,8 +146,11 @@ class BBotRegistryTest {
         int port = server.getAddress().getPort();
 
         try {
-            BBotRegistry.register(descriptor("failing-svc", Optional.of("/health"), Optional.empty()));
-            BBotRegistry.initialize(configWithApp("failing-svc", "http://localhost:" + port));
+            BBotSession session = BBotSession.builder()
+                    .register(descriptor("failing-svc", Optional.of("/health"), Optional.empty()))
+                    .initialize(configWithApp("failing-svc", "http://localhost:" + port))
+                    .build();
+            BBotRegistry.setSession(session);
 
             assertThatThrownBy(() -> BBotRegistry.checkHealth("failing-svc"))
                 .isInstanceOf(BBotHealthCheckException.class)
@@ -166,10 +173,12 @@ class BBotRegistryTest {
         int port = server.getAddress().getPort();
 
         try {
-            BBotRegistry.register(descriptor("versioned-svc", Optional.empty(), Optional.of("/version")));
-            BBotRegistry.initialize(configWithApp("versioned-svc", "http://localhost:" + port));
+            BBotSession session = BBotSession.builder()
+                    .register(descriptor("versioned-svc", Optional.empty(), Optional.of("/version")))
+                    .initialize(configWithApp("versioned-svc", "http://localhost:" + port))
+                    .build();
+            BBotRegistry.setSession(session);
 
-            // Must not throw
             BBotRegistry.assertVersion("versioned-svc", "v2.4.1");
         } finally {
             server.stop(0);
@@ -189,8 +198,11 @@ class BBotRegistryTest {
         int port = server.getAddress().getPort();
 
         try {
-            BBotRegistry.register(descriptor("versioned-svc", Optional.empty(), Optional.of("/version")));
-            BBotRegistry.initialize(configWithApp("versioned-svc", "http://localhost:" + port));
+            BBotSession session = BBotSession.builder()
+                    .register(descriptor("versioned-svc", Optional.empty(), Optional.of("/version")))
+                    .initialize(configWithApp("versioned-svc", "http://localhost:" + port))
+                    .build();
+            BBotRegistry.setSession(session);
 
             assertThatThrownBy(() -> BBotRegistry.assertVersion("versioned-svc", "v2.4.1"))
                 .isInstanceOf(BBotHealthCheckException.class)

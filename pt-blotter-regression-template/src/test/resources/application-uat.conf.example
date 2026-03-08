@@ -1,0 +1,41 @@
+# pt-blotter-regression-template — UAT environment config.
+#
+# This file shows how to configure b-bot for a REAL UAT environment
+# with SSO authentication. It is NOT committed with real URLs/secrets —
+# copy it to your project and fill in the blanks.
+#
+# Activate: mvn verify -Db-bot.env=uat -Db-bot.browser.headless=false
+
+b-bot {
+
+  # ── SSO Authentication ──────────────────────────────────────────────────
+  # First run:  -Db-bot.auth.mode=interactive  (opens browser, user logs in)
+  # Later runs: -Db-bot.auth.mode=auto         (reuses cached session, falls back to interactive)
+  auth {
+    mode = auto
+    loginUrl = "https://blotter.example.com/"
+    loginSuccessIndicator = "element:.ag-root-wrapper"
+    sessionTtl = 4h
+    storageStatePath = "target/auth/uat-sso-state.json"
+  }
+
+  browser {
+    headless = false
+  }
+
+  # ── Application URLs ────────────────────────────────────────────────────
+  apps {
+    blotter {
+      webUrl  = "https://blotter.example.com/"
+      apiBase = "https://blotter-api.example.com"
+    }
+    config-service {
+      apiBase = "https://config-api.example.com"
+    }
+    deployment {
+      webUrl  = "https://deployment.example.com/deployment/"
+      apiBase = "https://deployment.example.com"
+    }
+  }
+}
+

@@ -131,6 +131,7 @@ b-autobot/
 │       │   ├── ProbesLoader        # Injects window.agGridProbes bundle
 │       │   ├── NumericComparator   # UI vs API value comparison (BigDecimal)
 │       │   ├── exception/          # BBotException hierarchy (M8a) — 6 typed exceptions
+│       │   ├── auth/               # SsoAuthConfig, SsoAuthManager, ClientCredentialsAuth (M13)
 │       │   ├── config/BBotConfig   # HOCON layered config (5-layer loading)
 │       │   ├── registry/           # AppDescriptor / AppContext / BBotRegistry
 │       │   │   ├── BBotSession     # Immutable session — instance API (M11)
@@ -175,6 +176,44 @@ b-autobot/
             ├── application.conf             # Base config + commented overrides
             ├── application-devserver.conf   # Points at localhost:9099
             └── features/Smoke.feature
+```
+
+---
+
+## Authentication Conventions (M13)
+
+### Auth classes
+| Class | Package | Purpose |
+|-------|---------|---------|
+| `SsoAuthConfig` | `com.bbot.core.auth` | Immutable record — parses `b-bot.auth` HOCON block |
+| `SsoAuthManager` | `com.bbot.core.auth` | Orchestrator — interactive login, storageState, OAuth |
+| `ClientCredentialsAuth` | `com.bbot.core.auth` | OAuth2 `client_credentials` `AuthStrategy` impl |
+| `StorageStateAuth` | `com.bbot.core.rest` | `AuthStrategy` that reads Playwright storageState JSON |
+| `BBotAuthException` | `com.bbot.core.exception` | Auth-specific exception (expired session, OAuth failure) |
+
+### Rules
+1. **Never commit secrets.** Use HOCON env-var substitution: `clientId = ${?B_BOT_CLIENT_ID}`.
+2. **storageState files go in `target/`** (gitignored). Never commit auth state.
+3. **mode=none is always the default** in `reference.conf`. Existing mock-env tests are unaffected.
+4. **401/403 with active auth throws `BBotAuthException`** (not `BBotRestException`) with an actionable hint.
+5. **Interactive login uses its own Playwright instance** — isolated from the test suite's `PlaywrightManager`.
+6. **`ensureAuthenticated()` is idempotent** — safe to call multiple times; returns immediately if session is valid.
+
+### Config keys (`b-bot.auth.*`)
+```hocon
+b-bot.auth {
+  mode                    = none | interactive | storageState | auto | clientCredentials
+  storageStatePath        = "target/auth/storage-state.json"
+  sessionTtl              = 4h
+  loginUrl                = ""
+  loginTimeout            = 120s
+  loginSuccessIndicator   = pause | urlContains:<pattern> | element:<selector>
+  tokenUrl                = ""
+  clientId                = ""
+  clientSecret            = ""
+  scope                   = ""
+  refreshOn401            = true
+}
 ```
 
 ---

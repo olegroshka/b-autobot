@@ -18,7 +18,7 @@ class RestResponseTest {
 
     @AfterEach
     void cleanup() {
-        ScenarioState.reset();
+        ScenarioState.current().reset();
     }
 
     // ── assertStatus ──────────────────────────────────────────────────────────
@@ -134,7 +134,7 @@ class RestResponseTest {
 
         resp.capture("inquiry_id");
 
-        assertThat(ScenarioState.require("inquiry_id")).isEqualTo("INQ-001");
+        assertThat(ScenarioState.current().require("inquiry_id")).isEqualTo("INQ-001");
     }
 
     @Test
@@ -145,7 +145,7 @@ class RestResponseTest {
 
         resp.capture("$.inquiry_id");
 
-        assertThat(ScenarioState.require("inquiry_id")).isEqualTo("INQ-002");
+        assertThat(ScenarioState.current().require("inquiry_id")).isEqualTo("INQ-002");
     }
 
     @Test
@@ -156,7 +156,7 @@ class RestResponseTest {
 
         resp.capture("inquiry_id", "rfq-id");
 
-        assertThat(ScenarioState.require("rfq-id")).isEqualTo("INQ-003");
+        assertThat(ScenarioState.current().require("rfq-id")).isEqualTo("INQ-003");
     }
 
     // ── chaining ──────────────────────────────────────────────────────────────
@@ -174,7 +174,7 @@ class RestResponseTest {
                 .capture("inquiry_id");
 
         assertThat(result).isSameAs(resp);
-        assertThat(ScenarioState.require("inquiry_id")).isEqualTo("INQ-001");
+        assertThat(ScenarioState.current().require("inquiry_id")).isEqualTo("INQ-001");
     }
 
     // ── raw accessors ─────────────────────────────────────────────────────────

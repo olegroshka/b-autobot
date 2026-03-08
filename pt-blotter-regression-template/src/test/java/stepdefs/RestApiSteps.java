@@ -78,6 +78,7 @@ public class RestApiSteps {
      * }</pre>
      */
     @When("I POST template {string} with bond list {string} to app {string} path {string}")
+    @SuppressWarnings("unused")
     public void postTemplateWithBondList(String template, String bondList,
                                          String app, String path) {
         String body    = templateEngine.render(template, bondList);
@@ -98,6 +99,7 @@ public class RestApiSteps {
      * }</pre>
      */
     @When("I POST template {string} to app {string} path {string}")
+    @SuppressWarnings("unused")
     public void postTemplate(String template, String app, String path) {
         String body    = templateEngine.render(template);
         String apiBase = world.session().getConfig().getAppApiBase(app);
@@ -117,6 +119,7 @@ public class RestApiSteps {
      * }</pre>
      */
     @When("I GET from app {string} path {string}")
+    @SuppressWarnings("unused")
     public void getFromApp(String app, String path) {
         String apiBase = world.session().getConfig().getAppApiBase(app);
         lastResponse   = RestProbe.of(apiBase).get(path);
@@ -214,6 +217,7 @@ public class RestApiSteps {
      * }</pre>
      */
     @And("I capture the response field {string} as {string}")
+    @SuppressWarnings("unused")
     public void captureResponseFieldAs(String jsonPath, String alias) {
         requireLastResponse("I capture the response field ... as");
         lastResponse.capture(jsonPath, alias);
@@ -295,7 +299,7 @@ public class RestApiSteps {
         RestProbe probe = RestProbe.of(apiBase);
 
         // Capture the portfolio's PT ID so cancel actions can reference it as ${pt_id}
-        ScenarioState.put("pt_id", portfolio.ptId());
+        ScenarioState.current().put("pt_id", portfolio.ptId());
 
         portfolio.bonds().forEach((lineKey, bond) -> {
             Map<String, String> vars = new LinkedHashMap<>();

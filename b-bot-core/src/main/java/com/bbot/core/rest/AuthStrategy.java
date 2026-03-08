@@ -1,6 +1,7 @@
 package com.bbot.core.rest;
 
 import java.net.http.HttpRequest;
+import java.nio.file.Path;
 
 /**
  * Strategy interface for applying authentication to outbound HTTP requests.
@@ -56,6 +57,21 @@ public interface AuthStrategy {
      */
     static AuthStrategy bearer(String token) {
         return new BearerTokenAuth(token);
+    }
+
+    /**
+     * Creates an {@code AuthStrategy} from a Playwright storageState JSON file.
+     *
+     * <p>Extracts cookies and/or Bearer tokens saved by
+     * {@link com.bbot.core.auth.SsoAuthManager} and injects them into every
+     * outbound HTTP request.
+     *
+     * @param storageStatePath path to the Playwright storageState JSON file
+     * @return an auth strategy that injects cookies and/or Bearer token
+     * @throws IllegalArgumentException if the file is missing or unparseable
+     */
+    static AuthStrategy fromStorageState(Path storageStatePath) {
+        return new StorageStateAuth(storageStatePath);
     }
 }
 

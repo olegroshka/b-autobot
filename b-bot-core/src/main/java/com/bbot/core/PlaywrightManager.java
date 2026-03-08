@@ -1,5 +1,7 @@
 package com.bbot.core;
 
+import com.bbot.core.auth.SsoAuthConfig;
+import com.bbot.core.auth.SsoAuthManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Browser;
@@ -21,9 +23,14 @@ import java.nio.file.Path;
  * {@link BrowserContext} + {@link Page} per scenario (via Before/After hooks
  * in the consuming module's {@code Hooks} class).
  *
+ * <p>Implements {@link BrowserLifecycle} with instance methods that delegate
+ * to shared thread-local state. Multiple instances on the same thread all
+ * access the same browser state — which is the correct behaviour for
+ * single-threaded Cucumber execution.
+ *
  * <h2>Configuration</h2>
  * All browser settings are read from the active {@link BBotConfig} via
- * {@link BBotRegistry#getConfig()}. Override any default in your environment conf
+ * {@code BBotRegistry.getConfig()}. Override any default in your environment conf
  * or on the command line:
  * <pre>
  *   b-bot.browser.headless = false      # -Db-bot.browser.headless=false
@@ -36,7 +43,7 @@ import java.nio.file.Path;
  * when the registry has not yet been initialised, so existing suites that call
  * {@code initBrowser()} before {@code BBotRegistry.initialize()} continue to work.
  */
-public final class PlaywrightManager {
+public final class PlaywrightManager implements BrowserLifecycle {
 
     private static final Logger LOG = LoggerFactory.getLogger(PlaywrightManager.class);
 
@@ -46,12 +53,11 @@ public final class PlaywrightManager {
     private static final ThreadLocal<Page>            PAGE             = new ThreadLocal<>();
     private static final ThreadLocal<Boolean>         TRACING_ACTIVE   = ThreadLocal.withInitial(() -> false);
 
-    private PlaywrightManager() {}
+    public PlaywrightManager() {}
 
-    /** @deprecated Use instance-based {@link com.bbot.core.BrowserLifecycle} instead. */
-    @Deprecated(since = "1.1", forRemoval = true)
-    public static void initBrowser() {
-        BBotConfig cfg = BBotRegistry.getConfig();
+    @Override
+    public void initBrowser() {
+        BBotConfig cfg = BBotRegistry.configOrNull();
 
         boolean headless = cfg != null
                 ? cfg.getBoolean("b-bot.browser.headless")
@@ -74,19 +80,29 @@ public final class PlaywrightManager {
         LOG.info("Browser launched: type={}, headless={}", browserType, headless);
     }
 
-    /** @deprecated Use instance-based {@link com.bbot.core.BrowserLifecycle} instead. */
-    @Deprecated(since = "1.1", forRemoval = true)
-    public static void initContext() {
-        BBotConfig cfg = BBotRegistry.getConfig();
+    @Override
+    public void initContext() {
+        BBotConfig cfg = BBotRegistry.configOrNull();
 
         int viewportW = cfg != null && cfg.hasPath("b-bot.browser.viewport.width")
                 ? cfg.raw().getInt("b-bot.browser.viewport.width")  : 1920;
         int viewportH = cfg != null && cfg.hasPath("b-bot.browser.viewport.height")
                 ? cfg.raw().getInt("b-bot.browser.viewport.height") : 1080;
 
-        BrowserContext ctx = BROWSER.get().newContext(
-                new Browser.NewContextOptions()
-                        .setViewportSize(viewportW, viewportH));
+        Browser.NewContextOptions ctxOpts = new Browser.NewContextOptions()
+                .setViewportSize(viewportW, viewportH);
+
+        // Inject saved SSO auth state if available
+        if (cfg != null) {
+            SsoAuthConfig authConfig = SsoAuthConfig.from(cfg);
+            Path storagePath = SsoAuthManager.getStorageStatePath(authConfig);
+            if (storagePath != null && Files.exists(storagePath)) {
+                ctxOpts.setStorageStatePath(storagePath);
+                LOG.info("Browser context created with SSO storageState: {}", storagePath);
+            }
+        }
+
+        BrowserContext ctx = BROWSER.get().newContext(ctxOpts);
         ctx.addInitScript(ProbesLoader.load());
         CONTEXT.set(ctx);
         PAGE.set(ctx.newPage());
@@ -109,19 +125,17 @@ public final class PlaywrightManager {
         LOG.debug("Browser context created: viewport={}x{}, tracing={}", viewportW, viewportH, tracingEnabled);
     }
 
-    /** @deprecated Use instance-based {@link com.bbot.core.BrowserLifecycle} instead. */
-    @Deprecated(since = "1.1", forRemoval = true)
-    public static Page getPage() {
+    @Override
+    public Page getPage() {
         return PAGE.get();
     }
 
-    /** @deprecated Use instance-based {@link com.bbot.core.BrowserLifecycle} instead. */
-    @Deprecated(since = "1.1", forRemoval = true)
-    public static void closeContext() {
+    @Override
+    public void closeContext() {
         // Save trace before closing context
         if (Boolean.TRUE.equals(TRACING_ACTIVE.get()) && CONTEXT.get() != null) {
             try {
-                BBotConfig cfg = BBotRegistry.getConfig();
+                BBotConfig cfg = BBotRegistry.configOrNull();
                 String outputDir = cfg != null && cfg.hasPath("b-bot.tracing.outputDir")
                         ? cfg.getString("b-bot.tracing.outputDir")
                         : "target/playwright-traces";
@@ -145,9 +159,8 @@ public final class PlaywrightManager {
         LOG.debug("Browser context closed");
     }
 
-    /** @deprecated Use instance-based {@link com.bbot.core.BrowserLifecycle} instead. */
-    @Deprecated(since = "1.1", forRemoval = true)
-    public static void closeBrowser() {
+    @Override
+    public void closeBrowser() {
         if (BROWSER.get()    != null) BROWSER.get().close();
         if (PLAYWRIGHT.get() != null) PLAYWRIGHT.get().close();
         BROWSER.remove();

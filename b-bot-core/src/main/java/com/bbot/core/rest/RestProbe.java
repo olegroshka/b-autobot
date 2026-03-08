@@ -1,5 +1,6 @@
 package com.bbot.core.rest;
 
+import com.bbot.core.exception.BBotAuthException;
 import com.bbot.core.exception.BBotRestException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,8 +80,9 @@ public final class RestProbe implements RestClient {
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
+    @SuppressWarnings("BusyWait")
     private RestResponse execute(String method, String path, String jsonBody) {
-        String resolved = ScenarioState.resolve(path);
+        String resolved = ScenarioState.current().resolve(path);
         String url = apiBase + resolved;
         LOG.debug("REST {} {}", method, url);
         try {
@@ -99,8 +101,20 @@ public final class RestProbe implements RestClient {
             }
 
             LOG.debug("REST {} {} → HTTP {}", method, url, resp.statusCode());
+
+            // Auth-aware 401/403 detection: if auth is active (not NoAuth),
+            // surface a clear BBotAuthException instead of a generic RestResponse
+            if ((resp.statusCode() == 401 || resp.statusCode() == 403)
+                    && !(auth instanceof NoAuth)) {
+                throw new BBotAuthException(
+                        "REST " + method + " " + url + " returned HTTP " + resp.statusCode()
+                        + " — SSO session may have expired."
+                        + "\nRe-run with -Db-bot.auth.mode=interactive to re-authenticate."
+                        + "\nResponse: " + resp.body());
+            }
+
             return new RestResponse(resp.statusCode(), resp.body(), method + " " + url);
-        } catch (BBotRestException e) {
+        } catch (BBotRestException | BBotAuthException e) {
             throw e;
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -146,6 +160,7 @@ public final class RestProbe implements RestClient {
         public Builder apiBase(String apiBase)           { this.apiBase     = apiBase;     return this; }
         public Builder client(HttpClient client)         { this.client      = client;      return this; }
         public Builder auth(AuthStrategy auth)           { this.auth        = auth;        return this; }
+        @SuppressWarnings("unused")
         public Builder retryPolicy(RetryPolicy policy)   { this.retryPolicy = policy;      return this; }
 
         public RestProbe build() {

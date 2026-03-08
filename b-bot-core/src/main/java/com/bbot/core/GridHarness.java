@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
  * into every page via {@link PlaywrightManager#initContext()}.
  *
  * <h2>Configuration</h2>
- * All timeouts and poll intervals are read from {@link BBotRegistry#getConfig()}
+ * All timeouts and poll intervals are read from {@link BBotRegistry#configOrNull()}
  * so they can be tuned per environment without code changes:
  * <pre>
  *   b-bot.timeouts.gridFastPath   = 500ms   # phase-1 fast DOM scan
@@ -90,7 +90,7 @@ public class GridHarness implements GridQuery {
 
     /**
      * Creates a GridHarness bound to the given page.
-     * Timeouts fall back to {@link BBotRegistry#getConfig()}.
+     * Timeouts fall back to {@link BBotRegistry#configOrNull()}.
      *
      * @deprecated Prefer {@link #GridHarness(Page, BBotConfig)} for explicit config injection.
      */
@@ -249,9 +249,8 @@ public class GridHarness implements GridQuery {
      * Reads a duration (in ms) from the active config.
      * Uses the instance config if provided, otherwise falls back to the registry.
      */
-    @SuppressWarnings("deprecation")
     private long cfgMs(String key, long defaultMs) {
-        BBotConfig cfg = config != null ? config : BBotRegistry.getConfig();
+        BBotConfig cfg = config != null ? config : BBotRegistry.configOrNull();
         if (cfg != null && cfg.hasPath(key)) return cfg.getTimeout(key).toMillis();
         return defaultMs;
     }
@@ -260,9 +259,8 @@ public class GridHarness implements GridQuery {
      * Reads an integer from the active config.
      * Uses the instance config if provided, otherwise falls back to the registry.
      */
-    @SuppressWarnings("deprecation")
     private int cfgInt(String key, int defaultVal) {
-        BBotConfig cfg = config != null ? config : BBotRegistry.getConfig();
+        BBotConfig cfg = config != null ? config : BBotRegistry.configOrNull();
         if (cfg != null && cfg.hasPath(key)) return cfg.raw().getInt(key);
         return defaultVal;
     }

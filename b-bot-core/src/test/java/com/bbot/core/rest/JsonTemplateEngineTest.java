@@ -27,7 +27,7 @@ class JsonTemplateEngineTest {
 
     @AfterEach
     void cleanup() {
-        ScenarioState.reset();
+        ScenarioState.current().reset();
     }
 
     // ── Bond list token substitution ──────────────────────────────────────────
@@ -54,7 +54,7 @@ class JsonTemplateEngineTest {
 
     @Test
     void render_scenarioStateTokens() {
-        ScenarioState.put("inquiry_id", "INQ-TEST-999");
+        ScenarioState.current().put("inquiry_id", "INQ-TEST-999");
 
         String result = engine.render("test-quote");
 
@@ -76,7 +76,7 @@ class JsonTemplateEngineTest {
 
     @Test
     void render_noBondList() {
-        ScenarioState.put("inquiry_id", "INQ-456");
+        ScenarioState.current().put("inquiry_id", "INQ-456");
 
         String result = engine.render("test-quote");
 
@@ -110,7 +110,7 @@ class JsonTemplateEngineTest {
     void render_resolutionOrder_stateWins() {
         // Scenario state should take precedence over bond list and globals
         // test-rfq.json has ${settlement-date} — put a different value in state
-        ScenarioState.put("settlement-date", "2099-12-31");
+        ScenarioState.current().put("settlement-date", "2099-12-31");
 
         String result = engine.render("test-rfq", "TEST_BONDS");
 

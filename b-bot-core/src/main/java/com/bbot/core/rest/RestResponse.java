@@ -123,7 +123,7 @@ public final class RestResponse {
      * @return {@code this} for chaining
      */
     public RestResponse capture(String jsonPath, String alias) {
-        ScenarioState.put(alias, getField(jsonPath));
+        ScenarioState.current().put(alias, getField(jsonPath));
         return this;
     }
 

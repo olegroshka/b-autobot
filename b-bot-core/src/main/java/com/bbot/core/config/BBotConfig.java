@@ -1,5 +1,6 @@
 package com.bbot.core.config;
 
+import com.bbot.core.auth.SsoAuthConfig;
 import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.exception.BBotConfigException;
@@ -187,6 +188,17 @@ public final class BBotConfig {
             "API action '" + actionName + "' not found in any b-bot.apps.*.api-actions block. " +
             "Declare it under:  b-bot.apps.{appName}.api-actions." + actionName + " { method=..., path=... }",
             "b-bot.apps.*.api-actions." + actionName);
+    }
+
+    /**
+     * Returns a typed view over the {@code b-bot.auth} config block.
+     * Provides access to SSO authentication settings (mode, storageState path,
+     * OAuth credentials, etc.).
+     *
+     * @see SsoAuthConfig
+     */
+    public SsoAuthConfig getSsoAuthConfig() {
+        return SsoAuthConfig.from(this);
     }
 
     /**

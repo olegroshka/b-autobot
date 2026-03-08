@@ -9,7 +9,7 @@ import java.util.Optional;
 /**
  * Per-environment, per-app resolved runtime context.
  *
- * <p>Created once per registered app during {@link BBotRegistry#initialize(BBotConfig)}.
+ * <p>Created once per registered app during {@link BBotSession.Builder#initialize(BBotConfig)}.
  * Passed to every {@link DslFactory#create} call, giving the DSL everything it needs:
  * resolved URL(s), users, timeouts — zero static mock-server calls.
  *
@@ -54,7 +54,7 @@ public final class AppContext {
 
     /**
      * Static factory — reads {@code b-bot.apps.{name}.*} from the supplied config.
-     * Called by {@link BBotRegistry#initialize(BBotConfig)}.
+     * Called by {@link BBotSession.Builder#initialize(BBotConfig)}.
      */
     static AppContext fromConfig(String name, BBotConfig cfg) {
         return new AppContext(

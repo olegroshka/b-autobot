@@ -36,13 +36,14 @@ public class TestWorld {
     }
 
     /** Returns the per-scenario context for capturing/resolving inter-step values. */
+    @SuppressWarnings("unused")
     public ScenarioContext scenarioContext() {
         return scenarioContext;
     }
 
     /** Returns the current scenario's Playwright page. */
     public Page page() {
-        return PlaywrightManager.getPage();
+        return new PlaywrightManager().getPage();
     }
 }
 
