@@ -234,6 +234,40 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
     initSimulator(rowData)
     startSimulator(event.api)
     onGridReadyProp?.(event.api)
+
+    // Fetch any dynamic inquiries submitted via the REST API (not in hardcoded seed)
+    // and add them to the grid so cancelled/quoted rows submitted externally are visible.
+    fetch('/api/inquiries')
+      .then(r => r.ok ? r.json() : [])
+      .then((serverRows: any[]) => {
+        const existingIds = new Set(rowData.map(r => r.id))
+        const toAdd = serverRows
+          .filter(r => !existingIds.has(r.inquiry_id))
+          .map(r => ({
+            id:          r.inquiry_id,
+            ptId:        r.pt_id        ?? '',
+            ptLineId:    r.pt_line_id   ?? '',
+            isin:        r.isin         ?? '',
+            description: r.description  ?? '',
+            maturity:    r.maturity     ?? '',
+            coupon:      r.coupon       ?? 0,
+            notional:    r.notional     ?? 0,
+            side:        r.side         ?? 'BUY',
+            client:      r.client       ?? '',
+            status:      r.status       ?? 'PENDING',
+            twPrice:     r.twPrice      ?? '',
+            twSpread:    r.twSpread     ?? '',
+            cpPrice:     r.cpPrice      ?? '',
+            cpSpread:    r.cpSpread     ?? '',
+            cbbPrice:    r.cbbPrice     ?? '',
+            cbbSpread:   r.cbbSpread    ?? '',
+            pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+          } as Inquiry))
+        if (toAdd.length > 0) {
+          event.api.applyTransaction({ add: toAdd })
+        }
+      })
+      .catch(() => { /* API not reachable — use seed-only data */ })
   }, [rowData, onGridReadyProp])
 
   const handleSelectionChanged = useCallback((event: SelectionChangedEvent<Inquiry>) => {

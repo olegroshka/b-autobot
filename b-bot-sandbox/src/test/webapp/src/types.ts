@@ -1,6 +1,6 @@
 // ── Domain types — align with design contract in BLOTTER_DESIGN.md ────────────
 
-export type Status    = 'PENDING' | 'QUOTED' | 'DONE' | 'MISSED' | 'RELEASED'
+export type Status    = 'PENDING' | 'QUOTED' | 'DONE' | 'MISSED' | 'RELEASED' | 'DEALER_REJECT' | 'CUSTOMER_REJECT'
 export type Side      = 'BUY' | 'SELL'
 
 // ── Toolbar state types (not stored on the row) ───────────────────────────────
