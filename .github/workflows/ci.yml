@@ -1,14 +1,26 @@
 name: CI
 
+# ⚠️  Disabled — this is a sample/template CI config.
+# The multi-module build requires b-bot-core to be installed first,
+# which is not published to any remote Maven repository.
+# To re-enable, uncomment the triggers below and ensure a prior step
+# runs `mvn install -pl b-bot-core` before downstream modules.
+#
+# on:
+#   push:
+#     branches: [ main ]
+#   pull_request:
+#     branches: [ main ]
+#   schedule:
+#     - cron: '0 2 * * *'
+#   workflow_dispatch:
+
 on:
-  push:
-    branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  schedule:
-    # Nightly build at 02:00 UTC — triggers the template-nightly job
-    - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "run" to confirm — this workflow requires a local b-bot-core install'
+        required: true
 
 # Cancel in-progress runs on the same branch when a new push arrives.
 concurrency:
@@ -59,6 +71,13 @@ jobs:
           distribution: 'temurin'
           cache: maven
 
+      - name: Install b-bot-core into local Maven repo
+        run: |
+          # Remove any stale SNAPSHOT artifacts the Maven cache may have restored
+          # from a previous run — a partial cache entry can cause "POM missing" errors.
+          rm -rf ~/.m2/repository/com/bbot/b-bot-core
+          mvn install -pl b-bot-core -DskipTests --no-transfer-progress
+
       - name: Install Playwright browsers
         run: mvn test-compile -pl b-bot-sandbox -Dplaywright.install.skip=false --no-transfer-progress
 
@@ -84,7 +103,7 @@ jobs:
   # ─── Job 3: Template nightly smoke (24 scenarios against mock UAT) ─────────
   # Runs on schedule (nightly) and manual dispatch; skipped on push/PR to save time.
   template-nightly:
-    name: Template nightly (24 scenarios, mock UAT)
+    name: Template nightly (25 scenarios, mock UAT)
     runs-on: ubuntu-latest
     needs: sandbox-tests
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -98,6 +117,11 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
+
+      - name: Install b-bot-core into local Maven repo
+        run: |
+          rm -rf ~/.m2/repository/com/bbot/b-bot-core
+          mvn install -pl b-bot-core -DskipTests --no-transfer-progress
 
       - name: Build sandbox test classes (needed to run dev servers)
         run: mvn test-compile -pl b-bot-sandbox --no-transfer-progress
@@ -125,7 +149,7 @@ jobs:
           curl -sf http://localhost:8090/api/config || (cat /tmp/mock-uat-startup.log && exit 1)
           curl -sf http://localhost:9098/api/deployments || (cat /tmp/mock-uat-startup.log && exit 1)
 
-      - name: Run template regression suite (24 scenarios)
+      - name: Run template regression suite (25 scenarios)
         run: mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat --no-transfer-progress
 
       - name: Upload template surefire report

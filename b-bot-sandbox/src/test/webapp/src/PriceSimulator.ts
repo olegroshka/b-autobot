@@ -38,32 +38,57 @@ function gaussian(): number {
 
 // ── Initialise state from seed rows ──────────────────────────────────────────
 
+/** Parses a "bid / ask" cell string; returns the mid-price, or defaultMid if invalid. */
+function parseMidOrDefault(cell: string, defaultMid: number): number {
+  if (!cell || !cell.includes(' / ')) return defaultMid
+  const [bid, ask] = cell.split(' / ').map(Number)
+  return (isNaN(bid) || isNaN(ask)) ? defaultMid : (bid + ask) / 2
+}
+
+/** Parses a "bid / ask" cell string; returns [bid, ask], or the given defaults if invalid. */
+function parsePairOrDefault(cell: string, defaultBid: number, defaultAsk: number): [number, number] {
+  if (!cell || !cell.includes(' / ')) return [defaultBid, defaultAsk]
+  const [bid, ask] = cell.split(' / ').map(Number)
+  return (isNaN(bid) || isNaN(ask)) ? [defaultBid, defaultAsk] : [bid, ask]
+}
+
 /**
  * Populates internal simulation state from the initial row data.
  * Called once when the grid becomes ready.
  */
 export function initSimulator(rows: Inquiry[]): void {
   bondState.clear()
-  for (const row of rows) {
-    const parseMid = (cell: string) => {
-      const [bid, ask] = cell.split(' / ').map(Number)
-      return (bid + ask) / 2
-    }
-    const parsePair = (cell: string): [number, number] => {
-      const [bid, ask] = cell.split(' / ').map(Number)
-      return [bid, ask]
-    }
-    const [twSBid, twSAsk]   = parsePair(row.twSpread)
-    const [cpSBid, cpSAsk]   = parsePair(row.cpSpread)
-    const [cbbSBid, cbbSAsk] = parsePair(row.cbbSpread)
+  rows.forEach(addRowToSimulator)
+}
 
-    bondState.set(row.id, {
-      midPrice:     parseMid(row.twPrice),
-      twSpreadBid:  twSBid,  twSpreadAsk:  twSAsk,
-      cpSpreadBid:  cpSBid,  cpSpreadAsk:  cpSAsk,
-      cbbSpreadBid: cbbSBid, cbbSpreadAsk: cbbSAsk,
-    })
-  }
+/**
+ * Registers a single row with the simulator so it receives ticking reference
+ * prices on every subsequent tick interval.
+ *
+ * Parses existing "bid / ask" strings from the row when present; falls back to
+ * randomised near-par defaults when the row arrives with empty price cells
+ * (typical for dynamically-submitted RFQs that carry no market data yet).
+ *
+ * Safe to call while the simulator is running — the new entry is picked up on
+ * the very next tick.  Idempotent: does nothing if the row is already registered.
+ */
+export function addRowToSimulator(row: Inquiry): void {
+  if (bondState.has(row.id)) return
+
+  /* Randomise starting mid so each new bond ticks independently (95–105 range). */
+  const defaultMid = 100 + (Math.random() - 0.5) * 10
+
+  const mid                = parseMidOrDefault(row.twPrice,   defaultMid)
+  const [twSBid,  twSAsk]  = parsePairOrDefault(row.twSpread,  45 + Math.random() * 5, 47 + Math.random() * 5)
+  const [cpSBid,  cpSAsk]  = parsePairOrDefault(row.cpSpread,  45 + Math.random() * 5, 47 + Math.random() * 5)
+  const [cbbSBid, cbbSAsk] = parsePairOrDefault(row.cbbSpread, 45 + Math.random() * 5, 47 + Math.random() * 5)
+
+  bondState.set(row.id, {
+    midPrice:     mid,
+    twSpreadBid:  twSBid,  twSpreadAsk:  twSAsk,
+    cpSpreadBid:  cpSBid,  cpSpreadAsk:  cpSAsk,
+    cbbSpreadBid: cbbSBid, cbbSpreadAsk: cbbSAsk,
+  })
 }
 
 // ── Tick function ─────────────────────────────────────────────────────────────

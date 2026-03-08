@@ -45,7 +45,10 @@ export function getRefValue(
 export function estimateModDuration(coupon: number, maturityDate: string): number {
   const now      = Date.now()
   const mat      = new Date(maturityDate).getTime()
-  const n        = Math.max((mat - now) / (365.25 * 24 * 3600 * 1000), 0.25)
+  // Math.max(NaN, x) === NaN in JS — guard so rows with unknown maturity get a
+  // sensible 5-year default duration rather than NaN poisoning price/spread.
+  const yearsToMat = isNaN(mat) ? 5 : (mat - now) / (365.25 * 24 * 3600 * 1000)
+  const n        = Math.max(yearsToMat, 0.25)
   if (coupon <= 0) return n                                   // zero-coupon bond
   const r        = coupon / 100
   const macaulay = (1 - Math.pow(1 + r, -n)) / r             // Macaulay @ par

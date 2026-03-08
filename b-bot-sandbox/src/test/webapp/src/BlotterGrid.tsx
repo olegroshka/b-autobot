@@ -14,7 +14,7 @@ import {
 } from 'ag-grid-community'
 import type { Inquiry } from './types'
 import { buildSeedInquiries } from './seedData'
-import { initSimulator, startSimulator, stopSimulator } from './PriceSimulator'
+import { initSimulator, startSimulator, stopSimulator, addRowToSimulator } from './PriceSimulator'
 import { DOUBLE_CLICK_FILTER_COLS } from './filterUtils'
 import './BlotterGrid.css'
 
@@ -265,6 +265,7 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
           } as Inquiry))
         if (toAdd.length > 0) {
           event.api.applyTransaction({ add: toAdd })
+          toAdd.forEach(addRowToSimulator)
         }
       })
       .catch(() => { /* API not reachable — use seed-only data */ })
