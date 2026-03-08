@@ -18,16 +18,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class JsonTemplateEngineTest {
 
     private JsonTemplateEngine engine;
+    private ScenarioContext ctx;
 
     @BeforeEach
     void setUp() {
         BBotConfig cfg = BBotConfig.load();
-        engine = new JsonTemplateEngine(cfg.getTestData());
+        ctx = new ScenarioContext();
+        engine = new JsonTemplateEngine(cfg.getTestData(), ctx);
     }
 
     @AfterEach
     void cleanup() {
-        ScenarioState.current().reset();
+        ctx.reset();
     }
 
     // ── Bond list token substitution ──────────────────────────────────────────
@@ -54,7 +56,7 @@ class JsonTemplateEngineTest {
 
     @Test
     void render_scenarioStateTokens() {
-        ScenarioState.current().put("inquiry_id", "INQ-TEST-999");
+        ctx.put("inquiry_id", "INQ-TEST-999");
 
         String result = engine.render("test-quote");
 
@@ -76,7 +78,7 @@ class JsonTemplateEngineTest {
 
     @Test
     void render_noBondList() {
-        ScenarioState.current().put("inquiry_id", "INQ-456");
+        ctx.put("inquiry_id", "INQ-456");
 
         String result = engine.render("test-quote");
 
@@ -108,9 +110,7 @@ class JsonTemplateEngineTest {
 
     @Test
     void render_resolutionOrder_stateWins() {
-        // Scenario state should take precedence over bond list and globals
-        // test-rfq.json has ${settlement-date} — put a different value in state
-        ScenarioState.current().put("settlement-date", "2099-12-31");
+        ctx.put("settlement-date", "2099-12-31");
 
         String result = engine.render("test-rfq", "TEST_BONDS");
 

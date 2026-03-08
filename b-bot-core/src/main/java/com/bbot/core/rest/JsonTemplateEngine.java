@@ -16,7 +16,7 @@ import java.util.Map;
  *
  * <h2>Token resolution order (first match wins)</h2>
  * <ol>
- *   <li>{@link ScenarioState} — values captured from previous steps, e.g.
+ *   <li>{@link ScenarioContext} — values captured from previous steps, e.g.
  *       {@code ${inquiry_id}}</li>
  *   <li>Active bond list — fields prefixed with {@code bond.}, e.g.
  *       {@code ${bond.ISIN1}} when bond list "HYPT_1" is active</li>
@@ -37,17 +37,27 @@ import java.util.Map;
  * }
  * }</pre>
  *
- * <p>Obtain via {@code new JsonTemplateEngine(BBotRegistry.getConfig().getTestData())}.
+ * <p>Obtain via {@code new JsonTemplateEngine(config.getTestData(), scenarioContext)}.
  */
 public final class JsonTemplateEngine {
 
     private static final Logger LOG = LoggerFactory.getLogger(JsonTemplateEngine.class);
 
     private final TestDataConfig testData;
+    private final ScenarioContext ctx;
 
-    public JsonTemplateEngine(TestDataConfig testData) {
+    /**
+     * Creates a template engine that resolves {@code ${key}} tokens from the
+     * given scenario context.
+     *
+     * @param testData test data configuration
+     * @param ctx      scenario context for token resolution
+     */
+    public JsonTemplateEngine(TestDataConfig testData, ScenarioContext ctx) {
         this.testData = testData;
+        this.ctx = ctx;
     }
+
 
     /**
      * Renders the named template substituting tokens from the active bond list,
@@ -78,7 +88,7 @@ public final class JsonTemplateEngine {
 
     /**
      * Renders the named template substituting tokens directly from the supplied
-     * variable map, ScenarioState, and global test-data.
+     * variable map, scenario context, and global test-data.
      *
      * <p>Use this for portfolio-level submission where each bond provides its
      * own variable context ({@code isin}, {@code quantity}, {@code side}, etc.)
@@ -115,7 +125,7 @@ public final class JsonTemplateEngine {
         String result = raw;
 
         // 1. Scenario state — ${key} for any captured value
-        result = ScenarioState.current().resolve(result);
+        result = resolveCtx().resolve(result);
 
         // 2. Active bond list — ${bond.FIELD}
         for (Map.Entry<String, String> e : bondList.entrySet()) {
@@ -134,7 +144,7 @@ public final class JsonTemplateEngine {
         String result = raw;
 
         // 1. Scenario state — ${key}
-        result = ScenarioState.current().resolve(result);
+        result = resolveCtx().resolve(result);
 
         // 2. Caller-supplied vars — ${key} (override globals)
         for (Map.Entry<String, String> e : vars.entrySet()) {
@@ -147,6 +157,11 @@ public final class JsonTemplateEngine {
         }
 
         return result;
+    }
+
+    /** Returns the injected context for token resolution. */
+    private ScenarioContext resolveCtx() {
+        return ctx;
     }
 
 }

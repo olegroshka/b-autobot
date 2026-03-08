@@ -26,9 +26,8 @@ import java.util.Objects;
  * {@link Builder#initialize(BBotConfig)}, then {@link Builder#build()}.
  * Once built, the session is fully immutable (G11.1).
  *
- * <p>Instance methods mirror the previous static API on {@link BBotRegistry}
- * so that new code can work purely with instances while legacy code continues
- * using the static delegates.
+ * <p>Instance methods provide all domain operations (health checks, version
+ * assertions, DSL creation). Access via {@link BBotRegistry#session()}.
  *
  * @see BBotRegistry#session()
  */
@@ -70,7 +69,7 @@ public final class BBotSession {
      * @param dslType DSL class for type-safe cast
      */
     @SuppressWarnings("unchecked")
-    public <D> D dsl(String appName, Page page, Class<D> dslType) {
+    public <D> D dsl(String appName, Page page, @SuppressWarnings("unused") Class<D> dslType) {
         AppDescriptor<D> desc = (AppDescriptor<D>) requireDescriptor(appName);
         AppContext ctx = requireContext(appName);
         return desc.dslFactory().create(ctx, page);
@@ -145,15 +144,17 @@ public final class BBotSession {
         return ctx;
     }
 
-    private HttpClient httpClient() {
+    private HttpClient newHttpClient() {
         Duration timeout = configMs("b-bot.timeouts.healthCheck", 10_000);
         return HttpClientFactory.withTimeout(timeout);
     }
 
     private int httpGetStatus(String url) {
-        try {
+        try (HttpClient client = newHttpClient()) {
             HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-            return httpClient().send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
+            return client.send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
+        } catch (BBotHealthCheckException e) {
+            throw e;
         } catch (Exception e) {
             throw new BBotHealthCheckException(
                 "Health check HTTP request failed for: " + url, "", url, e);
@@ -161,15 +162,18 @@ public final class BBotSession {
     }
 
     private String httpGetBody(String url) {
-        try {
+        try (HttpClient client = newHttpClient()) {
             HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-            return httpClient().send(req, HttpResponse.BodyHandlers.ofString()).body();
+            return client.send(req, HttpResponse.BodyHandlers.ofString()).body();
+        } catch (BBotHealthCheckException e) {
+            throw e;
         } catch (Exception e) {
             throw new BBotHealthCheckException(
                 "Version check HTTP request failed for: " + url, "", url, e);
         }
     }
 
+    @SuppressWarnings("SameParameterValue")
     private Duration configMs(String key, long defaultMs) {
         if (config.hasPath(key)) return config.getTimeout(key);
         return Duration.ofMillis(defaultMs);

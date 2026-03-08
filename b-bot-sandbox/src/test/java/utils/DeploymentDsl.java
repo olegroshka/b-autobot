@@ -1,5 +1,6 @@
 package utils;
 
+import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.playwright.Locator;
@@ -24,7 +25,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 public final class DeploymentDsl {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final HttpClient   CLIENT = HttpClient.newHttpClient();
+    private static final HttpClient   CLIENT = HttpClientFactory.shared();
 
     private final Page   page;       // null = API-only mode
     private final String apiBaseUrl;

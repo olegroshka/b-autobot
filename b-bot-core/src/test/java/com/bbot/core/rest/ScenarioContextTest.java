@@ -8,8 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * Unit tests for {@link ScenarioContext} — the instance-based counterpart
- * of {@link ScenarioState}.
+ * Unit tests for {@link ScenarioContext}.
  *
  * <p>Covers: put/get round-trip, require semantics, reset, resolve token
  * substitution, unresolved tokens left intact.

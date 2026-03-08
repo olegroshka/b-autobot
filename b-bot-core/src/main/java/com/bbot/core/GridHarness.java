@@ -2,7 +2,6 @@ package com.bbot.core;
 
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.exception.BBotGridRowNotFoundException;
-import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import org.slf4j.Logger;
@@ -39,7 +38,7 @@ import java.util.regex.Pattern;
  * into every page via {@link PlaywrightManager#initContext()}.
  *
  * <h2>Configuration</h2>
- * All timeouts and poll intervals are read from {@link BBotRegistry#configOrNull()}
+ * All timeouts and poll intervals are read from the injected {@link BBotConfig}
  * so they can be tuned per environment without code changes:
  * <pre>
  *   b-bot.timeouts.gridFastPath   = 500ms   # phase-1 fast DOM scan
@@ -81,23 +80,12 @@ public class GridHarness implements GridQuery {
 
     /**
      * Creates a GridHarness bound to the given page, using the given config for timeouts.
-     * Preferred constructor for instance-based (M11+) usage.
      */
     public GridHarness(Page page, BBotConfig config) {
         this.page = page;
         this.config = config;
     }
 
-    /**
-     * Creates a GridHarness bound to the given page.
-     * Timeouts fall back to {@link BBotRegistry#configOrNull()}.
-     *
-     * @deprecated Prefer {@link #GridHarness(Page, BBotConfig)} for explicit config injection.
-     */
-    @Deprecated(since = "1.1", forRemoval = true)
-    public GridHarness(Page page) {
-        this(page, null);
-    }
 
     /**
      * Finds the first AG Grid cell where {@code col-id} equals {@code colId}
@@ -250,18 +238,15 @@ public class GridHarness implements GridQuery {
      * Uses the instance config if provided, otherwise falls back to the registry.
      */
     private long cfgMs(String key, long defaultMs) {
-        BBotConfig cfg = config != null ? config : BBotRegistry.configOrNull();
-        if (cfg != null && cfg.hasPath(key)) return cfg.getTimeout(key).toMillis();
+        if (config != null && config.hasPath(key)) return config.getTimeout(key).toMillis();
         return defaultMs;
     }
 
     /**
      * Reads an integer from the active config.
-     * Uses the instance config if provided, otherwise falls back to the registry.
      */
     private int cfgInt(String key, int defaultVal) {
-        BBotConfig cfg = config != null ? config : BBotRegistry.configOrNull();
-        if (cfg != null && cfg.hasPath(key)) return cfg.raw().getInt(key);
+        if (config != null && config.hasPath(key)) return config.raw().getInt(key);
         return defaultVal;
     }
 }

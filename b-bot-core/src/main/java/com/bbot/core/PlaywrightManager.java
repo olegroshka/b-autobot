@@ -3,7 +3,6 @@ package com.bbot.core;
 import com.bbot.core.auth.SsoAuthConfig;
 import com.bbot.core.auth.SsoAuthManager;
 import com.bbot.core.config.BBotConfig;
-import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.BrowserContext;
 import com.microsoft.playwright.BrowserType;
@@ -24,24 +23,16 @@ import java.nio.file.Path;
  * in the consuming module's {@code Hooks} class).
  *
  * <p>Implements {@link BrowserLifecycle} with instance methods that delegate
- * to shared thread-local state. Multiple instances on the same thread all
- * access the same browser state — which is the correct behaviour for
- * single-threaded Cucumber execution.
+ * to shared thread-local state.
  *
  * <h2>Configuration</h2>
- * All browser settings are read from the active {@link BBotConfig} via
- * {@code BBotRegistry.getConfig()}. Override any default in your environment conf
- * or on the command line:
+ * All browser settings are read from the injected {@link BBotConfig}.
  * <pre>
- *   b-bot.browser.headless = false      # -Db-bot.browser.headless=false
- *   b-bot.browser.type     = firefox    # -Db-bot.browser.type=firefox
+ *   b-bot.browser.headless = false
+ *   b-bot.browser.type     = firefox
  *   b-bot.browser.viewport.width  = 1440
  *   b-bot.browser.viewport.height = 900
  * </pre>
- *
- * <p>Falls back to legacy system properties ({@code HEADLESS}, {@code BROWSER})
- * when the registry has not yet been initialised, so existing suites that call
- * {@code initBrowser()} before {@code BBotRegistry.initialize()} continue to work.
  */
 public final class PlaywrightManager implements BrowserLifecycle {
 
@@ -53,19 +44,21 @@ public final class PlaywrightManager implements BrowserLifecycle {
     private static final ThreadLocal<Page>            PAGE             = new ThreadLocal<>();
     private static final ThreadLocal<Boolean>         TRACING_ACTIVE   = ThreadLocal.withInitial(() -> false);
 
-    public PlaywrightManager() {}
+    private final BBotConfig config;
+
+    /**
+     * Creates a PlaywrightManager with the given configuration.
+     *
+     * @param config the active configuration (must not be {@code null})
+     */
+    public PlaywrightManager(BBotConfig config) {
+        this.config = config;
+    }
 
     @Override
     public void initBrowser() {
-        BBotConfig cfg = BBotRegistry.configOrNull();
-
-        boolean headless = cfg != null
-                ? cfg.getBoolean("b-bot.browser.headless")
-                : Boolean.parseBoolean(System.getProperty("HEADLESS", "true"));
-
-        String browserType = cfg != null
-                ? cfg.getString("b-bot.browser.type").toLowerCase()
-                : System.getProperty("BROWSER", "chromium").toLowerCase();
+        boolean headless = config.getBoolean("b-bot.browser.headless");
+        String browserType = config.getString("b-bot.browser.type").toLowerCase();
 
         Playwright pw = Playwright.create();
         PLAYWRIGHT.set(pw);
@@ -82,24 +75,20 @@ public final class PlaywrightManager implements BrowserLifecycle {
 
     @Override
     public void initContext() {
-        BBotConfig cfg = BBotRegistry.configOrNull();
-
-        int viewportW = cfg != null && cfg.hasPath("b-bot.browser.viewport.width")
-                ? cfg.raw().getInt("b-bot.browser.viewport.width")  : 1920;
-        int viewportH = cfg != null && cfg.hasPath("b-bot.browser.viewport.height")
-                ? cfg.raw().getInt("b-bot.browser.viewport.height") : 1080;
+        int viewportW = config.hasPath("b-bot.browser.viewport.width")
+                ? config.raw().getInt("b-bot.browser.viewport.width")  : 1920;
+        int viewportH = config.hasPath("b-bot.browser.viewport.height")
+                ? config.raw().getInt("b-bot.browser.viewport.height") : 1080;
 
         Browser.NewContextOptions ctxOpts = new Browser.NewContextOptions()
                 .setViewportSize(viewportW, viewportH);
 
         // Inject saved SSO auth state if available
-        if (cfg != null) {
-            SsoAuthConfig authConfig = SsoAuthConfig.from(cfg);
-            Path storagePath = SsoAuthManager.getStorageStatePath(authConfig);
-            if (storagePath != null && Files.exists(storagePath)) {
-                ctxOpts.setStorageStatePath(storagePath);
-                LOG.info("Browser context created with SSO storageState: {}", storagePath);
-            }
+        SsoAuthConfig authConfig = SsoAuthConfig.from(config);
+        Path storagePath = SsoAuthManager.getStorageStatePath(authConfig);
+        if (storagePath != null && Files.exists(storagePath)) {
+            ctxOpts.setStorageStatePath(storagePath);
+            LOG.info("Browser context created with SSO storageState: {}", storagePath);
         }
 
         BrowserContext ctx = BROWSER.get().newContext(ctxOpts);
@@ -108,16 +97,15 @@ public final class PlaywrightManager implements BrowserLifecycle {
         PAGE.set(ctx.newPage());
 
         // Start Playwright tracing if enabled
-        boolean tracingEnabled = cfg != null
-                && cfg.hasPath("b-bot.tracing.enabled")
-                && cfg.getBoolean("b-bot.tracing.enabled");
+        boolean tracingEnabled = config.hasPath("b-bot.tracing.enabled")
+                && config.getBoolean("b-bot.tracing.enabled");
         if (tracingEnabled) {
             ctx.tracing().start(new Tracing.StartOptions()
                     .setScreenshots(true)
                     .setSnapshots(true));
             TRACING_ACTIVE.set(true);
-            String outputDir = cfg.hasPath("b-bot.tracing.outputDir")
-                    ? cfg.getString("b-bot.tracing.outputDir")
+            String outputDir = config.hasPath("b-bot.tracing.outputDir")
+                    ? config.getString("b-bot.tracing.outputDir")
                     : "target/playwright-traces";
             LOG.info("Playwright tracing started — outputDir={}", outputDir);
         }
@@ -135,9 +123,8 @@ public final class PlaywrightManager implements BrowserLifecycle {
         // Save trace before closing context
         if (Boolean.TRUE.equals(TRACING_ACTIVE.get()) && CONTEXT.get() != null) {
             try {
-                BBotConfig cfg = BBotRegistry.configOrNull();
-                String outputDir = cfg != null && cfg.hasPath("b-bot.tracing.outputDir")
-                        ? cfg.getString("b-bot.tracing.outputDir")
+                String outputDir = config.hasPath("b-bot.tracing.outputDir")
+                        ? config.getString("b-bot.tracing.outputDir")
                         : "target/playwright-traces";
                 Path dir = Path.of(outputDir);
                 Files.createDirectories(dir);

@@ -4,7 +4,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Self-description of a tested component registered with {@link BBotRegistry}.
+ * Self-description of a tested component registered with {@link BBotSession.Builder}.
  *
  * <p>Implementations live in the consuming module (sandbox or real regression project).
  * Core never imports any concrete {@code AppDescriptor} — the dependency always flows inward.
@@ -14,6 +14,7 @@ import java.util.Set;
  *
  * @param <D> the DSL type this descriptor produces via its {@link DslFactory}
  */
+@SuppressWarnings( "unused")
 public interface AppDescriptor<D> {
 
     /**

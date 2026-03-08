@@ -10,8 +10,7 @@ import java.util.Optional;
  * Instance-based key/value store for sharing values between Cucumber step
  * definitions within a single scenario.
  *
- * <p>This is the instance-based counterpart of the static {@link ScenarioState}.
- * When used with PicoContainer (or any DI framework), each scenario gets a
+ * <p>When used with PicoContainer (or any DI framework), each scenario gets a
  * fresh {@code ScenarioContext} — no need to call {@link #reset()} manually.
  *
  * <p>Typical use:
@@ -25,8 +24,6 @@ import java.util.Optional;
  * // Step 3 — retrieve
  * String id = scenarioContext.require("inquiry_id");
  * }</pre>
- *
- * @see ScenarioState
  */
 public final class ScenarioContext {
 

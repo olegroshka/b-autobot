@@ -1,5 +1,6 @@
 package utils;
 
+import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -15,14 +16,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * DSL for the Config Service REST API.
  *
- * <p>Uses the JDK {@link java.net.http.HttpClient} — zero new test-scope
- * dependencies.  The base URL is injected at construction time via
+ * <p>Uses the shared JDK {@link HttpClient} from {@link HttpClientFactory} — zero
+ * new test-scope dependencies. The base URL is injected at construction time via
  * {@link com.bbot.core.registry.AppContext#getApiBaseUrl()}.
  */
 public final class ConfigServiceDsl {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final HttpClient   CLIENT = HttpClient.newHttpClient();
+    private static final HttpClient   CLIENT = HttpClientFactory.shared();
 
     private final String baseUrl;
 

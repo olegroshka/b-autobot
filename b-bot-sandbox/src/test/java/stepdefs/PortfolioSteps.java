@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <h2>Hybrid Data Pattern</h2>
  * <ol>
  *   <li>Use Playwright's {@link APIRequestContext} ({@code page.request()}) to POST a
- *       {@link TradePortfolio} to {@link MockBlotterServer}.</li>
+ *       {@link TradePortfolio} to {@link utils.MockBlotterServer MockBlotterServer}.</li>
  *   <li>Capture the server-assigned {@code portfolio_id} and the full response
  *       as a {@link JsonNode} for later field lookups.</li>
  *   <li>Render an AG Grid blotter page in the same Playwright {@link Page} via
@@ -48,6 +48,9 @@ public class PortfolioSteps {
     // ── Shared infrastructure ─────────────────────────────────────────────────
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
+    private static final String GRID_ROLE_SELECTOR = "[role='grid']";
+    private static final int GRID_MOUNT_TIMEOUT_MS = 20_000;
+
 
     private final TestWorld world;
 
@@ -57,7 +60,6 @@ public class PortfolioSteps {
 
     // ── Scenario-scoped state (new instance per scenario) ─────────────────────
 
-    private TradePortfolio submittedPortfolio;
     private APIResponse    apiResponse;
     private String         returnedPortfolioId;
     private JsonNode       apiResponseNode;   // full parsed response for field lookups
@@ -75,13 +77,14 @@ public class PortfolioSteps {
      * The submit URL is derived from {@code b-bot.apps.blotter.apiBase} — no URLs
      * in feature files.
      */
+    @SuppressWarnings("resource")   // Page lifecycle is managed by PlaywrightManager
     @Given("the user from role {string} submits a portfolio via REST API")
     public void userRoleSubmitsPortfolioViaRestApi(String role) throws Exception {
         String traderId = world.session().getConfig().getTestData().getUser(role);
         String endpoint = world.session().getConfig().getAppApiBase("blotter") + "/submit";
 
         // ── 1. Build payload ──────────────────────────────────────────────────
-        submittedPortfolio = TradePortfolio.builder()
+        TradePortfolio submittedPortfolio = TradePortfolio.builder()
                 .traderId(traderId)
                 .submittedAt(Instant.now().toString())
                 .currency("USD")
@@ -151,10 +154,12 @@ public class PortfolioSteps {
 
     @And("the API response should contain a non-blank {string}")
     public void theApiResponseShouldContainNonBlank(String fieldName) {
-        String value = switch (fieldName) {
-            case "portfolio_id" -> returnedPortfolioId;
-            default -> throw new IllegalArgumentException("Unknown field: " + fieldName);
-        };
+        String value;
+        if ("portfolio_id".equals(fieldName)) {
+            value = returnedPortfolioId;
+        } else {
+            throw new IllegalArgumentException("Unknown field: " + fieldName);
+        }
         assertThat(value)
                 .as("Response field '%s' must not be blank", fieldName)
                 .isNotBlank();
@@ -168,13 +173,14 @@ public class PortfolioSteps {
      * Navigates to the {@code webUrl} of the named app and waits for the AG Grid to mount.
      * Used for the external demo scenarios (e.g. app {@code "finance-demo"}).
      */
+    @SuppressWarnings("resource")   // Page lifecycle is managed by PlaywrightManager
     @And("the blotter at app {string} is open")
     public void theBlotterIsOpen(String appName) {
         String url = world.session().getConfig().getAppWebUrl(appName);
         Page page = world.page();
         page.navigate(url);
-        page.locator("[role='grid']")
-                .waitFor(new Locator.WaitForOptions().setTimeout(20_000));
+        page.locator(GRID_ROLE_SELECTOR)
+                .waitFor(new Locator.WaitForOptions().setTimeout(GRID_MOUNT_TIMEOUT_MS));
     }
 
     /**
@@ -189,6 +195,7 @@ public class PortfolioSteps {
      * {@code window.gridApi} to be defined (proving the grid has initialised) before
      * returning control to the test.
      */
+    @SuppressWarnings("resource")   // Page lifecycle is managed by PlaywrightManager
     @And("the blotter is populated with the API response")
     public void theBlotterIsPopulatedWithApiResponse() throws Exception {
         assertThat(apiResponseNode)
@@ -213,6 +220,7 @@ public class PortfolioSteps {
                 new Page.WaitForFunctionOptions().setTimeout(15_000));
     }
 
+    @SuppressWarnings("resource")   // Page lifecycle is managed by PlaywrightManager
     @Then("the AG Grid should display the {string} column")
     public void theAgGridShouldDisplayColumn(String colId) {
         // LocatorAssertions.isVisible() has built-in retry; no options needed here.
@@ -232,7 +240,7 @@ public class PortfolioSteps {
                 .as("API must have returned '%s' before the UI can be asserted", fieldLabel)
                 .isNotBlank();
 
-        GridHarness harness = new GridHarness(world.page());
+        GridHarness harness = new GridHarness(world.page(), world.session().getConfig());
         foundCell = harness.findRowByCellValue("portfolioId", expectedValue, Duration.ofSeconds(10));
 
         assertThat(foundCell).isVisible();
@@ -264,8 +272,7 @@ public class PortfolioSteps {
      * @param apiFieldPath JSON path into the API response (dot/bracket notation)
      */
     @Then("verify cell {string} in row {string} matches the API field {string}")
-    public void verifyCellMatchesApiField(String colId, String rowStr, String apiFieldPath)
-            throws Exception {
+    public void verifyCellMatchesApiField(String colId, String rowStr, String apiFieldPath) {
 
         assertThat(apiResponseNode)
                 .as("API response not available — run the Given step first")
@@ -274,7 +281,7 @@ public class PortfolioSteps {
         int rowIndex = Integer.parseInt(rowStr);
 
         // ── a) Scrape the UI value using GridHarness ──────────────────────────
-        String uiValue = new GridHarness(world.page())
+        String uiValue = new GridHarness(world.page(), world.session().getConfig())
                 .getCellText(colId, rowIndex);
 
         // ── b) Extract the expected value from the stored API JSON response ───
@@ -290,7 +297,7 @@ public class PortfolioSteps {
 
     @When("I search the grid for ticker {string}")
     public void iSearchTheGridForTicker(String ticker) {
-        GridHarness harness = new GridHarness(world.page());
+        GridHarness harness = new GridHarness(world.page(), world.session().getConfig());
         foundCell = harness.findRowByCellValue("ticker", ticker, Duration.ofSeconds(15));
     }
 
@@ -299,7 +306,7 @@ public class PortfolioSteps {
         // Cast to Object so AssertJ's assertThat resolves (not PlaywrightAssertions)
         assertThat((Object) foundCell).isNotNull();
         assertThat(foundCell).isVisible();
-        GridHarness harness = new GridHarness(world.page());
+        GridHarness harness = new GridHarness(world.page(), world.session().getConfig());
         String actual = "ticker".equals(colId)
                 ? foundCell.textContent().trim()
                 : harness.getSiblingCellText(foundCell, colId);
@@ -315,10 +322,10 @@ public class PortfolioSteps {
     // ═════════════════════════════════════════════════════════════════════════
 
     private String resolveLabel(String label) {
-        return switch (label) {
-            case "Portfolio ID" -> returnedPortfolioId;
-            default -> throw new IllegalArgumentException("Unknown label: " + label);
-        };
+        if ("Portfolio ID".equals(label)) {
+            return returnedPortfolioId;
+        }
+        throw new IllegalArgumentException("Unknown label: " + label);
     }
 
     /**
@@ -344,7 +351,7 @@ public class PortfolioSteps {
      * without loading any external CDN assets.
      *
      * <p>The generated DOM matches the selectors used by {@link GridHarness}
-     * and {@link utils.TickingCellHelper}:
+     * and {@link com.bbot.core.TickingCellHelper}:
      * <ul>
      *   <li>{@code .ag-center-cols-container} — virtualised row container</li>
      *   <li>{@code [row-index='N']} — row wrapper</li>

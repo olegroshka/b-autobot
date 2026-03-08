@@ -13,8 +13,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Step definitions for ConfigService.feature.
  *
  * <p>All Playwright-free — uses the JDK HTTP client via {@link ConfigServiceDsl}.
- * DSL is obtained from {@link BBotRegistry} so the base URL is environment-injected.
+ * DSL is obtained from {@link TestWorld} via {@link com.bbot.core.registry.BBotSession} so the base URL is environment-injected.
  */
+@SuppressWarnings( "unused")
 public class ConfigServiceSteps {
 
     private final TestWorld world;

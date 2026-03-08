@@ -55,10 +55,12 @@ public final class PtBlotterDsl {
 
     private final Page       page;
     private final AppContext ctx;
+    private final TickingCellHelper tickingCells;
 
     public PtBlotterDsl(Page page, AppContext ctx) {
         this.page = page;
         this.ctx  = ctx;
+        this.tickingCells = new TickingCellHelper(page, ctx.config());
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
@@ -177,7 +179,7 @@ public final class PtBlotterDsl {
      * Safe to call on live-ticking price cells without {@code Thread.sleep()}.
      */
     public void waitForCellToChange(String colId, int rowIndex, Duration timeout) {
-        TickingCellHelper.waitForCellUpdate(page, colId, rowIndex, timeout);
+        tickingCells.waitForCellUpdate(colId, rowIndex, timeout);
     }
 
     /**
@@ -252,30 +254,37 @@ public final class PtBlotterDsl {
     /**
      * Returns the {@code row-index} attribute for the row that has ISIN = {@code isin}.
      *
-     * <p>Delegates to {@code window.agGridProbes.dom.findRowIndexByText('isin', value)},
-     * which searches all AG Grid containers (centre, pinned-left, pinned-right).
-     * The probe is injected by {@code b-bot-core}'s {@code PlaywrightManager}.
+     * <p>Two-step, scroll-aware approach:
+     * <ol>
+     *   <li>Scroll to the top of the grid viewport so the search starts from row 0.</li>
+     *   <li>Poll with {@code waitForFunction}: if the row is not in the DOM yet,
+     *       scroll down one page-height to trigger AG Grid row virtualisation and
+     *       retry on the next poll cycle.</li>
+     *   <li>Evaluate again after the wait to retrieve the numeric row-index.</li>
+     * </ol>
      *
-     * <p>Uses {@code waitForFunction} so the call retries until the row appears or
-     * the timeout expires (handles async grid renders after navigation).
-     * The probe returns -1 when not found — we convert that to {@code null} (falsy)
-     * so Playwright keeps retrying rather than accepting a stale -1 immediately.
-     */
-    /**
-     * Returns the {@code row-index} attribute for the row that has ISIN = {@code isin}.
+     * <p>Returning a boolean from step 2 (not the row index directly) avoids the
+     * JavaScript falsy-zero problem: row index 0 is falsy, so returning it directly
+     * would cause {@code waitForFunction} to retry forever when the target is row 0.
      *
-     * <p>Two-step approach: first wait (returns boolean) then evaluate (returns number).
-     * This avoids the JavaScript falsy-zero problem: row index 0 is falsy, so a function
-     * that returns the index directly would cause waitForFunction to retry forever for row 0.
-     *
-     * <p>The probe is {@code window.agGridProbes.dom.findRowIndexByText(colId, value)},
-     * injected by {@code b-bot-core}'s {@code PlaywrightManager} via addInitScript.
+     * <p>The probes are from {@code window.agGridProbes.*}, injected by
+     * {@code b-bot-core}'s {@code PlaywrightManager} via {@code addInitScript}.
      */
     private int findRowIndex(String isin) {
-        /* Step 1 — poll until the probe confirms the row exists (returns boolean) */
+        /* Scroll to top so the search always starts from row 0 */
+        page.evaluate("() => window.agGridProbes.scroll.scrollToTop()");
+
+        /* Step 1 — poll until probe finds the row, scrolling down on each miss */
         page.waitForFunction(
-                "isin => { var idx = window.agGridProbes.dom.findRowIndexByText('isin', isin);" +
-                " return typeof idx === 'number' && idx >= 0; }",
+                "isin => {" +
+                "  var idx = window.agGridProbes.dom.findRowIndexByText('isin', isin);" +
+                "  if (typeof idx === 'number' && idx >= 0) return true;" +
+                "  /* Row not visible yet — scroll down to load more virtualised rows */" +
+                "  if (!window.agGridProbes.scroll.isAtBottom()) {" +
+                "    window.agGridProbes.scroll.scrollDown();" +
+                "  }" +
+                "  return false;" +
+                "}",
                 isin,
                 new Page.WaitForFunctionOptions().setTimeout(ROW_LOOKUP_MS));
 

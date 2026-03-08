@@ -3,7 +3,7 @@ package stepdefs;
 import io.cucumber.java.en.Given;
 
 /**
- * Generic precondition steps backed by {@link BBotRegistry}.
+ * Generic precondition steps backed by {@link com.bbot.core.registry.BBotSession}.
  *
  * <p>These steps are environment-agnostic — they work against both mock servers
  * (sandbox) and real systems (UAT, pre-prod) because the health and version
@@ -12,6 +12,7 @@ import io.cucumber.java.en.Given;
  * <p>Copy this class verbatim into any consumer project that uses {@code b-bot-core}.
  * No changes are needed — just register your descriptors in {@code Hooks.java}.
  */
+@SuppressWarnings( "unused")
 public class AppPreconditionSteps {
 
     private final TestWorld world;

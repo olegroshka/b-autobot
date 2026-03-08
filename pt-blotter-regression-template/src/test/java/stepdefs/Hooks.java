@@ -6,7 +6,7 @@ import com.bbot.core.auth.SsoAuthManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.registry.BBotSession;
-import com.bbot.core.rest.ScenarioState;
+import com.bbot.core.rest.HttpClientFactory;
 import descriptors.BlotterDescriptor;
 import descriptors.ConfigServiceDescriptor;
 import descriptors.DeploymentDescriptor;
@@ -74,7 +74,7 @@ public class Hooks {
         SsoAuthManager.ensureAuthenticated(authConfig);
 
         // Browser lifecycle -- remove these lines if your suite is REST-only.
-        browser = new PlaywrightManager();
+        browser = new PlaywrightManager(cfg);
         browser.initBrowser();
     }
 
@@ -82,9 +82,7 @@ public class Hooks {
     public void openFreshContext() {
         // Each scenario gets its own isolated BrowserContext + Page.
         // PicoContainer provides a fresh ScenarioContext per scenario automatically.
-        // Also reset ScenarioState so RestProbe path resolution starts clean.
         // Remove if REST-only.
-        ScenarioState.current().reset();
         browser.initContext();
     }
 
@@ -98,6 +96,7 @@ public class Hooks {
     @SuppressWarnings("unused")
     public static void shutdownBrowser() {
         browser.closeBrowser();
+        HttpClientFactory.shutdown();
         BBotRegistry.clearSession();
     }
 }

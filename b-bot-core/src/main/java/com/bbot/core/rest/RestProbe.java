@@ -18,11 +18,11 @@ import java.net.http.HttpResponse;
  * authentication ({@link AuthStrategy}) and retry ({@link RetryPolicy}).
  *
  * <p>All request paths may contain {@code ${key}} tokens that are resolved against
- * {@link ScenarioState} before the request is sent.
+ * the injected {@link ScenarioContext} before the request is sent.
  *
  * <h2>Quick usage</h2>
  * <pre>{@code
- * RestProbe probe = RestProbe.of(apiBase);
+ * RestProbe probe = RestProbe.of(apiBase, scenarioContext);
  * probe.post("/api/inquiry", body).assertStatus(201).capture("inquiry_id");
  * }</pre>
  *
@@ -30,6 +30,7 @@ import java.net.http.HttpResponse;
  * <pre>{@code
  * RestProbe probe = RestProbe.builder()
  *     .apiBase(apiBase)
+ *     .context(scenarioContext)
  *     .auth(AuthStrategy.bearer(token))
  *     .retryPolicy(RetryPolicy.serverErrors(3, 500))
  *     .build();
@@ -39,26 +40,36 @@ public final class RestProbe implements RestClient {
 
     private static final Logger LOG = LoggerFactory.getLogger(RestProbe.class);
 
-    private final String       apiBase;
-    private final HttpClient   client;
-    private final AuthStrategy auth;
-    private final RetryPolicy  retryPolicy;
+    private final String          apiBase;
+    private final HttpClient      client;
+    private final AuthStrategy    auth;
+    private final RetryPolicy     retryPolicy;
+    private final ScenarioContext ctx;
 
-    private RestProbe(String apiBase, HttpClient client, AuthStrategy auth, RetryPolicy retryPolicy) {
+    private RestProbe(String apiBase, HttpClient client, AuthStrategy auth,
+                      RetryPolicy retryPolicy, ScenarioContext ctx) {
         this.apiBase     = apiBase;
         this.client      = client;
         this.auth        = auth;
         this.retryPolicy = retryPolicy;
+        this.ctx         = ctx;
     }
 
-    /** Creates a {@code RestProbe} with default settings (no auth, no retry). */
-    public static RestProbe of(String apiBase) {
+    /**
+     * Creates a {@code RestProbe} with the given scenario context for path
+     * token resolution and value capture.
+     *
+     * @param apiBase the REST API base URL
+     * @param ctx     scenario context for {@code ${key}} token resolution
+     */
+    public static RestProbe of(String apiBase, ScenarioContext ctx) {
         if (apiBase == null || apiBase.isBlank())
             throw new BBotRestException("RestProbe: apiBase is null/blank. " +
                 "Check that the app is configured in b-bot.apps.{name}.apiBase.",
                 "", "", 0, "");
         String base = apiBase.endsWith("/") ? apiBase.substring(0, apiBase.length() - 1) : apiBase;
-        return new RestProbe(base, HttpClientFactory.shared(), AuthStrategy.none(), RetryPolicy.NONE);
+        return new RestProbe(base, HttpClientFactory.shared(), AuthStrategy.none(),
+                             RetryPolicy.NONE, ctx);
     }
 
     /** Returns a builder for creating a fully-configured {@code RestProbe}. */
@@ -82,7 +93,7 @@ public final class RestProbe implements RestClient {
 
     @SuppressWarnings("BusyWait")
     private RestResponse execute(String method, String path, String jsonBody) {
-        String resolved = ScenarioState.current().resolve(path);
+        String resolved = ctx != null ? ctx.resolve(path) : path;
         String url = apiBase + resolved;
         LOG.debug("REST {} {}", method, url);
         try {
@@ -102,8 +113,6 @@ public final class RestProbe implements RestClient {
 
             LOG.debug("REST {} {} → HTTP {}", method, url, resp.statusCode());
 
-            // Auth-aware 401/403 detection: if auth is active (not NoAuth),
-            // surface a clear BBotAuthException instead of a generic RestResponse
             if ((resp.statusCode() == 401 || resp.statusCode() == 403)
                     && !(auth instanceof NoAuth)) {
                 throw new BBotAuthException(
@@ -113,7 +122,7 @@ public final class RestProbe implements RestClient {
                         + "\nResponse: " + resp.body());
             }
 
-            return new RestResponse(resp.statusCode(), resp.body(), method + " " + url);
+            return new RestResponse(resp.statusCode(), resp.body(), method + " " + url, ctx);
         } catch (BBotRestException | BBotAuthException e) {
             throw e;
         } catch (InterruptedException e) {
@@ -150,18 +159,20 @@ public final class RestProbe implements RestClient {
 
     /** Fluent builder for {@link RestProbe}. */
     public static final class Builder {
-        private String       apiBase;
-        private HttpClient   client;
-        private AuthStrategy auth        = AuthStrategy.none();
-        private RetryPolicy  retryPolicy = RetryPolicy.NONE;
+        private String          apiBase;
+        private HttpClient      client;
+        private AuthStrategy    auth        = AuthStrategy.none();
+        private RetryPolicy     retryPolicy = RetryPolicy.NONE;
+        private ScenarioContext ctx;
 
         Builder() {}
 
-        public Builder apiBase(String apiBase)           { this.apiBase     = apiBase;     return this; }
-        public Builder client(HttpClient client)         { this.client      = client;      return this; }
-        public Builder auth(AuthStrategy auth)           { this.auth        = auth;        return this; }
+        public Builder apiBase(String apiBase)                { this.apiBase     = apiBase;     return this; }
+        public Builder client(HttpClient client)              { this.client      = client;      return this; }
+        public Builder auth(AuthStrategy auth)                { this.auth        = auth;        return this; }
         @SuppressWarnings("unused")
-        public Builder retryPolicy(RetryPolicy policy)   { this.retryPolicy = policy;      return this; }
+        public Builder retryPolicy(RetryPolicy policy)        { this.retryPolicy = policy;      return this; }
+        public Builder context(ScenarioContext ctx)            { this.ctx         = ctx;         return this; }
 
         public RestProbe build() {
             if (apiBase == null || apiBase.isBlank())
@@ -169,7 +180,7 @@ public final class RestProbe implements RestClient {
                         "", "", 0, "");
             String base = apiBase.endsWith("/") ? apiBase.substring(0, apiBase.length() - 1) : apiBase;
             HttpClient c = client != null ? client : HttpClientFactory.shared();
-            return new RestProbe(base, c, auth, retryPolicy);
+            return new RestProbe(base, c, auth, retryPolicy, ctx);
         }
     }
 }

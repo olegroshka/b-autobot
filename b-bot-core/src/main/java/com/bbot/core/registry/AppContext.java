@@ -26,6 +26,7 @@ import java.util.Optional;
  * {@code webUrl} always ends with {@code '/'} (validated on construction).
  * {@code apiBase} never has a trailing slash (validated on construction).
  */
+@SuppressWarnings("unused")
 public final class AppContext {
 
     private final String name;
@@ -35,7 +36,7 @@ public final class AppContext {
     private final Map<String, String> versions;
     private final BBotConfig config;
 
-    /** Package-private — only {@link BBotRegistry} constructs instances. */
+    /** Package-private — only {@link BBotSession.Builder} constructs instances. */
     AppContext(String name, String webUrl, String apiBaseUrl,
                Map<String, String> users, Map<String, String> versions,
                BBotConfig config) {

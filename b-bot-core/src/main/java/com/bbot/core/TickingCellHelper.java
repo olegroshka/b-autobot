@@ -1,7 +1,6 @@
 package com.bbot.core;
 
 import com.bbot.core.config.BBotConfig;
-import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
 import org.slf4j.Logger;
@@ -15,8 +14,11 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Helpers for asserting on AG Grid "ticking" cells whose values
+ * Instance-based helper for asserting on AG Grid "ticking" cells whose values
  * update at ~200–500 ms intervals.
+ *
+ * <p>Create via {@code new TickingCellHelper(page, config)} and call instance
+ * methods that implement {@link CellAssertions}.
  *
  * <p><strong>Design rules:</strong>
  * <ul>
@@ -32,17 +34,28 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   .ag-center-cols-container [row-index='N'] [col-id='price']
  * </pre>
  */
-public final class TickingCellHelper {
+public class TickingCellHelper implements CellAssertions {
 
     private static final Logger LOG = LoggerFactory.getLogger(TickingCellHelper.class);
 
+    private final Page page;
+    private final BBotConfig config;
+
     /**
-     * Returns the polling interval (ms) for {@code waitForFunction} calls.
-     * Read from {@code b-bot.ticking.pollMs} in the active config;
-     * falls back to 150 ms if the registry is not yet initialised.
+     * Creates a TickingCellHelper bound to the given page and config.
+     *
+     * @param page   the Playwright page to operate on
+     * @param config the active configuration; may be {@code null} for defaults
      */
-    private static int pollMs() {
-        return pollMs(BBotRegistry.configOrNull());
+    public TickingCellHelper(Page page, BBotConfig config) {
+        this.page = page;
+        this.config = config;
+    }
+
+    // ── Polling config ────────────────────────────────────────────────────────
+
+    private int instancePollMs() {
+        return pollMs(config);
     }
 
     /**
@@ -55,17 +68,45 @@ public final class TickingCellHelper {
         return 150;
     }
 
-    private TickingCellHelper() {}
+    // ══════════════════════════════════════════════════════════════════════════
+    // CellAssertions interface — instance methods
+    // ══════════════════════════════════════════════════════════════════════════
 
-    // ── 1. Wait for a cell to update ─────────────────────────────────────────
+    @Override
+    public String waitForCellUpdate(String colId, int rowIndex, Duration timeout) {
+        return doWaitForCellUpdate(page, colId, rowIndex, timeout, instancePollMs());
+    }
 
-    /**
-     * Blocks until the AG Grid cell at {@code colId / rowIndex} shows a value
-     * different from whatever it displays at the moment of calling.
-     *
-     * @return The new cell text after the update
-     */
-    public static String waitForCellUpdate(Page page, String colId, int rowIndex, Duration timeout) {
+    @Override
+    public void assertCellValueInRange(String colId, int rowIndex,
+                                        double min, double max, Duration timeout) {
+        doAssertCellValueInRange(page, colId, rowIndex, min, max, timeout, instancePollMs());
+    }
+
+    @Override
+    public void waitForCellFlash(String colId, int rowIndex, Duration timeout) {
+        doWaitForCellFlash(page, colId, rowIndex, timeout, instancePollMs());
+    }
+
+    @Override
+    public void waitForCellStable(String colId, int rowIndex, Duration timeout) {
+        doWaitForCellStable(page, colId, rowIndex, timeout, instancePollMs());
+    }
+
+    @Override
+    public String readStableValueAfterTick(String colId, int rowIndex,
+                                            Duration flashTimeout, Duration stableTimeout) {
+        doWaitForCellFlash(page, colId, rowIndex, flashTimeout, instancePollMs());
+        doWaitForCellStable(page, colId, rowIndex, stableTimeout, instancePollMs());
+        return page.locator(buildCellSelector(colId, rowIndex)).textContent().trim();
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // Implementation
+    // ══════════════════════════════════════════════════════════════════════════
+
+    private static String doWaitForCellUpdate(Page page, String colId, int rowIndex,
+                                               Duration timeout, int pollMs) {
         String selector = buildCellSelector(colId, rowIndex);
         LOG.debug("Waiting for cell update: selector='{}', timeout={}ms", selector, timeout.toMillis());
         Locator cell = page.locator(selector);
@@ -77,21 +118,14 @@ public final class TickingCellHelper {
                 List.of(selector, initialValue),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(pollMs())
+                        .setPollingInterval(pollMs)
         );
         return cell.textContent().trim();
     }
 
-    // ── 2. Assert cell value is within a numeric range ────────────────────────
-
-    /**
-     * Asserts (with Playwright auto-retry) that the cell text matches a numeric
-     * pattern, then parses the value and checks it is within [{@code min}, {@code max}].
-     */
-    public static void assertCellValueInRange(
-            Page page, String colId, int rowIndex,
-            double min, double max, Duration timeout) {
-
+    private static void doAssertCellValueInRange(Page page, String colId, int rowIndex,
+                                                  double min, double max, Duration timeout,
+                                                  @SuppressWarnings("unused") int pollMs) {
         Locator cell = page.locator(buildCellSelector(colId, rowIndex));
         cell.scrollIntoViewIfNeeded();
 
@@ -107,13 +141,8 @@ public final class TickingCellHelper {
                 .isBetween(min, max);
     }
 
-    // ── 3. Wait for a cell flash ──────────────────────────────────────────────
-
-    /**
-     * Waits until AG Grid's tick-flash class {@code ag-cell-data-changed} is
-     * applied to the target cell.
-     */
-    public static void waitForCellFlash(Page page, String colId, int rowIndex, Duration timeout) {
+    private static void doWaitForCellFlash(Page page, String colId, int rowIndex,
+                                            Duration timeout, int pollMs) {
         String selector = buildCellSelector(colId, rowIndex);
         LOG.debug("Waiting for cell flash: selector='{}', timeout={}ms", selector, timeout.toMillis());
         page.locator(selector).scrollIntoViewIfNeeded();
@@ -123,48 +152,26 @@ public final class TickingCellHelper {
                 List.of(selector),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(pollMs())
+                        .setPollingInterval(pollMs)
         );
     }
 
-    // ── 4. Wait for flash animation to finish ────────────────────────────────
-
-    /**
-     * Waits until the {@code ag-cell-data-changed} flash class is gone, meaning
-     * the cell's value is stable and the DOM animation has completed.
-     */
-    public static void waitForCellStable(Page page, String colId, int rowIndex, Duration timeout) {
+    private static void doWaitForCellStable(Page page, String colId, int rowIndex,
+                                             Duration timeout, int pollMs) {
         String selector = buildCellSelector(colId, rowIndex);
         page.waitForFunction(
                 "args => window.agGridProbes.ticking.isCellStable(args[0])",
                 List.of(selector),
                 new Page.WaitForFunctionOptions()
                         .setTimeout(timeout.toMillis())
-                        .setPollingInterval(pollMs())
+                        .setPollingInterval(pollMs)
         );
     }
 
-    // ── 5. Read a stable cell value after one tick cycle ─────────────────────
-
-    /**
-     * Waits for a tick, waits for the animation to finish, then returns the
-     * stable text content — all without {@code Thread.sleep()}.
-     */
-    public static String readStableValueAfterTick(
-            Page page, String colId, int rowIndex,
-            Duration flashTimeout, Duration stableTimeout) {
-
-        waitForCellFlash(page, colId, rowIndex, flashTimeout);
-        waitForCellStable(page, colId, rowIndex, stableTimeout);
-        return page.locator(buildCellSelector(colId, rowIndex)).textContent().trim();
-    }
-
-    // ── Internal helpers ──────────────────────────────────────────────────────
+    // ── Pure utility methods (stateless helpers) ─────────────────────────────
 
     /**
      * Builds the canonical AG Grid cell CSS selector.
-     * Using attribute selectors instead of nth-child keeps tests stable when
-     * rows are filtered, sorted, or virtualised.
      */
     public static String buildCellSelector(String colId, int rowIndex) {
         return String.format(

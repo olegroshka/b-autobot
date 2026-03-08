@@ -26,20 +26,18 @@ class BBotRegistryTest {
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private static AppDescriptor<String> descriptor(String name) {
-        return descriptor(name, Optional.empty(), Optional.empty());
+        return descriptor(name, null, null);
     }
 
-    private static AppDescriptor<String> descriptor(
-            String name, Optional<String> healthPath,
-            Optional<String> versionPath) {
+    private static AppDescriptor<String> descriptor(String name, String healthPath, String versionPath) {
         return new AppDescriptor<>() {
             @Override public String name() { return name; }
             @Override public Set<ComponentType> componentTypes() { return Set.of(ComponentType.REST_API); }
             @Override public DslFactory<String> dslFactory() {
                 return (ctx, page) -> "dsl-for-" + name;
             }
-            @Override public Optional<String> healthCheckPath() { return healthPath; }
-            @Override public Optional<String> versionPath()     { return versionPath; }
+            @Override public Optional<String> healthCheckPath() { return Optional.ofNullable(healthPath); }
+            @Override public Optional<String> versionPath()     { return Optional.ofNullable(versionPath); }
         };
     }
 
@@ -103,7 +101,7 @@ class BBotRegistryTest {
         BBotRegistry.setSession(session);
 
         // Must complete without exception
-        BBotRegistry.checkHealth("no-health");
+        BBotRegistry.session().checkHealth("no-health");
     }
 
     @Test
@@ -122,12 +120,12 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("svc", Optional.of("/health"), Optional.empty()))
+                    .register(descriptor("svc", "/health", null))
                     .initialize(configWithApp("svc", "http://localhost:" + port))
                     .build();
             BBotRegistry.setSession(session);
 
-            BBotRegistry.checkHealth("svc");
+            BBotRegistry.session().checkHealth("svc");
 
             assertThat(callCount.get()).isEqualTo(1);
         } finally {
@@ -147,12 +145,12 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("failing-svc", Optional.of("/health"), Optional.empty()))
+                    .register(descriptor("failing-svc", "/health", null))
                     .initialize(configWithApp("failing-svc", "http://localhost:" + port))
                     .build();
             BBotRegistry.setSession(session);
 
-            assertThatThrownBy(() -> BBotRegistry.checkHealth("failing-svc"))
+            assertThatThrownBy(() -> BBotRegistry.session().checkHealth("failing-svc"))
                 .isInstanceOf(BBotHealthCheckException.class)
                 .hasMessageContaining("503");
         } finally {
@@ -174,12 +172,12 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("versioned-svc", Optional.empty(), Optional.of("/version")))
+                    .register(descriptor("versioned-svc", null, "/version"))
                     .initialize(configWithApp("versioned-svc", "http://localhost:" + port))
                     .build();
             BBotRegistry.setSession(session);
 
-            BBotRegistry.assertVersion("versioned-svc", "v2.4.1");
+            BBotRegistry.session().assertVersion("versioned-svc", "v2.4.1");
         } finally {
             server.stop(0);
         }
@@ -199,12 +197,12 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("versioned-svc", Optional.empty(), Optional.of("/version")))
+                    .register(descriptor("versioned-svc", null, "/version"))
                     .initialize(configWithApp("versioned-svc", "http://localhost:" + port))
                     .build();
             BBotRegistry.setSession(session);
 
-            assertThatThrownBy(() -> BBotRegistry.assertVersion("versioned-svc", "v2.4.1"))
+            assertThatThrownBy(() -> BBotRegistry.session().assertVersion("versioned-svc", "v2.4.1"))
                 .isInstanceOf(BBotHealthCheckException.class)
                 .hasMessageContaining("v2.4.1");
         } finally {

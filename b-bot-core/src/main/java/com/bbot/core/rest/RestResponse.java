@@ -21,7 +21,7 @@ import com.jayway.jsonpath.PathNotFoundException;
  *      .assertStatus(201)
  *      .assertField("status", "PENDING")
  *      .assertFieldNotEmpty("inquiry_id")
- *      .capture("inquiry_id");   // → ScenarioState.put("inquiry_id", "INQ-001")
+ *      .capture("inquiry_id");   // → ctx.put("inquiry_id", "INQ-001")
  * }</pre>
  */
 public final class RestResponse {
@@ -29,12 +29,15 @@ public final class RestResponse {
     private final int    status;
     private final String body;
     private final String requestLabel;  // e.g. "POST http://localhost:9099/api/inquiry"
+    private final ScenarioContext ctx;
 
-    RestResponse(int status, String body, String requestLabel) {
+    RestResponse(int status, String body, String requestLabel, ScenarioContext ctx) {
         this.status       = status;
         this.body         = body == null ? "" : body;
         this.requestLabel = requestLabel;
+        this.ctx          = ctx;
     }
+
 
     // ── Status assertion ──────────────────────────────────────────────────────
 
@@ -116,19 +119,21 @@ public final class RestResponse {
     // ── Capture ───────────────────────────────────────────────────────────────
 
     /**
-     * Reads the value at {@code jsonPath} and stores it in {@link ScenarioState}
-     * under {@code alias}, making it available as {@code ${alias}} in subsequent
-     * step paths and templates.
+     * Reads the value at {@code jsonPath} and stores it in the scenario context,
+     * making it available as {@code ${alias}} in subsequent step paths and templates.
      *
      * @return {@code this} for chaining
      */
     public RestResponse capture(String jsonPath, String alias) {
-        ScenarioState.current().put(alias, getField(jsonPath));
+        String value = getField(jsonPath);
+        if (ctx != null) {
+            ctx.put(alias, value);
+        }
         return this;
     }
 
     /**
-     * Reads the value at {@code jsonPath} and stores it in {@link ScenarioState}.
+     * Reads the value at {@code jsonPath} and stores it in the scenario context.
      * The alias is the last segment of the path, e.g. {@code "$.inquiry_id"} → {@code "inquiry_id"}.
      *
      * @return {@code this} for chaining

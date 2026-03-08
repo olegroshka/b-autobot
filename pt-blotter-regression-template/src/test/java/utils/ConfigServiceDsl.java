@@ -1,5 +1,6 @@
 package utils;
 
+import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -7,12 +8,12 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 
 /**
  * REST DSL for the Config Service microservice.
  *
- * <p>Uses JDK {@link HttpClient} — no Playwright, no browser.
+ * <p>Uses the shared JDK {@link HttpClient} from {@link HttpClientFactory} —
+ * no Playwright, no browser.
  * All methods throw {@link AssertionError} on unexpected responses so that
  * Cucumber marks the step as FAILED with a clear message.
  *
@@ -22,7 +23,7 @@ import java.time.Duration;
 public final class ConfigServiceDsl {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final HttpClient   CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private static final HttpClient   CLIENT = HttpClientFactory.shared();
 
     private final String apiBase;
 

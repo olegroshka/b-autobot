@@ -5,6 +5,7 @@ import com.bbot.core.exception.BBotRestException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
 
@@ -29,6 +30,7 @@ class RestProbeTest {
     private static final AtomicReference<String> LAST_BODY        = new AtomicReference<>();
     private static final AtomicReference<String> LAST_PATH        = new AtomicReference<>();
     private static final AtomicReference<String> LAST_AUTH_HEADER = new AtomicReference<>();
+    private ScenarioContext ctx;
 
     @BeforeAll
     static void startServer() throws IOException {
@@ -63,9 +65,13 @@ class RestProbeTest {
         server.stop(0);
     }
 
+    @BeforeEach
+    void initContext() {
+        ctx = new ScenarioContext();
+    }
+
     @AfterEach
     void resetState() {
-        ScenarioState.current().reset();
         LAST_METHOD.set(null);
         LAST_BODY.set(null);
         LAST_PATH.set(null);
@@ -77,21 +83,21 @@ class RestProbeTest {
     @SuppressWarnings("ConstantConditions")
     @Test
     void of_nullApiBase_throws() {
-        assertThatThrownBy(() -> RestProbe.of(null))
+        assertThatThrownBy(() -> RestProbe.of(null, ctx))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("apiBase");
     }
 
     @Test
     void of_blankApiBase_throws() {
-        assertThatThrownBy(() -> RestProbe.of("  "))
+        assertThatThrownBy(() -> RestProbe.of("  ", ctx))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("apiBase");
     }
 
     @Test
     void of_stripsTrailingSlash() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port + "/");
+        RestProbe probe = RestProbe.of("http://localhost:" + port + "/", ctx);
         RestResponse resp = probe.get("/echo");
         assertThat(resp.status()).isEqualTo(200);
     }
@@ -100,7 +106,7 @@ class RestProbeTest {
 
     @Test
     void get_sendsGetRequest() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         RestResponse resp = probe.get("/api/test");
 
         assertThat(resp.status()).isEqualTo(200);
@@ -109,9 +115,9 @@ class RestProbeTest {
     }
 
     @Test
-    void get_resolvesScenarioStateTokens() {
-        ScenarioState.current().put("id", "42");
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+    void get_resolvesContextTokens() {
+        ctx.put("id", "42");
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         probe.get("/api/item/${id}");
 
         assertThat(LAST_PATH.get()).isEqualTo("/api/item/42");
@@ -121,7 +127,7 @@ class RestProbeTest {
 
     @Test
     void post_sendsPostWithBody() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         RestResponse resp = probe.post("/api/create", "{\"name\":\"test\"}");
 
         assertThat(resp.status()).isEqualTo(200);
@@ -133,7 +139,7 @@ class RestProbeTest {
 
     @Test
     void put_sendsPutWithBody() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         RestResponse resp = probe.put("/api/update", "{\"name\":\"updated\"}");
 
         assertThat(resp.status()).isEqualTo(200);
@@ -143,9 +149,9 @@ class RestProbeTest {
     }
 
     @Test
-    void put_resolvesScenarioStateTokens() {
-        ScenarioState.current().put("resource_id", "99");
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+    void put_resolvesContextTokens() {
+        ctx.put("resource_id", "99");
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         probe.put("/api/item/${resource_id}", "{}");
 
         assertThat(LAST_PATH.get()).isEqualTo("/api/item/99");
@@ -155,7 +161,7 @@ class RestProbeTest {
 
     @Test
     void delete_sendsDeleteRequest() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         RestResponse resp = probe.delete("/api/remove/1");
 
         assertThat(resp.status()).isEqualTo(200);
@@ -164,9 +170,9 @@ class RestProbeTest {
     }
 
     @Test
-    void delete_resolvesScenarioStateTokens() {
-        ScenarioState.current().put("del_id", "77");
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+    void delete_resolvesContextTokens() {
+        ctx.put("del_id", "77");
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         probe.delete("/api/item/${del_id}");
 
         assertThat(LAST_PATH.get()).isEqualTo("/api/item/77");
@@ -176,7 +182,7 @@ class RestProbeTest {
 
     @Test
     void patch_sendsPatchWithBody() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         RestResponse resp = probe.patch("/api/patch/1", "{\"field\":\"value\"}");
 
         assertThat(resp.status()).isEqualTo(200);
@@ -186,9 +192,9 @@ class RestProbeTest {
     }
 
     @Test
-    void patch_resolvesScenarioStateTokens() {
-        ScenarioState.current().put("patch_id", "55");
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+    void patch_resolvesContextTokens() {
+        ctx.put("patch_id", "55");
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         probe.patch("/api/item/${patch_id}", "{}");
 
         assertThat(LAST_PATH.get()).isEqualTo("/api/item/55");
@@ -198,7 +204,7 @@ class RestProbeTest {
 
     @Test
     void get_connectionRefused_throws() {
-        RestProbe probe = RestProbe.of("http://localhost:1");
+        RestProbe probe = RestProbe.of("http://localhost:1", ctx);
         assertThatThrownBy(() -> probe.get("/api/test"))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("REST GET failed");
@@ -206,7 +212,7 @@ class RestProbeTest {
 
     @Test
     void post_connectionRefused_throws() {
-        RestProbe probe = RestProbe.of("http://localhost:1");
+        RestProbe probe = RestProbe.of("http://localhost:1", ctx);
         assertThatThrownBy(() -> probe.post("/api/test", "{}"))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("REST POST failed");
@@ -214,7 +220,7 @@ class RestProbeTest {
 
     @Test
     void put_connectionRefused_throws() {
-        RestProbe probe = RestProbe.of("http://localhost:1");
+        RestProbe probe = RestProbe.of("http://localhost:1", ctx);
         assertThatThrownBy(() -> probe.put("/api/test", "{}"))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("REST PUT failed");
@@ -222,7 +228,7 @@ class RestProbeTest {
 
     @Test
     void delete_connectionRefused_throws() {
-        RestProbe probe = RestProbe.of("http://localhost:1");
+        RestProbe probe = RestProbe.of("http://localhost:1", ctx);
         assertThatThrownBy(() -> probe.delete("/api/test"))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("REST DELETE failed");
@@ -230,7 +236,7 @@ class RestProbeTest {
 
     @Test
     void patch_connectionRefused_throws() {
-        RestProbe probe = RestProbe.of("http://localhost:1");
+        RestProbe probe = RestProbe.of("http://localhost:1", ctx);
         assertThatThrownBy(() -> probe.patch("/api/test", "{}"))
             .isInstanceOf(BBotRestException.class)
             .hasMessageContaining("REST PATCH failed");
@@ -240,7 +246,7 @@ class RestProbeTest {
 
     @Test
     void get_responseBodyParseable() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         RestResponse resp = probe.get("/api/test");
 
         assertThat(resp.body()).contains("\"status\":\"ok\"");
@@ -290,7 +296,7 @@ class RestProbeTest {
 
     @Test
     void of_defaultAuth_noAuthHeader() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         probe.get("/api/public");
 
         assertThat(LAST_AUTH_HEADER.get()).isNull();
@@ -326,7 +332,7 @@ class RestProbeTest {
 
     @Test
     void get_401_withNoAuth_returnsRestResponse() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
 
         // With NoAuth (default), 401 is returned as a normal RestResponse
         RestResponse resp = probe.get("/api/unauthorized");
@@ -337,7 +343,7 @@ class RestProbeTest {
 
     @Test
     void of_defaultsToNoAuthAndNoRetry() {
-        RestProbe probe = RestProbe.of("http://localhost:" + port);
+        RestProbe probe = RestProbe.of("http://localhost:" + port, ctx);
         assertThat(probe.auth()).isNotNull();
         assertThat(probe.retryPolicy()).isEqualTo(RetryPolicy.NONE);
     }

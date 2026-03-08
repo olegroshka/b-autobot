@@ -547,5 +547,5 @@ G12.4  mvn verify → BUILD SUCCESS (all modules)
 
 ---
 
-**Current status:** M7 COMPLETE (121 tests, JaCoCo green, 66/66 sandbox). M8 COMPLETE (exception hierarchy, SLF4J logging, Playwright tracing). M9 COMPLETE (full HTTP verbs, auth strategy, retry policy, builder, shared HttpClient). M10 COMPLETE (BrowserLifecycle, GridQuery, CellAssertions, RestClient interfaces). M11 COMPLETE (BBotSession, ScenarioContext, PicoContainer DI, 18 @Deprecated annotations, GridHarness/TickingCellHelper config injection). Next: M12 sub-step 12a.
+**Current status:** M7 COMPLETE (121 tests, JaCoCo green, 66/66 sandbox). M8 COMPLETE (exception hierarchy, SLF4J logging, Playwright tracing). M9 COMPLETE (full HTTP verbs, auth strategy, retry policy, builder, shared HttpClient). M10 COMPLETE (BrowserLifecycle, GridQuery, CellAssertions, RestClient interfaces). M11 COMPLETE (BBotSession, ScenarioContext, PicoContainer DI, 18 @Deprecated annotations, GridHarness/TickingCellHelper config injection, RestProbe/RestResponse/JsonTemplateEngine ScenarioContext injection, PlaywrightManager config injection, CellAssertions instance methods, consumer code migrated). 252 core tests green. Next: M12 sub-step 12a.
 

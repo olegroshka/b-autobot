@@ -3,7 +3,7 @@ package stepdefs;
 import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.Portfolio;
 import com.bbot.core.data.TestDataConfig;
-import com.bbot.core.rest.ScenarioState;
+import com.bbot.core.rest.ScenarioContext;
 import com.bbot.core.rest.JsonTemplateEngine;
 import com.bbot.core.rest.RestProbe;
 import com.bbot.core.rest.RestResponse;
@@ -28,7 +28,7 @@ import java.util.Map;
  *   <li>JSON templates live in {@code src/test/resources/templates/} and are referenced
  *       by short name in the feature file.</li>
  *   <li>Values captured from one response (e.g. {@code inquiry_id}) are stored in
- *       {@link com.bbot.core.rest.ScenarioState} and automatically resolved as
+ *       {@link com.bbot.core.rest.ScenarioContext} and automatically resolved as
  *       {@code ${inquiry_id}} in subsequent paths and templates.</li>
  *   <li>Bond list references ({@code bond "HYPT_1" field "ISIN1"}) are resolved against
  *       {@code b-bot.test-data.bond-lists.HYPT_1.ISIN1} in your env config.</li>
@@ -55,14 +55,16 @@ public class RestApiSteps {
      */
     private RestResponse lastResponse;
 
-    private final TestWorld         world;
-    private final TestDataConfig    testData;
+    private final TestWorld          world;
+    private final TestDataConfig     testData;
     private final JsonTemplateEngine templateEngine;
+    private final ScenarioContext    scenarioContext;
 
     public RestApiSteps(TestWorld world) {
         this.world          = world;
         this.testData       = world.session().getConfig().getTestData();
-        this.templateEngine = new JsonTemplateEngine(testData);
+        this.scenarioContext = world.scenarioContext();
+        this.templateEngine = new JsonTemplateEngine(testData, scenarioContext);
     }
 
     // ── POST ──────────────────────────────────────────────────────────────────
@@ -83,7 +85,7 @@ public class RestApiSteps {
                                          String app, String path) {
         String body    = templateEngine.render(template, bondList);
         String apiBase = world.session().getConfig().getAppApiBase(app);
-        lastResponse   = RestProbe.of(apiBase).post(path, body);
+        lastResponse   = RestProbe.of(apiBase, scenarioContext).post(path, body);
     }
 
     /**
@@ -103,7 +105,7 @@ public class RestApiSteps {
     public void postTemplate(String template, String app, String path) {
         String body    = templateEngine.render(template);
         String apiBase = world.session().getConfig().getAppApiBase(app);
-        lastResponse   = RestProbe.of(apiBase).post(path, body);
+        lastResponse   = RestProbe.of(apiBase, scenarioContext).post(path, body);
     }
 
     // ── GET ───────────────────────────────────────────────────────────────────
@@ -122,7 +124,7 @@ public class RestApiSteps {
     @SuppressWarnings("unused")
     public void getFromApp(String app, String path) {
         String apiBase = world.session().getConfig().getAppApiBase(app);
-        lastResponse   = RestProbe.of(apiBase).get(path);
+        lastResponse   = RestProbe.of(apiBase, scenarioContext).get(path);
     }
 
     // ── Status assertions ─────────────────────────────────────────────────────
@@ -243,12 +245,12 @@ public class RestApiSteps {
         String apiBase = world.session().getConfig().getAppApiBase(action.app());
         String path = resolveActionPath(action.path());
         if ("GET".equalsIgnoreCase(action.method())) {
-            lastResponse = RestProbe.of(apiBase).get(path);
+            lastResponse = RestProbe.of(apiBase, scenarioContext).get(path);
         } else {
             String body = action.template() != null
                     ? templateEngine.render(action.template())
                     : "{}";
-            lastResponse = RestProbe.of(apiBase).post(path, body);
+            lastResponse = RestProbe.of(apiBase, scenarioContext).post(path, body);
         }
     }
 
@@ -266,12 +268,12 @@ public class RestApiSteps {
         String apiBase = world.session().getConfig().getAppApiBase(action.app());
         String path = resolveActionPath(action.path());
         if ("GET".equalsIgnoreCase(action.method())) {
-            lastResponse = RestProbe.of(apiBase).get(path);
+            lastResponse = RestProbe.of(apiBase, scenarioContext).get(path);
         } else {
             String body = action.template() != null
                     ? templateEngine.render(action.template(), bondList)
                     : "{}";
-            lastResponse = RestProbe.of(apiBase).post(path, body);
+            lastResponse = RestProbe.of(apiBase, scenarioContext).post(path, body);
         }
     }
 
@@ -296,10 +298,10 @@ public class RestApiSteps {
     public void submitAllInquiriesForPortfolio(String portfolioName) {
         Portfolio portfolio = testData.getPortfolio(portfolioName);
         String apiBase = world.session().getConfig().getAppApiBase("blotter");
-        RestProbe probe = RestProbe.of(apiBase);
+        RestProbe probe = RestProbe.of(apiBase, scenarioContext);
 
         // Capture the portfolio's PT ID so cancel actions can reference it as ${pt_id}
-        ScenarioState.current().put("pt_id", portfolio.ptId());
+        scenarioContext.put("pt_id", portfolio.ptId());
 
         portfolio.bonds().forEach((lineKey, bond) -> {
             Map<String, String> vars = new LinkedHashMap<>();
@@ -328,7 +330,7 @@ public class RestApiSteps {
 
     /**
      * Converts {@code {key}} tokens (used in api-actions conf to avoid HOCON substitution
-     * conflicts) to {@code ${key}} so {@link RestProbe} can resolve them from scenario state.
+     * conflicts) to {@code ${key}} so {@link RestProbe} can resolve them from {@link com.bbot.core.rest.ScenarioContext}.
      */
     private static String resolveActionPath(String pathTemplate) {
         return pathTemplate.replaceAll("\\{(\\w[\\w-]*?)}", "\\${$1}");

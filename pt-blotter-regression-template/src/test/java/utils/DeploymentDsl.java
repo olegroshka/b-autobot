@@ -1,5 +1,6 @@
 package utils;
 
+import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -7,14 +8,14 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 
 /**
  * REST DSL for the Deployment Dashboard service registry.
  *
- * <p>Uses JDK {@link HttpClient} — no Playwright, no browser.
+ * <p>Uses the shared JDK {@link HttpClient} from {@link HttpClientFactory} —
+ * no Playwright, no browser.
  * All methods throw {@link AssertionError} on unexpected responses.
  *
  * <p>The API base URL is injected from the active environment config
@@ -33,7 +34,7 @@ public final class DeploymentDsl {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final TypeReference<List<Map<String, Object>>> LIST_TYPE = new TypeReference<>() {};
-    private static final HttpClient CLIENT = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+    private static final HttpClient CLIENT = HttpClientFactory.shared();
 
     private final String apiBase;
 

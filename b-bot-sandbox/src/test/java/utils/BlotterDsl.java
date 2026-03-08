@@ -31,10 +31,12 @@ public final class BlotterDsl {
 
     private final Page       page;
     private final AppContext ctx;
+    private final TickingCellHelper tickingCells;
 
     public BlotterDsl(Page page, AppContext ctx) {
         this.page = page;
         this.ctx  = ctx;
+        this.tickingCells = new TickingCellHelper(page, ctx.config());
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────────
@@ -124,8 +126,8 @@ public final class BlotterDsl {
 
     @SuppressWarnings("UnusedReturnValue")
     public String waitForCellUpdate(String colId, int rowIndex, int seconds) {
-        return TickingCellHelper.waitForCellUpdate(
-                page, colId, rowIndex, Duration.ofSeconds(seconds));
+        return tickingCells.waitForCellUpdate(
+                colId, rowIndex, Duration.ofSeconds(seconds));
     }
 
     public void assertCellMatchesPattern(String colId, int rowIndex, String pattern) {
@@ -140,7 +142,7 @@ public final class BlotterDsl {
     }
 
     public void waitForCellValueChange(String colId, int rowIndex, int seconds) {
-        TickingCellHelper.waitForCellUpdate(page, colId, rowIndex, Duration.ofSeconds(seconds));
+        tickingCells.waitForCellUpdate(colId, rowIndex, Duration.ofSeconds(seconds));
     }
 
     // ── M3 — REST API ──────────────────────────────────────────────────────────

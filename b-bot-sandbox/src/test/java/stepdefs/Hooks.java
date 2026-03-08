@@ -4,7 +4,7 @@ import com.bbot.core.PlaywrightManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.registry.BBotSession;
-import com.bbot.core.rest.ScenarioState;
+import com.bbot.core.rest.HttpClientFactory;
 import descriptors.BlotterAppDescriptor;
 import descriptors.ConfigServiceDescriptor;
 import descriptors.DeploymentDescriptor;
@@ -67,14 +67,12 @@ public class Hooks {
         BBotRegistry.setSession(session);
 
         // 4. Launch Playwright browser.
-        browser = new PlaywrightManager();
+        browser = new PlaywrightManager(cfg);
         browser.initBrowser();
     }
 
     @Before
     public void openFreshContext() {
-        // Reset ScenarioState so RestProbe path resolution starts clean for each scenario.
-        ScenarioState.current().reset();
         browser.initContext();
     }
 
@@ -87,6 +85,7 @@ public class Hooks {
     @SuppressWarnings("unused")
     public static void shutdownBrowser() {
         browser.closeBrowser();
+        HttpClientFactory.shutdown();
         BBotRegistry.clearSession();
         MockBlotterServer.stop();
         MockDeploymentServer.stop();
