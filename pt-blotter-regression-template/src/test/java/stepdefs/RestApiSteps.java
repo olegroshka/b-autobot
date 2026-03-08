@@ -306,9 +306,14 @@ public class RestApiSteps {
         portfolio.bonds().forEach((lineKey, bond) -> {
             Map<String, String> vars = new LinkedHashMap<>();
             vars.put("isin",            bond.isin());
+            vars.put("description",     bond.description());
+            vars.put("maturity",        bond.maturity());
+            vars.put("coupon",          String.valueOf(bond.coupon()));
             vars.put("quantity",        String.valueOf(bond.quantity()));
+            vars.put("notional",        String.valueOf(bond.notional()));
             vars.put("side",            bond.side());
             vars.put("currency",        bond.currency());
+            vars.put("client",          bond.client());
             vars.put("pt-id",           portfolio.ptId());
             vars.put("settlement-date", portfolio.settlementDate());
 

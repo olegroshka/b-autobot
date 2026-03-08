@@ -1,7 +1,12 @@
 {
   "isin":           "${bond.ISIN1}",
-  "settlementDate": "${settlement-date}",
+  "description":    "${bond.DESC1}",
+  "maturity":       "${bond.MAT1}",
+  "coupon":         ${bond.COUPON1},
+  "notional":       1000000,
   "quantity":       1000000,
   "side":           "Buy",
-  "currency":       "USD"
+  "currency":       "USD",
+  "client":         "${bond.CLIENT1}",
+  "settlementDate": "${settlement-date}"
 }

@@ -1,8 +1,13 @@
 {
   "isin":           "${isin}",
   "pt_id":          "${pt-id}",
+  "description":    "${description}",
+  "maturity":       "${maturity}",
+  "coupon":         ${coupon},
   "quantity":       ${quantity},
+  "notional":       ${notional},
   "side":           "${side}",
   "currency":       "${currency}",
+  "client":         "${client}",
   "settlementDate": "${settlement-date}"
 }

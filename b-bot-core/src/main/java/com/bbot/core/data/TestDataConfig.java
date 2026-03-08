@@ -202,11 +202,17 @@ public final class TestDataConfig {
             Config bc = pc.getConfig("bonds");
             bc.root().keySet().stream().sorted().forEach(key -> {
                 Config b = bc.getConfig(key);
+                long qty = b.getLong("quantity");
                 bonds.put(key, new PortfolioBond(
                     b.getString("isin"),
-                    b.getLong("quantity"),
+                    qty,
                     b.getString("side"),
-                    b.hasPath("currency") ? b.getString("currency") : "USD"
+                    b.hasPath("currency")    ? b.getString("currency")    : "USD",
+                    b.hasPath("description") ? b.getString("description") : "",
+                    b.hasPath("maturity")    ? b.getString("maturity")    : "",
+                    b.hasPath("coupon")      ? b.getDouble("coupon")      : 0.0,
+                    b.hasPath("notional")    ? b.getLong("notional")      : qty,
+                    b.hasPath("client")      ? b.getString("client")      : ""
                 ));
             });
         }
