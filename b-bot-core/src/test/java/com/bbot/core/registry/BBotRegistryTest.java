@@ -1,6 +1,7 @@
 package com.bbot.core.registry;
 
 import com.bbot.core.config.BBotConfig;
+import com.bbot.core.exception.BBotHealthCheckException;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +30,8 @@ class BBotRegistryTest {
     }
 
     private static AppDescriptor<String> descriptor(
-            String name, Optional<String> healthPath, Optional<String> versionPath) {
+            String name, Optional<String> healthPath,
+            Optional<String> versionPath) {
         return new AppDescriptor<>() {
             @Override public String name() { return name; }
             @Override public Set<ComponentType> componentTypes() { return Set.of(ComponentType.REST_API); }
@@ -88,7 +90,7 @@ class BBotRegistryTest {
 
         // After reset, both descriptor and context are gone
         assertThatThrownBy(() -> BBotRegistry.dsl("myapp", null, String.class))
-            .isInstanceOf(IllegalArgumentException.class);
+            .isInstanceOf(IllegalStateException.class);
     }
 
     @Test
@@ -144,7 +146,7 @@ class BBotRegistryTest {
             BBotRegistry.initialize(configWithApp("failing-svc", "http://localhost:" + port));
 
             assertThatThrownBy(() -> BBotRegistry.checkHealth("failing-svc"))
-                .isInstanceOf(AssertionError.class)
+                .isInstanceOf(BBotHealthCheckException.class)
                 .hasMessageContaining("503");
         } finally {
             server.stop(0);
@@ -191,7 +193,7 @@ class BBotRegistryTest {
             BBotRegistry.initialize(configWithApp("versioned-svc", "http://localhost:" + port));
 
             assertThatThrownBy(() -> BBotRegistry.assertVersion("versioned-svc", "v2.4.1"))
-                .isInstanceOf(AssertionError.class)
+                .isInstanceOf(BBotHealthCheckException.class)
                 .hasMessageContaining("v2.4.1");
         } finally {
             server.stop(0);

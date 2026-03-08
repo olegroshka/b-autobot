@@ -1,6 +1,5 @@
 package stepdefs;
 
-import com.bbot.core.registry.BBotRegistry;
 import io.cucumber.java.en.Then;
 import utils.ConfigServiceDsl;
 
@@ -12,8 +11,13 @@ import utils.ConfigServiceDsl;
  */
 public class ConfigServiceSteps {
 
-    private final ConfigServiceDsl configService =
-            BBotRegistry.dsl("config-service", null, ConfigServiceDsl.class);
+    private final TestWorld world;
+    private final ConfigServiceDsl configService;
+
+    public ConfigServiceSteps(TestWorld world) {
+        this.world = world;
+        this.configService = world.session().dsl("config-service", null, ConfigServiceDsl.class);
+    }
 
     @Then("the config namespace {string} should be present")
     public void configNamespaceShouldBePresent(String namespace) {
@@ -28,7 +32,7 @@ public class ConfigServiceSteps {
 
     @Then("the user from role {string} should have isPTAdmin {string} in config service")
     public void userByRoleShouldHaveIsPTAdmin(String role, String expectedValue) {
-        String username = BBotRegistry.getConfig().getTestData().getUser(role);
+        String username = world.session().getConfig().getTestData().getUser(role);
         boolean expected = Boolean.parseBoolean(expectedValue);
         configService.assertUserIsPTAdmin(username, expected);
     }

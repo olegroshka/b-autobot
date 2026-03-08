@@ -1,5 +1,6 @@
 package com.bbot.core.rest;
 
+import com.bbot.core.exception.BBotRestException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
 
@@ -44,9 +45,10 @@ public final class RestResponse {
      */
     public RestResponse assertStatus(int expected) {
         if (status != expected)
-            throw new AssertionError(String.format(
+            throw new BBotRestException(String.format(
                 "%s — expected HTTP %d but got %d%nBody: %s",
-                requestLabel, expected, status, body));
+                requestLabel, expected, status, body),
+                extractMethod(), extractUrl(), status, body);
         return this;
     }
 
@@ -62,9 +64,10 @@ public final class RestResponse {
     public RestResponse assertField(String jsonPath, String expected) {
         String actual = getField(jsonPath);
         if (!expected.equals(actual))
-            throw new AssertionError(String.format(
+            throw new BBotRestException(String.format(
                 "Field '%s': expected \"%s\" but was \"%s\"%nBody: %s",
-                jsonPath, expected, actual, body));
+                jsonPath, expected, actual, body),
+                extractMethod(), extractUrl(), status, body);
         return this;
     }
 
@@ -76,9 +79,10 @@ public final class RestResponse {
     public RestResponse assertFieldNotEmpty(String jsonPath) {
         String actual = getField(jsonPath);
         if (actual == null || actual.isBlank())
-            throw new AssertionError(String.format(
+            throw new BBotRestException(String.format(
                 "Field '%s' expected to be non-empty but was: \"%s\"%nBody: %s",
-                jsonPath, actual, body));
+                jsonPath, actual, body),
+                extractMethod(), extractUrl(), status, body);
         return this;
     }
 
@@ -91,18 +95,21 @@ public final class RestResponse {
      */
     public String getField(String jsonPath) {
         if (body.isBlank())
-            throw new AssertionError(
-                "Cannot read field '" + jsonPath + "' — response body is empty. " + requestLabel);
+            throw new BBotRestException(
+                "Cannot read field '" + jsonPath + "' — response body is empty. " + requestLabel,
+                extractMethod(), extractUrl(), status, body);
         String path = jsonPath.startsWith("$") ? jsonPath : "$." + jsonPath;
         try {
             Object value = JsonPath.read(body, path);
             return value == null ? null : value.toString();
         } catch (PathNotFoundException e) {
-            throw new AssertionError(String.format(
-                "JSON path '%s' not found in response.%nBody: %s", path, body), e);
+            throw new BBotRestException(String.format(
+                "JSON path '%s' not found in response.%nBody: %s", path, body),
+                extractMethod(), extractUrl(), status, body);
         } catch (Exception e) {
-            throw new AssertionError(String.format(
-                "Failed to read JSON path '%s' from response.%nBody: %s", path, body), e);
+            throw new BBotRestException(String.format(
+                "Failed to read JSON path '%s' from response.%nBody: %s", path, body),
+                extractMethod(), extractUrl(), status, body);
         }
     }
 
@@ -140,4 +147,18 @@ public final class RestResponse {
 
     /** Returns the raw response body as a String. */
     public String body()   { return body;   }
+
+    // ── Internal helpers ──────────────────────────────────────────────────────
+
+    /** Extracts the HTTP method from the request label (e.g. "POST" from "POST http://..."). */
+    private String extractMethod() {
+        int space = requestLabel.indexOf(' ');
+        return space > 0 ? requestLabel.substring(0, space) : "";
+    }
+
+    /** Extracts the URL from the request label (e.g. "http://..." from "POST http://..."). */
+    private String extractUrl() {
+        int space = requestLabel.indexOf(' ');
+        return space > 0 ? requestLabel.substring(space + 1) : requestLabel;
+    }
 }

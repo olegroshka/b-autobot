@@ -1,5 +1,6 @@
 package com.bbot.core;
 
+import com.bbot.core.exception.BBotException;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.math.BigDecimal;
@@ -69,7 +70,7 @@ public final class NumericComparator {
 
     /**
      * Asserts that {@code uiText} and {@code apiText} are equivalent, throwing
-     * an {@link AssertionError} with a descriptive message if they are not.
+     * a {@link com.bbot.core.exception.BBotException} with a descriptive message if they are not.
      *
      * @param uiText     The raw cell text scraped from the grid
      * @param apiText    The expected value extracted from the API JSON
@@ -80,7 +81,7 @@ public final class NumericComparator {
     public static void assertEquivalent(
             String uiText, String apiText, String colId, int rowIndex, String apiField) {
         if (!equivalent(uiText, apiText)) {
-            throw new AssertionError(String.format(
+            throw new BBotException(String.format(
                     "Numeric/value mismatch for [col-id='%s'][row=%d]:%n" +
                     "  UI value  : '%s' (normalised: '%s')%n" +
                     "  API field : '%s' \u2192 '%s' (normalised: '%s')%n" +

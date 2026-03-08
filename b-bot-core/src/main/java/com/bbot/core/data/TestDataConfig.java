@@ -1,9 +1,9 @@
 package com.bbot.core.data;
 
+import com.bbot.core.exception.BBotConfigException;
 import com.typesafe.config.Config;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Typed view over the {@code b-bot.test-data} HOCON block.
@@ -96,9 +96,9 @@ public final class TestDataConfig {
     public Map<String, String> getBondList(String name) {
         String path = ROOT + ".bond-lists." + name;
         if (!cfg.hasPath(path))
-            throw new AssertionError(
+            throw new BBotConfigException(
                 "Bond list '" + name + "' not found in b-bot.test-data.bond-lists. " +
-                "Define it in your application-{env}.conf.");
+                "Define it in your application-{env}.conf.", path);
         Map<String, String> result = new LinkedHashMap<>();
         cfg.getConfig(path).entrySet().forEach(e ->
             result.put(e.getKey(), e.getValue().unwrapped().toString()));
@@ -114,9 +114,10 @@ public final class TestDataConfig {
         Map<String, String> list = getBondList(bondListName);
         String value = list.get(fieldName);
         if (value == null)
-            throw new AssertionError(
+            throw new BBotConfigException(
                 "Field '" + fieldName + "' not found in bond list '" + bondListName + "'. " +
-                "Available fields: " + list.keySet());
+                "Available fields: " + list.keySet(),
+                ROOT + ".bond-lists." + bondListName + "." + fieldName);
         return value;
     }
 
@@ -132,9 +133,9 @@ public final class TestDataConfig {
     public String getTemplatePath(String templateName) {
         String path = ROOT + ".templates." + templateName;
         if (!cfg.hasPath(path))
-            throw new AssertionError(
+            throw new BBotConfigException(
                 "Template '" + templateName + "' not registered in b-bot.test-data.templates. " +
-                "Add:  templates." + templateName + " = \"path/to/file.json\"");
+                "Add:  templates." + templateName + " = \"path/to/file.json\"", path);
         return cfg.getString(path);
     }
     // ── Service versions ──────────────────────────────────────────────────────
@@ -150,9 +151,9 @@ public final class TestDataConfig {
     public String getServiceVersion(String serviceName) {
         String path = ROOT + ".service-versions." + serviceName;
         if (!cfg.hasPath(path))
-            throw new AssertionError(
+            throw new BBotConfigException(
                 "Service version for '" + serviceName + "' not found in b-bot.test-data.service-versions. " +
-                "Add:  service-versions.\"" + serviceName + "\" = \"vX.Y.Z\"");
+                "Add:  service-versions.\"" + serviceName + "\" = \"vX.Y.Z\"", path);
         return cfg.getString(path);
     }
 
@@ -169,9 +170,9 @@ public final class TestDataConfig {
     public String getUser(String role) {
         String path = ROOT + ".users." + role;
         if (!cfg.hasPath(path))
-            throw new AssertionError(
+            throw new BBotConfigException(
                 "User role '" + role + "' not found in b-bot.test-data.users. " +
-                "Add:  users." + role + " = \"username\"");
+                "Add:  users." + role + " = \"username\"", path);
         return cfg.getString(path);
     }
 
@@ -186,9 +187,9 @@ public final class TestDataConfig {
     public Portfolio getPortfolio(String name) {
         String root = ROOT + ".portfolios." + name;
         if (!cfg.hasPath(root))
-            throw new AssertionError(
+            throw new BBotConfigException(
                 "Portfolio '" + name + "' not found in b-bot.test-data.portfolios. " +
-                "Declare it in your application-{env}.conf.");
+                "Declare it in your application-{env}.conf.", root);
         Config pc = cfg.getConfig(root);
 
         String ptId = pc.getString("pt-id");

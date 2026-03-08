@@ -3,11 +3,9 @@ package stepdefs;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import com.bbot.core.registry.BBotRegistry;
 import utils.ConfigServiceDsl;
 
 import java.io.IOException;
-import static org.assertj.core.api.Assertions.assertThat;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,8 +17,13 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class ConfigServiceSteps {
 
-    private final ConfigServiceDsl dsl =
-            BBotRegistry.dsl("config-service", null, ConfigServiceDsl.class);
+    private final TestWorld world;
+    private final ConfigServiceDsl dsl;
+
+    public ConfigServiceSteps(TestWorld world) {
+        this.world = world;
+        this.dsl = world.session().dsl("config-service", null, ConfigServiceDsl.class);
+    }
 
     // Shared state between When/Then steps
     private String lastNs;
@@ -31,7 +34,7 @@ public class ConfigServiceSteps {
 
     @Given("the config service is running")
     public void theConfigServiceIsRunning() {
-        BBotRegistry.checkHealth("config-service");
+        world.session().checkHealth("config-service");
     }
 
     // ── Namespace assertions ──────────────────────────────────────────────────
@@ -96,7 +99,7 @@ public class ConfigServiceSteps {
 
     @Then("the entry list should contain user {string}")
     public void entryListShouldContainUser(String role) throws IOException, InterruptedException {
-        String username = BBotRegistry.getConfig().getTestData().getUser(role);
+        String username = world.session().getConfig().getTestData().getUser(role);
         dsl.assertKeyPresent(lastNs, lastType, username);
     }
 
@@ -105,7 +108,7 @@ public class ConfigServiceSteps {
             throws IOException, InterruptedException {
         lastNs   = ns;
         lastType = type;
-        lastKey  = BBotRegistry.getConfig().getTestData().getUser(role);
+        lastKey  = world.session().getConfig().getTestData().getUser(role);
         dsl.readConfig(lastNs, lastType, lastKey);
     }
 
@@ -115,7 +118,7 @@ public class ConfigServiceSteps {
             throws IOException, InterruptedException {
         lastNs   = ns;
         lastType = type;
-        lastKey  = BBotRegistry.getConfig().getTestData().getUser(role);
+        lastKey  = world.session().getConfig().getTestData().getUser(role);
         dsl.updateConfig(lastNs, lastType, lastKey, field, value);
     }
 

@@ -72,6 +72,11 @@
         <artifactId>cucumber-junit-platform-engine</artifactId>
         <version>${cucumber.version}</version>
       </dependency>
+      <dependency>
+        <groupId>io.cucumber</groupId>
+        <artifactId>cucumber-picocontainer</artifactId>
+        <version>${cucumber.version}</version>
+      </dependency>
 
       <!-- JUnit 5 -->
       <dependency>
@@ -110,6 +115,11 @@
       </dependency>
 
       <!-- Logging -->
+      <dependency>
+        <groupId>org.slf4j</groupId>
+        <artifactId>slf4j-api</artifactId>
+        <version>${slf4j.version}</version>
+      </dependency>
       <dependency>
         <groupId>org.slf4j</groupId>
         <artifactId>slf4j-simple</artifactId>
@@ -170,6 +180,21 @@
           <groupId>com.github.eirslett</groupId>
           <artifactId>frontend-maven-plugin</artifactId>
           <version>${frontend.maven.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>3.10.1</version>
+          <configuration>
+            <release>${java.version}</release>
+            <quiet>true</quiet>
+            <failOnWarnings>true</failOnWarnings>
+            <!-- Doclint: catch broken links, invalid HTML, and missing tags -->
+            <additionalJOptions>
+              <additionalJOption>-Xdoclint:all</additionalJOption>
+              <additionalJOption>-Xdoclint:-missing</additionalJOption>
+            </additionalJOptions>
+          </configuration>
         </plugin>
       </plugins>
     </pluginManagement>

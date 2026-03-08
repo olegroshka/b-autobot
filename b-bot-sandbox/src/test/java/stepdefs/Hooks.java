@@ -3,6 +3,7 @@ package stepdefs;
 import com.bbot.core.PlaywrightManager;
 import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
+import com.bbot.core.rest.ScenarioState;
 import descriptors.BlotterAppDescriptor;
 import descriptors.ConfigServiceDescriptor;
 import descriptors.DeploymentDescriptor;
@@ -63,7 +64,10 @@ public class Hooks {
     }
 
     @Before
+    @SuppressWarnings("deprecation")
     public void openFreshContext() {
+        // Reset ScenarioState so RestProbe path resolution starts clean for each scenario.
+        ScenarioState.reset();
         PlaywrightManager.initContext();
     }
 

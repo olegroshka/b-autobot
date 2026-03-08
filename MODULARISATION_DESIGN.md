@@ -1506,3 +1506,73 @@ is proven against a real system and `b-bot-core` is ready for wider adoption.
 
 The 66/66 sandbox regression is a non-negotiable invariant at every milestone.
 It is the safety net that proves the refactoring never breaks the reference implementation.
+
+---
+
+## Industrialisation Milestones (M7–M12)
+
+After the modularisation was complete (M1–M6), a second phase of work raised the
+codebase to industrial-grade library quality. These milestones are documented in
+`IMPLEMENTATION_PLAN.md`; a brief summary is included here for completeness.
+
+| Milestone | Focus | Outcome |
+|-----------|-------|---------|
+| M7 | Core unit test coverage | 184 unit tests, JaCoCo 65% threshold enforced |
+| M8a–f | Typed exceptions + SLF4J logging + Playwright tracing | `BBotException` hierarchy (6 types); 8 classes instrumented |
+| M9 | REST client hardening | `RestProbe` — GET/POST/PUT/DELETE/PATCH, auth, retry, shared `HttpClient` |
+| M10 | Dependency inversion interfaces | `BrowserLifecycle`, `GridQuery`, `CellAssertions`, `RestClient` — mockable |
+| M11 | Instance-based architecture | `BBotSession` + PicoContainer DI; static API `@Deprecated(forRemoval=true)` |
+| M12 | CI + Javadoc + documentation | GitHub Actions 3-job pipeline; Javadoc JAR (0 warnings); MD sync |
+
+### Key M11 additions to `b-bot-core`
+
+```
+b-bot-core/src/main/java/com/bbot/core/
+├── BrowserLifecycle.java          ← interface for browser lifecycle
+├── CellAssertions.java            ← interface for ticking-cell assertions
+├── GridQuery.java                 ← interface for AG Grid row queries
+├── exception/
+│   ├── BBotException.java         ← base unchecked exception
+│   ├── BBotConfigException.java
+│   ├── BBotGridRowNotFoundException.java
+│   ├── BBotHealthCheckException.java
+│   ├── BBotRestException.java
+│   └── BBotTemplateException.java
+├── registry/
+│   ├── BBotSession.java           ← NEW: immutable session (instance API)
+│   └── BBotRegistry.java         ← CHANGED: static delegates + @Deprecated
+└── rest/
+    ├── RestClient.java            ← NEW: interface
+    ├── ScenarioContext.java       ← NEW: per-scenario instance-based state
+    ├── ScenarioState.java         ← CHANGED: delegates to thread-local ScenarioContext
+    ├── AuthStrategy.java          ← NEW: bearer token / no-auth
+    ├── RetryPolicy.java           ← NEW: exponential backoff record
+    └── HttpClientFactory.java     ← NEW: shared HttpClient factory
+```
+
+### PicoContainer DI pattern (M11)
+
+Both consuming modules (`b-bot-sandbox` and `pt-blotter-regression-template`) use
+`cucumber-picocontainer` to inject a shared `TestWorld` into every step definition class.
+PicoContainer creates a fresh `TestWorld` (and therefore a fresh `ScenarioContext`) for
+each scenario automatically — no manual reset needed for the instance-based API.
+
+```java
+// TestWorld is created once per scenario by PicoContainer
+public class TestWorld {
+    private final BBotSession     session;         // immutable — safe to share
+    private final ScenarioContext scenarioContext;  // fresh per scenario
+
+    public TestWorld() {
+        this.session         = BBotRegistry.session();
+        this.scenarioContext = new ScenarioContext();
+    }
+}
+
+// Step definitions receive the same TestWorld instance
+public class BondBlotterSteps {
+    public BondBlotterSteps(TestWorld world) {
+        this.dsl = world.session().dsl("blotter", world.page(), BlotterDsl.class);
+    }
+}
+```

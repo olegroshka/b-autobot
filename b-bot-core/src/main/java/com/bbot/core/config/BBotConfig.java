@@ -2,8 +2,11 @@ package com.bbot.core.config;
 
 import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.TestDataConfig;
+import com.bbot.core.exception.BBotConfigException;
 import com.typesafe.config.Config;
 import com.typesafe.config.ConfigFactory;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.Collections;
@@ -41,6 +44,8 @@ import java.util.Map;
  */
 public final class BBotConfig {
 
+    private static final Logger LOG = LoggerFactory.getLogger(BBotConfig.class);
+
     private final Config cfg;
 
     private BBotConfig(Config cfg) {
@@ -64,11 +69,13 @@ public final class BBotConfig {
                 : ConfigFactory.parseResources("application-" + env + ".conf")
                       .withFallback(appBase);
 
-        return new BBotConfig(
+        BBotConfig result = new BBotConfig(
             ConfigFactory.systemProperties()
                 .withFallback(layered)
                 .resolve()
         );
+        LOG.info("BBotConfig loaded — env='{}', layers resolved", env);
+        return result;
     }
 
     /**
@@ -79,6 +86,7 @@ public final class BBotConfig {
      * not known at config-file-write time.
      */
     public BBotConfig withOverrides(Map<String, String> overrides) {
+        LOG.debug("BBotConfig overrides applied — {} keys: {}", overrides.size(), overrides.keySet());
         return new BBotConfig(
             ConfigFactory.parseMap(overrides).withFallback(cfg).resolve()
         );
@@ -160,7 +168,7 @@ public final class BBotConfig {
     public ApiAction getApiAction(String actionName) {
         String appsRoot = "b-bot.apps";
         if (!cfg.hasPath(appsRoot))
-            throw new AssertionError("No apps configured under b-bot.apps");
+            throw new BBotConfigException("No apps configured under b-bot.apps", appsRoot);
         Config apps = cfg.getConfig(appsRoot);
         for (String appName : apps.root().keySet()) {
             String actionPath = appName + ".api-actions." + actionName;
@@ -175,9 +183,10 @@ public final class BBotConfig {
                 );
             }
         }
-        throw new AssertionError(
+        throw new BBotConfigException(
             "API action '" + actionName + "' not found in any b-bot.apps.*.api-actions block. " +
-            "Declare it under:  b-bot.apps.{appName}.api-actions." + actionName + " { method=..., path=... }");
+            "Declare it under:  b-bot.apps.{appName}.api-actions." + actionName + " { method=..., path=... }",
+            "b-bot.apps.*.api-actions." + actionName);
     }
 
     /**

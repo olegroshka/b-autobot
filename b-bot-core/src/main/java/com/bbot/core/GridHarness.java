@@ -1,9 +1,12 @@
 package com.bbot.core;
 
 import com.bbot.core.config.BBotConfig;
+import com.bbot.core.exception.BBotGridRowNotFoundException;
 import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -47,7 +50,9 @@ import java.util.regex.Pattern;
  *   b-bot.grid.maxScrollSteps     = 200     # maximum scroll iterations
  * </pre>
  */
-public class GridHarness {
+public class GridHarness implements GridQuery {
+
+    private static final Logger LOG = LoggerFactory.getLogger(GridHarness.class);
 
     private static final String ROWS_CONTAINER = ".ag-center-cols-container";
 
@@ -72,9 +77,26 @@ public class GridHarness {
             "window.agGridProbes.dom.getLastDomRowIndex() > before";
 
     private final Page page;
+    private final BBotConfig config;
 
-    public GridHarness(Page page) {
+    /**
+     * Creates a GridHarness bound to the given page, using the given config for timeouts.
+     * Preferred constructor for instance-based (M11+) usage.
+     */
+    public GridHarness(Page page, BBotConfig config) {
         this.page = page;
+        this.config = config;
+    }
+
+    /**
+     * Creates a GridHarness bound to the given page.
+     * Timeouts fall back to {@link BBotRegistry#getConfig()}.
+     *
+     * @deprecated Prefer {@link #GridHarness(Page, BBotConfig)} for explicit config injection.
+     */
+    @Deprecated(since = "1.1", forRemoval = true)
+    public GridHarness(Page page) {
+        this(page, null);
     }
 
     /**
@@ -94,6 +116,7 @@ public class GridHarness {
         Locator fastResult = fastFind(colId, cellText);
         if (fastResult != null) {
             fastResult.scrollIntoViewIfNeeded();
+            LOG.debug("GridHarness: fast-path found [col-id='{}'] text='{}'", colId, cellText);
             return fastResult;
         }
 
@@ -102,6 +125,8 @@ public class GridHarness {
         if (rowIdxObj instanceof Number num) {
             int rowIdx = num.intValue();
             if (rowIdx >= 0) {
+                LOG.debug("GridHarness: grid-API path — row index={} for [col-id='{}'] text='{}'",
+                          rowIdx, colId, cellText);
                 page.evaluate(JS_ENSURE_VISIBLE, rowIdx);
                 waitForRowInDom(rowIdx, Duration.ofMillis(cfgMs("b-bot.timeouts.gridRowInDom", 5_000)));
                 Locator cell = cellLocator(colId, rowIdx);
@@ -182,6 +207,7 @@ public class GridHarness {
     }
 
     private Locator scrollProbe(String colId, String cellText, Instant deadline) {
+        LOG.debug("GridHarness: scroll-probe fallback for [col-id='{}'] text='{}'", colId, cellText);
         page.evaluate(JS_SCROLL_TOP);
         page.waitForFunction(JS_HAS_ROWS, null,
                 new Page.WaitForFunctionOptions()
@@ -210,29 +236,33 @@ public class GridHarness {
             } catch (Exception ignored) { /* at bottom or grid stalled — check next iter */ }
         }
 
-        throw new RuntimeException(String.format(
+        LOG.warn("GridHarness: exhaustive scroll search failed — col='{}', text='{}'", colId, cellText);
+        throw new BBotGridRowNotFoundException(String.format(
                 "GridHarness: no row found where [col-id='%s'] has text '%s' " +
-                "after exhaustive scroll search.", colId, cellText));
+                "after exhaustive scroll search.", colId, cellText),
+                colId, cellText, Duration.between(Instant.now(), deadline).abs());
     }
 
     // ── Config helpers ────────────────────────────────────────────────────────
 
     /**
      * Reads a duration (in ms) from the active config.
-     * Falls back to {@code defaultMs} if the registry is uninitialised or key is absent.
+     * Uses the instance config if provided, otherwise falls back to the registry.
      */
-    private static long cfgMs(String key, long defaultMs) {
-        BBotConfig cfg = BBotRegistry.getConfig();
+    @SuppressWarnings("deprecation")
+    private long cfgMs(String key, long defaultMs) {
+        BBotConfig cfg = config != null ? config : BBotRegistry.getConfig();
         if (cfg != null && cfg.hasPath(key)) return cfg.getTimeout(key).toMillis();
         return defaultMs;
     }
 
     /**
      * Reads an integer from the active config.
-     * Falls back to {@code defaultVal} if the registry is uninitialised or key is absent.
+     * Uses the instance config if provided, otherwise falls back to the registry.
      */
-    private static int cfgInt(String key, int defaultVal) {
-        BBotConfig cfg = BBotRegistry.getConfig();
+    @SuppressWarnings("deprecation")
+    private int cfgInt(String key, int defaultVal) {
+        BBotConfig cfg = config != null ? config : BBotRegistry.getConfig();
         if (cfg != null && cfg.hasPath(key)) return cfg.raw().getInt(key);
         return defaultVal;
     }

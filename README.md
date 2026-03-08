@@ -1,5 +1,6 @@
 # b-autobot
 
+[![CI](https://github.com/olegr-io/b-autobot/actions/workflows/ci.yml/badge.svg)](https://github.com/olegr-io/b-autobot/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-21-blue.svg)](https://adoptium.net/)
 [![Playwright](https://img.shields.io/badge/Playwright-1.49.0-green.svg)](https://playwright.dev/java/)
@@ -67,15 +68,22 @@ Scenario: Admin has PT admin access
 
 ```
 b-autobot/
+├── .github/workflows/ci.yml        ← GitHub Actions CI (core + sandbox + nightly template)
 ├── b-bot-core/                     ← Publishable library (no Cucumber dependency)
 │   └── src/main/java/com/bbot/core/
-│       ├── PlaywrightManager       # Thread-local Playwright lifecycle
-│       ├── GridHarness             # 3-phase virtualisation-safe row finder
-│       ├── TickingCellHelper       # Live-ticking cell wait/assert helpers
+│       ├── BrowserLifecycle        # Interface — mockable browser lifecycle abstraction
+│       ├── CellAssertions          # Interface — mockable ticking-cell assertion abstraction
+│       ├── GridQuery               # Interface — mockable AG Grid row query abstraction
+│       ├── PlaywrightManager       # Thread-local Playwright lifecycle (@Deprecated statics)
+│       ├── GridHarness             # 3-phase virtualisation-safe row finder (implements GridQuery)
+│       ├── TickingCellHelper       # Live-ticking cell wait/assert helpers (implements CellAssertions)
 │       ├── ProbesLoader            # Injects window.agGridProbes bundle
 │       ├── NumericComparator       # UI vs API value comparison (BigDecimal)
 │       ├── config/BBotConfig       # HOCON layered config (5-layer loading)
-│       └── registry/               # AppDescriptor / AppContext / BBotRegistry
+│       ├── exception/              # BBotException hierarchy (6 typed exceptions)
+│       ├── registry/BBotSession    # Immutable session (M11 instance-based API)
+│       ├── registry/BBotRegistry   # Static registry delegates to BBotSession (@Deprecated)
+│       └── rest/                   # RestClient, RestProbe, RestResponse, ScenarioContext, …
 │
 ├── b-bot-sandbox/                  ← Demo & regression suite (all 66 scenarios)
 │   └── src/test/
@@ -125,18 +133,24 @@ b-autobot/
 |---|---|
 | Publishable core library | `b-bot-core` — zero Cucumber dependency; consumers add it as a single `<dependency>` |
 | HOCON layered config | `BBotConfig` — 5-layer loading; all timeouts/browser settings overridable per environment |
+| Instance-based architecture | `BBotSession` + PicoContainer DI — fresh `ScenarioContext` per scenario; static API deprecated |
+| Typed exception hierarchy | `BBotException` family — typed catches, diagnostic messages, no raw `AssertionError` |
+| Dependency inversion interfaces | `BrowserLifecycle`, `GridQuery`, `CellAssertions`, `RestClient` — mockable in unit tests |
 | Component registry | `BBotRegistry` + `AppDescriptor` — register apps, resolve contexts, create DSLs |
 | BDD with living documentation | Cucumber 7 feature files as acceptance criteria |
 | Playwright + Java browser automation | Page Object Model, role-based locators, no `Thread.sleep` |
 | Live-ticking cell handling | `TickingCellHelper` — `waitForFunction` polling, flash-class detection |
 | AG Grid virtualisation | `GridHarness` — 3-phase scroll strategy (DOM → JS API → scroll-probe) |
+| Full REST client | `RestProbe` — GET/POST/PUT/DELETE/PATCH, auth, retry, shared `HttpClient`, JsonPath assertions |
+| SLF4J structured logging | All 8 core classes instrumented; Playwright tracing support for CI failure diagnosis |
 | Industrial JS probes | Named probe modules in `b-bot-sandbox/src/test/js/` tested with Jest + jsdom |
 | WireMock mock server | Embedded, classpath-based file serving, dynamic port |
 | Config Service microservice | JDK `HttpServer` mock, in-memory CRUD, CORS headers |
 | Access-controlled UI | RELEASE PT button gated by `isPTAdmin` from Config Service |
 | Deployment Dashboard | AG Grid service registry, 12 seeded services, filter |
 | Version-gated regression | `@precondition` scenario asserts deployed versions |
-| Copy-adapt template | `pt-blotter-regression-template` — 25-scenario working demo; copy-adapt for real UAT systems |
+| GitHub Actions CI | 3-job pipeline — core tests, 66-scenario sandbox, nightly 24-scenario template |
+| Copy-adapt template | `pt-blotter-regression-template` — 24-scenario working demo; copy-adapt for real UAT systems |
 
 ---
 
@@ -147,10 +161,13 @@ b-autobot/
 | Language | Java | 21 |
 | Browser automation | Playwright for Java | 1.49.0 |
 | BDD framework | Cucumber | 7.18.1 |
+| DI container | Cucumber PicoContainer | 7.18.1 |
 | Test runner | JUnit 5 Platform Suite | 5.10.3 / 1.10.3 |
 | Config | Typesafe Config (HOCON) | 1.4.3 |
+| Logging | SLF4J API | 2.0.13 |
 | REST mock | WireMock | 3.5.4 |
 | JSON parsing | Jackson Databind | 2.17.2 |
+| JSON path | JsonPath | 2.9.0 |
 | Assertions | AssertJ | 3.26.3 |
 | Build | Maven | 3.x |
 | JS probe tests | Jest + jsdom | 29.x |
@@ -305,18 +322,17 @@ any working directory (Maven reactor root or module directory).
 
 ## CI/CD integration
 
+A ready-to-use GitHub Actions workflow lives at `.github/workflows/ci.yml`.
+
+| Job | When | What |
+|-----|------|------|
+| `core-tests` | every push / PR | `mvn verify -pl b-bot-core` — 184 unit tests, JaCoCo, Javadoc JAR |
+| `sandbox-tests` | every push / PR | `mvn verify -pl b-bot-sandbox` — 66 integration scenarios, Cucumber HTML report |
+| `template-nightly` | nightly 02:00 UTC + `workflow_dispatch` | starts mock UAT servers, runs 24 template scenarios |
+
 Test output is standard JUnit XML (`target/surefire-reports/`) and Cucumber JSON
 (`target/cucumber-reports/report.json`), compatible with Jenkins, GitHub Actions,
 GitLab CI, and any CI system that consumes these formats.
 
-```yaml
-# GitHub Actions example
-- name: Run sandbox regression suite
-  run: mvn verify
-
-- name: Publish Cucumber report
-  uses: actions/upload-artifact@v4
-  with:
-    name: cucumber-report
-    path: b-bot-sandbox/target/cucumber-html-reports/
-```
+JaCoCo coverage is enforced (65% minimum); the Javadoc JAR is built with
+`failOnWarnings=true` to catch API documentation regressions early.

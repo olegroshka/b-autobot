@@ -1,6 +1,5 @@
 package stepdefs;
 
-import com.bbot.core.registry.BBotRegistry;
 import io.cucumber.java.en.Given;
 
 /**
@@ -15,13 +14,19 @@ import io.cucumber.java.en.Given;
  */
 public class AppPreconditionSteps {
 
+    private final TestWorld world;
+
+    public AppPreconditionSteps(TestWorld world) {
+        this.world = world;
+    }
+
     /**
      * Asserts the named app's health endpoint returns 2xx.
      * Example: {@code Given the "blotter" app is healthy}
      */
     @Given("the {string} app is healthy")
     public void appIsHealthy(String appName) {
-        BBotRegistry.checkHealth(appName);
+        world.session().checkHealth(appName);
     }
 
     /**
@@ -30,6 +35,6 @@ public class AppPreconditionSteps {
      */
     @Given("the {string} service is running at version {string}")
     public void serviceIsRunningAtVersion(String appName, String expectedVersion) {
-        BBotRegistry.assertVersion(appName, expectedVersion);
+        world.session().assertVersion(appName, expectedVersion);
     }
 }

@@ -114,19 +114,33 @@ This logic is encapsulated in `bundle.js` and accessible as `window.agGridProbes
 b-autobot/
 ├── CLAUDE.md
 ├── BLOTTER_DESIGN.md               # Full design doc — blotter, config service, deployment dashboard
-├── MODULARISATION_DESIGN.md        # Multi-module architecture design record
+├── MODULARISATION_DESIGN.md        # Multi-module architecture design record (M1–M12)
+├── IMPLEMENTATION_PLAN.md          # Industrialisation plan (M7–M12) — all COMPLETE
+├── .github/workflows/ci.yml        # GitHub Actions CI (core + sandbox + nightly template)
 ├── pom.xml                         # Parent aggregator — version management for all modules
 │
 ├── b-bot-core/                     # Publishable library (no Cucumber dependency)
 │   └── src/main/
 │       ├── java/com/bbot/core/
-│       │   ├── PlaywrightManager
-│       │   ├── GridHarness
-│       │   ├── TickingCellHelper
-│       │   ├── ProbesLoader
-│       │   ├── NumericComparator
+│       │   ├── BrowserLifecycle    # Interface (M10) — mockable browser lifecycle
+│       │   ├── CellAssertions      # Interface (M10) — mockable ticking-cell assertions
+│       │   ├── GridQuery           # Interface (M10) — mockable AG Grid row queries
+│       │   ├── PlaywrightManager   # @Deprecated statics (M11) — use BBotSession
+│       │   ├── GridHarness         # implements GridQuery; config via constructor (M11)
+│       │   ├── TickingCellHelper   # Live-ticking cell wait/assert helpers
+│       │   ├── ProbesLoader        # Injects window.agGridProbes bundle
+│       │   ├── NumericComparator   # UI vs API value comparison (BigDecimal)
+│       │   ├── exception/          # BBotException hierarchy (M8a) — 6 typed exceptions
 │       │   ├── config/BBotConfig   # HOCON layered config (5-layer loading)
-│       │   └── registry/           # AppDescriptor / AppContext / BBotRegistry
+│       │   ├── registry/           # AppDescriptor / AppContext / BBotRegistry
+│       │   │   ├── BBotSession     # Immutable session — instance API (M11)
+│       │   │   └── BBotRegistry    # @Deprecated statics delegate to BBotSession (M11)
+│       │   └── rest/               # RestClient (M10), RestProbe, RestResponse (M9)
+│       │       ├── ScenarioContext # Per-scenario instance-based state (M11)
+│       │       ├── ScenarioState   # @Deprecated thread-local, delegates to ScenarioContext
+│       │       ├── AuthStrategy    # Bearer token / no-auth (M9)
+│       │       ├── RetryPolicy     # Exponential backoff record (M9)
+│       │       └── HttpClientFactory # Shared HttpClient factory (M9)
 │       └── resources/
 │           ├── js/probes/bundle.js # JS probe bundle (on classpath for ProbesLoader)
 │           └── reference.conf      # Core defaults (browser, timeouts, grid settings)
@@ -138,7 +152,7 @@ b-autobot/
 │       │   ├── model/              # Jackson POJOs (Trade, TradePortfolio)
 │       │   ├── pages/              # FinanceDemoPage (AG Grid Finance Demo POM)
 │       │   ├── runners/            # JUnit 5 @Suite runner
-│       │   ├── stepdefs/           # BondBlotterSteps, ConfigServiceSteps, DeploymentSteps, …
+│       │   ├── stepdefs/           # TestWorld (M11 PicoContainer), *Steps, Hooks
 │       │   └── utils/              # BlotterDsl, ConfigServiceDsl, DeploymentDsl,
 │       │                           # MockBlotterServer, MockConfigServer, MockDeploymentServer,
 │       │                           # BlotterDevServer, ConfigDevServer, DeploymentDevServer
@@ -151,11 +165,11 @@ b-autobot/
 │           ├── config-service-ui/  # Pre-built Config Service UI (git-committed)
 │           └── deployment-ui/      # Pre-built Deployment Dashboard UI (git-committed)
 │
-└── pt-blotter-regression-template/ # Copy-adapt starter for real-system consumers
+└── pt-blotter-regression-template/ # Copy-adapt starter for real-system consumers (24 scenarios)
     └── src/test/
         ├── java/
-        │   ├── descriptors/BlotterDescriptor.java
-        │   ├── stepdefs/{Hooks,BlotterSteps,AppPreconditionSteps}.java
+        │   ├── descriptors/        # BlotterDescriptor, ConfigServiceDescriptor, DeploymentDescriptor
+        │   ├── stepdefs/           # TestWorld (M11 PicoContainer), Hooks, *Steps, RestApiSteps
         │   └── utils/PtBlotterDsl.java
         └── resources/
             ├── application.conf             # Base config + commented overrides

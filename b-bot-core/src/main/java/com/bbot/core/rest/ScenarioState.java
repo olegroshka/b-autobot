@@ -1,7 +1,5 @@
 package com.bbot.core.rest;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -24,56 +22,64 @@ import java.util.Optional;
  *
  * <p>Reset at the start of every Cucumber scenario by calling {@link #reset()}
  * from a {@code @Before} hook.
+ *
+ * <p>Since M11, the static methods delegate to a thread-local
+ * {@link ScenarioContext} instance. New code should prefer injecting a
+ * {@code ScenarioContext} via PicoContainer instead.
+ *
+ * @see ScenarioContext
  */
 public final class ScenarioState {
 
-    private static final ThreadLocal<Map<String, String>> STATE =
-            ThreadLocal.withInitial(HashMap::new);
+    private static final ThreadLocal<ScenarioContext> CTX =
+            ThreadLocal.withInitial(ScenarioContext::new);
 
     private ScenarioState() {}
 
-    /** Stores {@code value} under {@code key} for the current scenario. */
+    /**
+     * Returns the thread-local {@link ScenarioContext} backing this static API.
+     * Useful for bridge code that needs both APIs during the migration period.
+     */
+    public static ScenarioContext current() {
+        return CTX.get();
+    }
+
+    /** @deprecated Use {@link ScenarioContext#put(String, String)} instead. */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void put(String key, String value) {
-        STATE.get().put(key, value);
+        CTX.get().put(key, value);
     }
 
-    /** Returns the value for {@code key}, or empty if not yet captured. */
+    /** @deprecated Use {@link ScenarioContext#get(String)} instead. */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static Optional<String> get(String key) {
-        return Optional.ofNullable(STATE.get().get(key));
+        return CTX.get().get(key);
     }
 
     /**
-     * Returns the value for {@code key}, or throws {@link AssertionError} with a
-     * diagnostic message listing available keys.
+     * Returns the value for {@code key}, or throws with a diagnostic message
+     * listing available keys.
+     *
+     * @deprecated Use {@link ScenarioContext#require(String)} instead.
      */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static String require(String key) {
-        return get(key).orElseThrow(() -> new AssertionError(
-                "ScenarioState: key '" + key + "' not found. " +
-                "Ensure a previous step captured this value. " +
-                "Available keys: " + STATE.get().keySet()));
+        return CTX.get().require(key);
     }
 
-    /**
-     * Clears all captured values for the current thread.
-     * Call from a Cucumber {@code @Before} hook so each scenario starts clean.
-     */
+    /** @deprecated Use instance-based {@link ScenarioContext} via PicoContainer instead. */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void reset() {
-        STATE.get().clear();
+        CTX.get().reset();
     }
 
     /**
      * Resolves all {@code ${key}} tokens in {@code template} from the current state.
-     * Tokens with no matching key are left unchanged so the unresolved reference
-     * is visible in any downstream error.
      *
-     * @param template a string that may contain {@code ${key}} tokens
-     * @return the string with all resolvable tokens substituted
+     * @deprecated Use {@link ScenarioContext#resolve(String)} instead.
      */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static String resolve(String template) {
-        String result = template;
-        for (Map.Entry<String, String> e : STATE.get().entrySet()) {
-            result = result.replace("${" + e.getKey() + "}", e.getValue());
-        }
-        return result;
+        return CTX.get().resolve(template);
     }
 }

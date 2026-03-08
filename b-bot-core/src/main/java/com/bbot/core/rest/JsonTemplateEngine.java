@@ -1,6 +1,9 @@
 package com.bbot.core.rest;
 
 import com.bbot.core.data.TestDataConfig;
+import com.bbot.core.exception.BBotTemplateException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -38,6 +41,8 @@ import java.util.Map;
  */
 public final class JsonTemplateEngine {
 
+    private static final Logger LOG = LoggerFactory.getLogger(JsonTemplateEngine.class);
+
     private final TestDataConfig testData;
 
     public JsonTemplateEngine(TestDataConfig testData) {
@@ -56,6 +61,7 @@ public final class JsonTemplateEngine {
      * @return rendered JSON string, ready to use as an HTTP request body
      */
     public String render(String templateName, String bondListName) {
+        LOG.debug("Rendering template '{}' with bond list '{}'", templateName, bondListName);
         String raw = load(testData.getTemplatePath(templateName));
         return substitute(raw, testData.getBondList(bondListName), testData.getAllGlobals());
     }
@@ -65,6 +71,7 @@ public final class JsonTemplateEngine {
      * (no bond list). Use this for templates that don't reference bond-specific fields.
      */
     public String render(String templateName) {
+        LOG.debug("Rendering template '{}' (no bond list)", templateName);
         String raw = load(testData.getTemplatePath(templateName));
         return substitute(raw, Map.of(), testData.getAllGlobals());
     }
@@ -82,6 +89,7 @@ public final class JsonTemplateEngine {
      *                     substituted as {@code ${key}} tokens in the template
      */
     public String renderWithContext(String templateName, Map<String, String> vars) {
+        LOG.debug("Rendering template '{}' with context vars: {}", templateName, vars.keySet());
         String raw = load(testData.getTemplatePath(templateName));
         return substituteWithContext(raw, vars, testData.getAllGlobals());
     }
@@ -91,12 +99,16 @@ public final class JsonTemplateEngine {
     private String load(String classpathPath) {
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(classpathPath)) {
             if (is == null)
-                throw new AssertionError(
+                throw new BBotTemplateException(
                     "Template not found on classpath: '" + classpathPath + "'. " +
-                    "Ensure the file is under src/test/resources/ in your module.");
+                    "Ensure the file is under src/test/resources/ in your module.",
+                    classpathPath);
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (BBotTemplateException e) {
+            throw e;  // re-throw without wrapping
         } catch (IOException e) {
-            throw new AssertionError("Failed to load template: " + classpathPath, e);
+            throw new BBotTemplateException(
+                    "Failed to load template: " + classpathPath, classpathPath, e);
         }
     }
 

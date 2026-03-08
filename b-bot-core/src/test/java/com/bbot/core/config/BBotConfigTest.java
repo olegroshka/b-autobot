@@ -1,5 +1,7 @@
 package com.bbot.core.config;
 
+import com.bbot.core.data.ApiAction;
+import com.bbot.core.exception.BBotConfigException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -7,6 +9,7 @@ import java.time.Duration;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * Unit tests for {@link BBotConfig}.
@@ -124,5 +127,65 @@ class BBotConfigTest {
 
         assertThat(cfg.hasPath("b-bot.browser.type")).isTrue();
         assertThat(cfg.hasPath("b-bot.does.not.exist")).isFalse();
+    }
+
+    // ── G7g: getApiAction ─────────────────────────────────────────────────────
+
+    @Test
+    void getApiAction_findsAcrossApps() {
+        BBotConfig cfg = BBotConfig.load();
+
+        ApiAction action = cfg.getApiAction("submit-rfq");
+        assertThat(action).isNotNull();
+        assertThat(action.app()).isEqualTo("blotter");
+    }
+
+    @Test
+    void getApiAction_recordFields() {
+        BBotConfig cfg = BBotConfig.load();
+
+        ApiAction action = cfg.getApiAction("submit-rfq");
+        assertThat(action.name()).isEqualTo("submit-rfq");
+        assertThat(action.method()).isEqualTo("POST");
+        assertThat(action.app()).isEqualTo("blotter");
+        assertThat(action.path()).isEqualTo("/api/inquiry");
+        assertThat(action.template()).isEqualTo("test-rfq");
+    }
+
+    @Test
+    void getApiAction_nullableTemplate() {
+        BBotConfig cfg = BBotConfig.load();
+
+        ApiAction action = cfg.getApiAction("list-inquiries");
+        assertThat(action.method()).isEqualTo("GET");
+        assertThat(action.template()).isNull();
+    }
+
+    @Test
+    void getApiAction_unknownName_throws() {
+        BBotConfig cfg = BBotConfig.load();
+
+        assertThatThrownBy(() -> cfg.getApiAction("nonexistent-action"))
+            .isInstanceOf(BBotConfigException.class)
+            .hasMessageContaining("nonexistent-action");
+    }
+
+    // ── getTestData ───────────────────────────────────────────────────────────
+
+    @Test
+    void getTestData_returnsNonNull() {
+        BBotConfig cfg = BBotConfig.load();
+
+        assertThat(cfg.getTestData()).isNotNull();
+    }
+
+    // ── M8f: tracing config defaults ──────────────────────────────────────────
+
+    @Test
+    void tracingDefaults_disabledWithDefaultOutputDir() {
+        BBotConfig cfg = BBotConfig.load();
+
+        assertThat(cfg.getBoolean("b-bot.tracing.enabled")).isFalse();
+        assertThat(cfg.getString("b-bot.tracing.outputDir")).isEqualTo("target/playwright-traces");
     }
 }

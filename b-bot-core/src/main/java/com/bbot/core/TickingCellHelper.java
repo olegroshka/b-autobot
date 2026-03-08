@@ -4,6 +4,8 @@ import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.time.Duration;
 import java.util.List;
@@ -32,13 +34,23 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public final class TickingCellHelper {
 
+    private static final Logger LOG = LoggerFactory.getLogger(TickingCellHelper.class);
+
     /**
      * Returns the polling interval (ms) for {@code waitForFunction} calls.
      * Read from {@code b-bot.ticking.pollMs} in the active config;
      * falls back to 150 ms if the registry is not yet initialised.
      */
+    @SuppressWarnings("deprecation")
     private static int pollMs() {
-        BBotConfig cfg = BBotRegistry.getConfig();
+        return pollMs(BBotRegistry.getConfig());
+    }
+
+    /**
+     * Returns the polling interval (ms) for {@code waitForFunction} calls,
+     * reading from the supplied config. Falls back to 150 ms.
+     */
+    static int pollMs(BBotConfig cfg) {
         if (cfg != null && cfg.hasPath("b-bot.ticking.pollMs"))
             return cfg.raw().getInt("b-bot.ticking.pollMs");
         return 150;
@@ -56,6 +68,7 @@ public final class TickingCellHelper {
      */
     public static String waitForCellUpdate(Page page, String colId, int rowIndex, Duration timeout) {
         String selector = buildCellSelector(colId, rowIndex);
+        LOG.debug("Waiting for cell update: selector='{}', timeout={}ms", selector, timeout.toMillis());
         Locator cell = page.locator(selector);
         cell.scrollIntoViewIfNeeded();
         String initialValue = cell.textContent().trim();
@@ -103,6 +116,7 @@ public final class TickingCellHelper {
      */
     public static void waitForCellFlash(Page page, String colId, int rowIndex, Duration timeout) {
         String selector = buildCellSelector(colId, rowIndex);
+        LOG.debug("Waiting for cell flash: selector='{}', timeout={}ms", selector, timeout.toMillis());
         page.locator(selector).scrollIntoViewIfNeeded();
 
         page.waitForFunction(

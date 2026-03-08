@@ -1,5 +1,8 @@
 package com.bbot.core;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +24,8 @@ import java.nio.charset.StandardCharsets;
  */
 public final class ProbesLoader {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ProbesLoader.class);
+
     private static volatile String bundle;
 
     private ProbesLoader() {}
@@ -36,6 +41,7 @@ public final class ProbesLoader {
             synchronized (ProbesLoader.class) {
                 if (bundle == null) {
                     bundle = readResource("/js/probes/bundle.js");
+                    LOG.info("Probes bundle loaded from classpath ({} chars)", bundle.length());
                 }
             }
         }

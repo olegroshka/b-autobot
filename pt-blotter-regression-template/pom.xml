@@ -83,6 +83,11 @@
       <artifactId>cucumber-junit-platform-engine</artifactId>
       <scope>test</scope>
     </dependency>
+    <dependency>
+      <groupId>io.cucumber</groupId>
+      <artifactId>cucumber-picocontainer</artifactId>
+      <scope>test</scope>
+    </dependency>
 
     <!-- JUnit 5 Platform — discovers and runs Cucumber via @Suite -->
     <dependency>

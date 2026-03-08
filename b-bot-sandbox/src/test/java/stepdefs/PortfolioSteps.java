@@ -16,8 +16,6 @@ import model.Trade;
 import model.TradePortfolio;
 import com.bbot.core.GridHarness;
 import com.bbot.core.NumericComparator;
-import com.bbot.core.PlaywrightManager;
-import com.bbot.core.registry.BBotRegistry;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -51,6 +49,12 @@ public class PortfolioSteps {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    private final TestWorld world;
+
+    public PortfolioSteps(TestWorld world) {
+        this.world = world;
+    }
+
     // ── Scenario-scoped state (new instance per scenario) ─────────────────────
 
     private TradePortfolio submittedPortfolio;
@@ -73,8 +77,8 @@ public class PortfolioSteps {
      */
     @Given("the user from role {string} submits a portfolio via REST API")
     public void userRoleSubmitsPortfolioViaRestApi(String role) throws Exception {
-        String traderId = BBotRegistry.getConfig().getTestData().getUser(role);
-        String endpoint = BBotRegistry.getConfig().getAppApiBase("blotter") + "/submit";
+        String traderId = world.session().getConfig().getTestData().getUser(role);
+        String endpoint = world.session().getConfig().getAppApiBase("blotter") + "/submit";
 
         // ── 1. Build payload ──────────────────────────────────────────────────
         submittedPortfolio = TradePortfolio.builder()
@@ -121,7 +125,7 @@ public class PortfolioSteps {
         //
         // page.request() returns an APIRequestContext bound to the browser context,
         // sharing the same cookie jar — important for SSO-protected blotters.
-        Page page = PlaywrightManager.getPage();
+        Page page = world.page();
         APIRequestContext ctx = page.request();
 
         apiResponse = ctx.post(endpoint,
@@ -166,8 +170,8 @@ public class PortfolioSteps {
      */
     @And("the blotter at app {string} is open")
     public void theBlotterIsOpen(String appName) {
-        String url = BBotRegistry.getConfig().getAppWebUrl(appName);
-        Page page = PlaywrightManager.getPage();
+        String url = world.session().getConfig().getAppWebUrl(appName);
+        Page page = world.page();
         page.navigate(url);
         page.locator("[role='grid']")
                 .waitFor(new Locator.WaitForOptions().setTimeout(20_000));
@@ -194,7 +198,7 @@ public class PortfolioSteps {
         // Build camelCase row data from the snake_case API response
         String rowDataJson = MAPPER.writeValueAsString(List.of(buildGridRow(apiResponseNode)));
 
-        Page page = PlaywrightManager.getPage();
+        Page page = world.page();
 
         // Render the CDN-free mock blotter; DOMCONTENTLOADED is sufficient
         // because the mock DOM is built by an inline script with no external resources.
@@ -212,7 +216,7 @@ public class PortfolioSteps {
     @Then("the AG Grid should display the {string} column")
     public void theAgGridShouldDisplayColumn(String colId) {
         // LocatorAssertions.isVisible() has built-in retry; no options needed here.
-        assertThat(PlaywrightManager.getPage()
+        assertThat(world.page()
                 .locator(String.format(".ag-header-cell[col-id='%s']", colId)))
                 .isVisible();
     }
@@ -228,7 +232,7 @@ public class PortfolioSteps {
                 .as("API must have returned '%s' before the UI can be asserted", fieldLabel)
                 .isNotBlank();
 
-        GridHarness harness = new GridHarness(PlaywrightManager.getPage());
+        GridHarness harness = new GridHarness(world.page());
         foundCell = harness.findRowByCellValue("portfolioId", expectedValue, Duration.ofSeconds(10));
 
         assertThat(foundCell).isVisible();
@@ -270,7 +274,7 @@ public class PortfolioSteps {
         int rowIndex = Integer.parseInt(rowStr);
 
         // ── a) Scrape the UI value using GridHarness ──────────────────────────
-        String uiValue = new GridHarness(PlaywrightManager.getPage())
+        String uiValue = new GridHarness(world.page())
                 .getCellText(colId, rowIndex);
 
         // ── b) Extract the expected value from the stored API JSON response ───
@@ -286,7 +290,7 @@ public class PortfolioSteps {
 
     @When("I search the grid for ticker {string}")
     public void iSearchTheGridForTicker(String ticker) {
-        GridHarness harness = new GridHarness(PlaywrightManager.getPage());
+        GridHarness harness = new GridHarness(world.page());
         foundCell = harness.findRowByCellValue("ticker", ticker, Duration.ofSeconds(15));
     }
 
@@ -295,7 +299,7 @@ public class PortfolioSteps {
         // Cast to Object so AssertJ's assertThat resolves (not PlaywrightAssertions)
         assertThat((Object) foundCell).isNotNull();
         assertThat(foundCell).isVisible();
-        GridHarness harness = new GridHarness(PlaywrightManager.getPage());
+        GridHarness harness = new GridHarness(world.page());
         String actual = "ticker".equals(colId)
                 ? foundCell.textContent().trim()
                 : harness.getSiblingCellText(foundCell, colId);
@@ -390,3 +394,4 @@ public class PortfolioSteps {
                 """.formatted(rowDataJson);
     }
 }
+

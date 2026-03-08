@@ -1,6 +1,5 @@
 package stepdefs;
 
-import com.bbot.core.registry.BBotRegistry;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -14,13 +13,18 @@ import utils.DeploymentDsl;
  */
 public class DeploymentSteps {
 
+    private final TestWorld world;
+    private final DeploymentDsl deployment;
+
     private static final String ENV_HINT =
             "\n\nIs the mock UAT environment running?" +
             "\n  Unix/Mac: scripts/start-mock-uat.sh" +
             "\n  Windows:  scripts\\start-mock-uat.bat\n";
 
-    private final DeploymentDsl deployment =
-            BBotRegistry.dsl("deployment", null, DeploymentDsl.class);
+    public DeploymentSteps(TestWorld world) {
+        this.world = world;
+        this.deployment = world.session().dsl("deployment", null, DeploymentDsl.class);
+    }
 
     /**
      * Connectivity check — asserts the deployment registry API is reachable
@@ -29,7 +33,7 @@ public class DeploymentSteps {
     @Given("the deployment dashboard is available")
     public void deploymentDashboardIsAvailable() {
         try {
-            BBotRegistry.checkHealth("deployment");
+            world.session().checkHealth("deployment");
         } catch (AssertionError e) {
             throw new AssertionError(e.getMessage() + ENV_HINT, e);
         } catch (Exception e) {
@@ -50,7 +54,7 @@ public class DeploymentSteps {
 
     @And("the service {string} is {string} at its tested version")
     public void serviceShouldBeAtTestedVersion(String name, String status) {
-        String version = BBotRegistry.getConfig().getTestData().getServiceVersion(name);
+        String version = world.session().getConfig().getTestData().getServiceVersion(name);
         deployment.assertServiceStatusAndVersion(name, status, version);
     }
 }

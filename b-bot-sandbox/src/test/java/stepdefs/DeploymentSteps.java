@@ -3,8 +3,6 @@ package stepdefs;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import com.bbot.core.PlaywrightManager;
-import com.bbot.core.registry.BBotRegistry;
 import utils.DeploymentDsl;
 
 import java.io.IOException;
@@ -21,16 +19,22 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class DeploymentSteps {
 
+    private final TestWorld world;
+
     /** API-only DSL (page=null). */
-    private final DeploymentDsl api =
-            BBotRegistry.dsl("deployment", null, DeploymentDsl.class);
+    private final DeploymentDsl api;
 
     /** Browser DSL — lazily instantiated when a @grid or @filter step runs. */
     private DeploymentDsl ui;
 
+    public DeploymentSteps(TestWorld world) {
+        this.world = world;
+        this.api = world.session().dsl("deployment", null, DeploymentDsl.class);
+    }
+
     private DeploymentDsl ui() {
         if (ui == null)
-            ui = BBotRegistry.dsl("deployment", PlaywrightManager.getPage(), DeploymentDsl.class);
+            ui = world.session().dsl("deployment", world.page(), DeploymentDsl.class);
         return ui;
     }
 
@@ -38,7 +42,7 @@ public class DeploymentSteps {
 
     @Given("the deployment dashboard is available")
     public void deploymentDashboardIsAvailable() {
-        BBotRegistry.checkHealth("deployment");
+        world.session().checkHealth("deployment");
     }
 
     // ── API — service assertions ──────────────────────────────────────────────
@@ -57,7 +61,7 @@ public class DeploymentSteps {
     @Then("the service {string} should be {string} at its tested version")
     public void serviceAtTestedVersion(String name, String status)
             throws IOException, InterruptedException {
-        String version = BBotRegistry.getConfig().getTestData().getServiceVersion(name);
+        String version = world.session().getConfig().getTestData().getServiceVersion(name);
         api.assertServiceRunningAtVersion(name, status, version);
     }
 

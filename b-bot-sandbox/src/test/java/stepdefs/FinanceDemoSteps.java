@@ -5,7 +5,6 @@ import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
 import pages.FinanceDemoPage;
-import com.bbot.core.PlaywrightManager;
 import com.bbot.core.TickingCellHelper;
 
 import java.time.Duration;
@@ -18,8 +17,13 @@ public class FinanceDemoSteps {
     private static final String BASE_URL =
             System.getProperty("BASE_URL", "https://www.ag-grid.com/example-finance/");
 
-    private final FinanceDemoPage financePage =
-            new FinanceDemoPage(PlaywrightManager.getPage());
+    private final TestWorld world;
+    private final FinanceDemoPage financePage;
+
+    public FinanceDemoSteps(TestWorld world) {
+        this.world = world;
+        this.financePage = new FinanceDemoPage(world.page());
+    }
 
     // ── Snapshot state used between When/Then steps ───────────────────────
     private String observedCellValue;
@@ -51,7 +55,7 @@ public class FinanceDemoSteps {
     @Then("the price cell should change its value within {int} seconds")
     public void thePriceCellShouldChangeWithin(int seconds) {
         String newValue = TickingCellHelper.waitForCellUpdate(
-                PlaywrightManager.getPage(), "price", 0,
+                world.page(), "price", 0,
                 Duration.ofSeconds(seconds));
         assertThat(newValue)
                 .as("Price cell should have updated from '%s'", observedCellValue)
@@ -63,7 +67,7 @@ public class FinanceDemoSteps {
     @Then("the price of the first row should be between {double} and {double}")
     public void thePriceOfFirstRowShouldBeBetween(double min, double max) {
         TickingCellHelper.assertCellValueInRange(
-                PlaywrightManager.getPage(), "price", 0,
+                world.page(), "price", 0,
                 min, max, Duration.ofSeconds(5));
     }
 
@@ -72,7 +76,7 @@ public class FinanceDemoSteps {
     @When("I wait for the {string} cell in row {int} to flash")
     public void iWaitForCellToFlash(String colId, int rowIndex) {
         TickingCellHelper.waitForCellFlash(
-                PlaywrightManager.getPage(), colId, rowIndex,
+                world.page(), colId, rowIndex,
                 Duration.ofSeconds(10));
         tickReceived = true;
     }
@@ -103,7 +107,7 @@ public class FinanceDemoSteps {
         String valueBefore = financePage.getCellText("price", rowIndex);
         // Allow time to pass without a Thread.sleep by using waitForTimeout
         // (the only permitted use — we're asserting absence of change).
-        PlaywrightManager.getPage().waitForTimeout(Duration.ofSeconds(seconds).toMillis());
+        world.page().waitForTimeout(Duration.ofSeconds(seconds).toMillis());
         String valueAfter = financePage.getCellText("price", rowIndex);
         assertThat(valueAfter)
                 .as("Price should remain stable while feed is paused")
@@ -182,7 +186,7 @@ public class FinanceDemoSteps {
     @Then("cell {string} in row {int} should change within {int} seconds")
     public void cellInRowShouldChangeWithin(String colId, int rowIndex, int seconds) {
         String newValue = TickingCellHelper.waitForCellUpdate(
-                PlaywrightManager.getPage(), colId, rowIndex,
+                world.page(), colId, rowIndex,
                 Duration.ofSeconds(seconds));
         assertThat(newValue)
                 .as("Cell [col='%s', row=%d] should have updated from '%s'", colId, rowIndex, observedCellValue)

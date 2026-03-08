@@ -1,8 +1,6 @@
 package stepdefs;
 
 import com.bbot.core.data.TestDataConfig;
-import com.bbot.core.PlaywrightManager;
-import com.bbot.core.registry.BBotRegistry;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -27,12 +25,16 @@ import java.time.Duration;
  */
 public class BlotterSteps {
 
-    // DSL is instantiated fresh for every scenario via BBotRegistry.
-    private final PtBlotterDsl blotter =
-            BBotRegistry.dsl("blotter", PlaywrightManager.getPage(), PtBlotterDsl.class);
+    private final TestWorld world;
+    private final PtBlotterDsl blotter;
+
+    public BlotterSteps(TestWorld world) {
+        this.world = world;
+        this.blotter = world.session().dsl("blotter", world.page(), PtBlotterDsl.class);
+    }
 
     private TestDataConfig testData() {
-        return BBotRegistry.getConfig().getTestData();
+        return world.session().getConfig().getTestData();
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────

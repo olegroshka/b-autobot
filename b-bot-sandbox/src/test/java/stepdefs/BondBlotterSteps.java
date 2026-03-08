@@ -5,8 +5,6 @@ import com.microsoft.playwright.APIResponse;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import com.bbot.core.PlaywrightManager;
-import com.bbot.core.registry.BBotRegistry;
 import utils.BlotterDsl;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,11 +30,16 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 public class BondBlotterSteps {
 
-    private final BlotterDsl dsl =
-            BBotRegistry.dsl("blotter", PlaywrightManager.getPage(), BlotterDsl.class);
+    private final TestWorld world;
+    private final BlotterDsl dsl;
+
+    public BondBlotterSteps(TestWorld world) {
+        this.world = world;
+        this.dsl = world.session().dsl("blotter", world.page(), BlotterDsl.class);
+    }
 
     private TestDataConfig testData() {
-        return BBotRegistry.getConfig().getTestData();
+        return world.session().getConfig().getTestData();
     }
 
     // Shared state between When/Then steps within a scenario

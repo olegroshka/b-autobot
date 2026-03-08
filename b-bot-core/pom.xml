@@ -66,8 +66,12 @@
     </dependency>
 
     <!-- ═══════════════════════════════════════
-         Logging
+         Logging — SLF4J API (compile: consumers provide their own binding)
     ═══════════════════════════════════════ -->
+    <dependency>
+      <groupId>org.slf4j</groupId>
+      <artifactId>slf4j-api</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.slf4j</groupId>
       <artifactId>slf4j-simple</artifactId>
@@ -107,6 +111,81 @@
             <include>**/*Test.java</include>
           </includes>
         </configuration>
+      </plugin>
+
+      <!-- ═══════════════════════════════════════
+           JaCoCo — code coverage reporting + enforcement
+           M7: 80% line coverage on com.bbot.core packages
+      ═══════════════════════════════════════ -->
+      <!-- ═══════════════════════════════════════
+           Javadoc — M12b: zero-warning API documentation
+      ═══════════════════════════════════════ -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <goals><goal>jar</goal></goals>
+            <phase>verify</phase>
+          </execution>
+        </executions>
+      </plugin>
+
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>0.8.13</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals><goal>prepare-agent</goal></goals>
+            <configuration>
+              <!--
+                Exclude JDK internal packages from instrumentation.
+                JaCoCo's ASM may lag behind the latest JDK class-file version,
+                causing IllegalClassFormatException on JDK internals.
+                Our own code (compiled with release 21) is unaffected.
+              -->
+              <excludes>
+                <exclude>java.*</exclude>
+                <exclude>javax.*</exclude>
+                <exclude>jdk.*</exclude>
+                <exclude>sun.*</exclude>
+                <exclude>com.sun.*</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>test</phase>
+            <goals><goal>report</goal></goals>
+          </execution>
+          <execution>
+            <id>check</id>
+            <phase>verify</phase>
+            <goals><goal>check</goal></goals>
+            <configuration>
+              <excludes>
+                <!-- Playwright-dependent: require a live browser, covered by integration tests -->
+                <exclude>com/bbot/core/PlaywrightManager.class</exclude>
+                <exclude>com/bbot/core/GridHarness.class</exclude>
+              </excludes>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>LINE</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>0.65</minimum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

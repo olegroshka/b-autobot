@@ -4,7 +4,6 @@ import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.Portfolio;
 import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.rest.ScenarioState;
-import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.rest.JsonTemplateEngine;
 import com.bbot.core.rest.RestProbe;
 import com.bbot.core.rest.RestResponse;
@@ -56,13 +55,14 @@ public class RestApiSteps {
      */
     private RestResponse lastResponse;
 
+    private final TestWorld         world;
     private final TestDataConfig    testData;
     private final JsonTemplateEngine templateEngine;
 
-    public RestApiSteps() {
-        TestDataConfig td = BBotRegistry.getConfig().getTestData();
-        this.testData       = td;
-        this.templateEngine = new JsonTemplateEngine(td);
+    public RestApiSteps(TestWorld world) {
+        this.world          = world;
+        this.testData       = world.session().getConfig().getTestData();
+        this.templateEngine = new JsonTemplateEngine(testData);
     }
 
     // ── POST ──────────────────────────────────────────────────────────────────
@@ -81,7 +81,7 @@ public class RestApiSteps {
     public void postTemplateWithBondList(String template, String bondList,
                                          String app, String path) {
         String body    = templateEngine.render(template, bondList);
-        String apiBase = BBotRegistry.getConfig().getAppApiBase(app);
+        String apiBase = world.session().getConfig().getAppApiBase(app);
         lastResponse   = RestProbe.of(apiBase).post(path, body);
     }
 
@@ -100,7 +100,7 @@ public class RestApiSteps {
     @When("I POST template {string} to app {string} path {string}")
     public void postTemplate(String template, String app, String path) {
         String body    = templateEngine.render(template);
-        String apiBase = BBotRegistry.getConfig().getAppApiBase(app);
+        String apiBase = world.session().getConfig().getAppApiBase(app);
         lastResponse   = RestProbe.of(apiBase).post(path, body);
     }
 
@@ -118,7 +118,7 @@ public class RestApiSteps {
      */
     @When("I GET from app {string} path {string}")
     public void getFromApp(String app, String path) {
-        String apiBase = BBotRegistry.getConfig().getAppApiBase(app);
+        String apiBase = world.session().getConfig().getAppApiBase(app);
         lastResponse   = RestProbe.of(apiBase).get(path);
     }
 
@@ -235,8 +235,8 @@ public class RestApiSteps {
      */
     @When("I perform {string}")
     public void performAction(String actionName) {
-        ApiAction action = BBotRegistry.getConfig().getApiAction(actionName);
-        String apiBase = BBotRegistry.getConfig().getAppApiBase(action.app());
+        ApiAction action = world.session().getConfig().getApiAction(actionName);
+        String apiBase = world.session().getConfig().getAppApiBase(action.app());
         String path = resolveActionPath(action.path());
         if ("GET".equalsIgnoreCase(action.method())) {
             lastResponse = RestProbe.of(apiBase).get(path);
@@ -258,8 +258,8 @@ public class RestApiSteps {
      */
     @When("I perform {string} with bond list {string}")
     public void performActionWithBondList(String actionName, String bondList) {
-        ApiAction action = BBotRegistry.getConfig().getApiAction(actionName);
-        String apiBase = BBotRegistry.getConfig().getAppApiBase(action.app());
+        ApiAction action = world.session().getConfig().getApiAction(actionName);
+        String apiBase = world.session().getConfig().getAppApiBase(action.app());
         String path = resolveActionPath(action.path());
         if ("GET".equalsIgnoreCase(action.method())) {
             lastResponse = RestProbe.of(apiBase).get(path);
@@ -291,7 +291,7 @@ public class RestApiSteps {
     @Given("I submit all inquiries for portfolio {string}")
     public void submitAllInquiriesForPortfolio(String portfolioName) {
         Portfolio portfolio = testData.getPortfolio(portfolioName);
-        String apiBase = BBotRegistry.getConfig().getAppApiBase("blotter");
+        String apiBase = world.session().getConfig().getAppApiBase("blotter");
         RestProbe probe = RestProbe.of(apiBase);
 
         // Capture the portfolio's PT ID so cancel actions can reference it as ${pt_id}

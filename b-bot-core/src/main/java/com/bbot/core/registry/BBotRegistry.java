@@ -2,15 +2,8 @@ package com.bbot.core.registry;
 
 import com.bbot.core.config.BBotConfig;
 import com.microsoft.playwright.Page;
-
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Central registry of all {@link AppDescriptor}s.
@@ -24,31 +17,51 @@ import java.util.concurrent.ConcurrentHashMap;
  *   <li>{@link #assertVersion(String, String)} — per precondition; asserts deployed version</li>
  *   <li>{@link #reset()}                  — in {@code @AfterAll} to clear state for the next JVM run</li>
  * </ol>
+ *
+ * <p>Since M11, every static method delegates to a {@link BBotSession} instance.
+ * New code should prefer the instance API via {@link #session()}.
  */
 public final class BBotRegistry {
 
-    private static final Map<String, AppDescriptor<?>> DESCRIPTORS    = new LinkedHashMap<>();
-    private static final Map<String, AppContext>        CONTEXTS       = new ConcurrentHashMap<>();
-    private static volatile BBotConfig                  CURRENT_CONFIG = null;
+    private static final Logger LOG = LoggerFactory.getLogger(BBotRegistry.class);
+
+    /** The accumulated builder between register() and initialize(). */
+    private static volatile BBotSession.Builder BUILDER = null;
+    /** The immutable session produced by initialize(). */
+    private static volatile BBotSession INSTANCE = null;
+    /** Config reference kept for getConfig() before / after session lifecycle. */
+    private static volatile BBotConfig CURRENT_CONFIG = null;
 
     private BBotRegistry() {}
 
     // ── Registration ─────────────────────────────────────────────────────────
 
-    /** Registers a descriptor. Call once per app in {@code @BeforeAll}, before {@link #initialize}. */
+    /** @deprecated Use {@link BBotSession.Builder#register(AppDescriptor)} instead. */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void register(AppDescriptor<?> descriptor) {
-        DESCRIPTORS.put(descriptor.name(), descriptor);
+        if (BUILDER == null) {
+            BUILDER = BBotSession.builder();
+        }
+        BUILDER.register(descriptor);
+        LOG.info("Registered app descriptor '{}'", descriptor.name());
     }
 
     /**
      * Resolves an {@link AppContext} for every registered descriptor from the supplied config.
      * Call once in {@code @BeforeAll} after all dynamic-port servers have started and
      * any runtime URL overrides have been applied via {@link BBotConfig#withOverrides}.
+     *
+     * @deprecated Use {@link BBotSession.Builder#initialize(BBotConfig)} and {@link BBotSession.Builder#build()} instead.
      */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void initialize(BBotConfig cfg) {
+        if (BUILDER == null) {
+            BUILDER = BBotSession.builder();
+        }
+        INSTANCE = BUILDER.initialize(cfg).build();
         CURRENT_CONFIG = cfg;
-        DESCRIPTORS.forEach((name, desc) ->
-            CONTEXTS.put(name, AppContext.fromConfig(name, cfg)));
+        BUILDER = null; // consumed — prevent double build
+        LOG.info("Registry initialised — {} app(s): {}", INSTANCE.appNames().size(), INSTANCE.appNames());
     }
 
     /**
@@ -58,9 +71,26 @@ public final class BBotRegistry {
      * <p>Core utilities ({@code PlaywrightManager}, {@code GridHarness},
      * {@code TickingCellHelper}) call this to read configurable timeouts and
      * browser settings without requiring callers to pass config explicitly.
+     *
+     * @deprecated Use {@link BBotSession#getConfig()} instead.
      */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static BBotConfig getConfig() {
         return CURRENT_CONFIG;
+    }
+
+    /**
+     * Returns the immutable {@link BBotSession} built by the last
+     * {@link #register} / {@link #initialize} cycle.
+     *
+     * @throws IllegalStateException if the registry has not yet been initialised
+     */
+    public static BBotSession session() {
+        BBotSession s = INSTANCE;
+        if (s == null) throw new IllegalStateException(
+            "BBotRegistry.session() called before initialize(). " +
+            "Register descriptors and call initialize(config) in @BeforeAll first.");
+        return s;
     }
 
     // ── DSL factory ───────────────────────────────────────────────────────────
@@ -72,12 +102,12 @@ public final class BBotRegistry {
      * @param appName  registered name, e.g. {@code "blotter"}
      * @param page     current scenario's Playwright page; {@code null} for REST-only apps
      * @param dslType  DSL class for type-safe cast (prevents accidental miscast)
+     *
+     * @deprecated Use {@link BBotSession#dsl(String, Page, Class)} instead.
      */
-    @SuppressWarnings("unchecked")
+    @Deprecated(since = "1.1", forRemoval = true)
     public static <D> D dsl(String appName, Page page, Class<D> dslType) {
-        AppDescriptor<D> desc = (AppDescriptor<D>) requireDescriptor(appName);
-        AppContext ctx = requireContext(appName);
-        return desc.dslFactory().create(ctx, page);
+        return requireSession().dsl(appName, page, dslType);
     }
 
     // ── Health / version assertions ───────────────────────────────────────────
@@ -85,101 +115,48 @@ public final class BBotRegistry {
     /**
      * Asserts the named app's health endpoint returns 2xx.
      * No-op if the descriptor declares no {@link AppDescriptor#healthCheckPath}.
+     *
+     * @deprecated Use {@link BBotSession#checkHealth(String)} instead.
      */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void checkHealth(String appName) {
-        AppDescriptor<?> desc = requireDescriptor(appName);
-        AppContext ctx = requireContext(appName);
-        desc.healthCheckPath().ifPresent(path -> {
-            String url = ctx.getApiBaseUrl() + path;
-            int status = httpGetStatus(url);
-            if (status < 200 || status >= 300) {
-                throw new AssertionError(
-                    "Health check FAILED for '" + appName + "': " +
-                    "GET " + url + " returned HTTP " + status);
-            }
-        });
+        requireSession().checkHealth(appName);
     }
 
     /**
      * Asserts the named app's version endpoint returns JSON containing the expected version string.
      * No-op if the descriptor declares no {@link AppDescriptor#versionPath}.
+     *
+     * @deprecated Use {@link BBotSession#assertVersion(String, String)} instead.
      */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void assertVersion(String appName, String expectedVersion) {
-        AppDescriptor<?> desc = requireDescriptor(appName);
-        AppContext ctx = requireContext(appName);
-        desc.versionPath().ifPresent(path -> {
-            String body = httpGetBody(ctx.getApiBaseUrl() + path);
-            if (!body.contains("\"" + expectedVersion + "\"")) {
-                throw new AssertionError(
-                    "Version mismatch for '" + appName + "': expected \"" +
-                    expectedVersion + "\" but response was: " + body);
-            }
-        });
+        requireSession().assertVersion(appName, expectedVersion);
     }
 
-    /** Checks health of all registered apps that declare a {@link AppDescriptor#healthCheckPath}. */
+    /** @deprecated Use {@link BBotSession#checkAllHealth()} instead. */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void checkAllHealth() {
-        DESCRIPTORS.keySet().forEach(BBotRegistry::checkHealth);
+        requireSession().checkAllHealth();
     }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
-    /** Clears all state. Call in {@code @AfterAll} so the JVM can be reused cleanly. */
+    /** @deprecated Use instance-based lifecycle management instead. */
+    @Deprecated(since = "1.1", forRemoval = true)
     public static void reset() {
-        DESCRIPTORS.clear();
-        CONTEXTS.clear();
+        INSTANCE = null;
+        BUILDER = null;
         CURRENT_CONFIG = null;
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────
 
-    private static AppDescriptor<?> requireDescriptor(String name) {
-        AppDescriptor<?> d = DESCRIPTORS.get(name);
-        if (d == null) throw new IllegalArgumentException(
-            "No AppDescriptor registered for '" + name + "'. " +
-            "Registered names: " + DESCRIPTORS.keySet());
-        return d;
-    }
-
-    private static AppContext requireContext(String name) {
-        AppContext ctx = CONTEXTS.get(name);
-        if (ctx == null) throw new IllegalStateException(
-            "BBotRegistry not initialised for '" + name + "'. " +
-            "Call BBotRegistry.initialize(config) in @BeforeAll " +
-            "after all servers are started.");
-        return ctx;
-    }
-
-    private static HttpClient httpClient() {
-        Duration timeout = configMs("b-bot.timeouts.healthCheck", 10_000);
-        return HttpClient.newBuilder().connectTimeout(timeout).build();
-    }
-
-    private static int httpGetStatus(String url) {
-        try {
-            HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-            return httpClient().send(req, HttpResponse.BodyHandlers.discarding()).statusCode();
-        } catch (Exception e) {
-            throw new AssertionError("Health check HTTP request failed for: " + url, e);
-        }
-    }
-
-    private static String httpGetBody(String url) {
-        try {
-            HttpRequest req = HttpRequest.newBuilder().uri(URI.create(url)).GET().build();
-            return httpClient().send(req, HttpResponse.BodyHandlers.ofString()).body();
-        } catch (Exception e) {
-            throw new AssertionError("Version check HTTP request failed for: " + url, e);
-        }
-    }
-
-    /**
-     * Reads a timeout from the active config, falling back to {@code defaultMs} if
-     * the registry is not yet initialised or the key is absent.
-     */
-    private static Duration configMs(String key, long defaultMs) {
-        BBotConfig cfg = CURRENT_CONFIG;
-        if (cfg != null && cfg.hasPath(key)) return cfg.getTimeout(key);
-        return Duration.ofMillis(defaultMs);
+    private static BBotSession requireSession() {
+        BBotSession s = INSTANCE;
+        if (s == null) throw new IllegalStateException(
+            "BBotRegistry not initialised. " +
+            "Call BBotRegistry.register() + BBotRegistry.initialize(config) in @BeforeAll.");
+        return s;
     }
 }
