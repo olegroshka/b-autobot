@@ -248,7 +248,7 @@ mvn test-compile -pl b-bot-sandbox -Dblotter.build.skip=false
 
 # Step 2 — start the mock server (from project root)
 mvn exec:java -pl b-bot-sandbox \
-    -Dexec.mainClass=utils.BlotterDevServer \
+    -Dexec.mainClass=com.bbot.sandbox.utils.BlotterDevServer \
     -Dexec.classpathScope=test
 
 # Step 3 — open in browser
@@ -257,8 +257,8 @@ mvn exec:java -pl b-bot-sandbox \
 
 Press **ENTER** in the terminal to stop the server.
 
-Similarly for the Config Service (`utils.ConfigDevServer`, port 8090) and
-Deployment Dashboard (`utils.DeploymentDevServer`, port 9098).
+Similarly for the Config Service (`com.bbot.sandbox.utils.ConfigDevServer`, port 8090) and
+Deployment Dashboard (`com.bbot.sandbox.utils.DeploymentDevServer`, port 9098).
 
 ---
 

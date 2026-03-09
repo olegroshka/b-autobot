@@ -31,9 +31,9 @@ echo.
 
 rem Each server opens in its own console window.
 rem Press ENTER in the server window to stop that individual server.
-start "BlotterDevServer" cmd /k "cd /d "%PROJECT_DIR%" && mvn exec:java -pl b-bot-sandbox -Dexec.mainClass=utils.BlotterDevServer -Dexec.classpathScope=test"
-start "ConfigDevServer" cmd /k "cd /d "%PROJECT_DIR%" && mvn exec:java -pl b-bot-sandbox -Dexec.mainClass=utils.ConfigDevServer -Dexec.classpathScope=test"
-start "DeploymentDevServer" cmd /k "cd /d "%PROJECT_DIR%" && mvn exec:java -pl b-bot-sandbox -Dexec.mainClass=utils.DeploymentDevServer -Dexec.classpathScope=test"
+start "BlotterDevServer" cmd /k "cd /d "%PROJECT_DIR%" && mvn exec:java -pl b-bot-sandbox -Dexec.mainClass=com.bbot.sandbox.utils.BlotterDevServer -Dexec.classpathScope=test"
+start "ConfigDevServer" cmd /k "cd /d "%PROJECT_DIR%" && mvn exec:java -pl b-bot-sandbox -Dexec.mainClass=com.bbot.sandbox.utils.ConfigDevServer -Dexec.classpathScope=test"
+start "DeploymentDevServer" cmd /k "cd /d "%PROJECT_DIR%" && mvn exec:java -pl b-bot-sandbox -Dexec.mainClass=com.bbot.sandbox.utils.DeploymentDevServer -Dexec.classpathScope=test"
 
 echo Waiting 20 seconds for all servers to start...
 timeout /t 20 /nobreak >nul

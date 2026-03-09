@@ -45,7 +45,7 @@ start_server() {
     # Start the server; its stdin reads from the FIFO
     (cd "$PROJECT_DIR" && \
      $MVN exec:java -pl b-bot-sandbox \
-         -Dexec.mainClass="utils.${class}" \
+         -Dexec.mainClass="com.bbot.sandbox.utils.${class}" \
          -Dexec.classpathScope=test \
          -q < "$fifo") > "$logfile" 2>&1 &
     echo $! > "$PID_DIR/${name}.pid"
