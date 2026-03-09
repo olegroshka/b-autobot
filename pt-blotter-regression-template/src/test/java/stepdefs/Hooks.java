@@ -7,9 +7,6 @@ import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.registry.BBotSession;
 import com.bbot.core.rest.HttpClientFactory;
-import descriptors.BlotterDescriptor;
-import descriptors.ConfigServiceDescriptor;
-import descriptors.DeploymentDescriptor;
 import io.cucumber.java.After;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
@@ -21,10 +18,10 @@ import io.cucumber.java.BeforeAll;
  *
  * <h2>Template customisation points</h2>
  * <ul>
- *   <li>Register additional {@link com.bbot.core.registry.AppDescriptor}s
- *       for every application your suite tests (one descriptor per app).</li>
- *   <li>If you need environment-specific overrides that are only known at
- *       runtime (e.g. dynamic ports from test containers), apply them via
+ *   <li>For each application under test, declare {@code descriptor-class} in HOCON.
+ *       {@link BBotSession.Builder#initialize} auto-discovers and instantiates them.</li>
+ *   <li>If you need environment-specific overrides that are only known at runtime
+ *       (e.g. dynamic ports from test containers), apply them via
  *       {@code BBotConfig.withOverrides(Map)} before calling
  *       {@code BBotSession.builder().initialize(cfg)}.</li>
  *   <li>If your suite does not use a browser (REST-only), remove the
@@ -57,13 +54,9 @@ public class Hooks {
         // Load HOCON config -- picks up application-{env}.conf automatically.
         BBotConfig cfg = BBotConfig.load();
 
-        // Build an immutable BBotSession with one descriptor per application under test.
-        // Each descriptor declares: app name, DSL factory, health-check path.
+        // Build an immutable BBotSession — auto-discovers descriptor classes declared
+        // under b-bot.apps.*.descriptor-class in the active environment config.
         BBotSession session = BBotSession.builder()
-                .register(new BlotterDescriptor())
-                .register(new ConfigServiceDescriptor())
-                .register(new DeploymentDescriptor())
-                // .register(new MyOtherServiceDescriptor())
                 .initialize(cfg)
                 .build();
         BBotRegistry.setSession(session);

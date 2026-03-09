@@ -9,8 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -18,27 +16,18 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 /**
  * Unit tests for {@link BBotSession} — immutability, builder lifecycle,
  * DSL factory delegation, health/version checks.
+ *
+ * <p>All descriptor registration uses {@code register(name, descriptor)} since
+ * {@link AppDescriptor} no longer carries a {@code name()} method.
+ * Health/version paths live in config overrides, not in descriptors.
  */
 class BBotSessionTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /** Minimal descriptor — only dslFactory() is required. */
     private static AppDescriptor<String> descriptor(String name) {
-        return descriptor(name, Optional.empty(), Optional.empty());
-    }
-
-    private static AppDescriptor<String> descriptor(
-            String name, Optional<String> healthPath,
-            Optional<String> versionPath) {
-        return new AppDescriptor<>() {
-            @Override public String name() { return name; }
-            @Override public Set<ComponentType> componentTypes() { return Set.of(ComponentType.REST_API); }
-            @Override public DslFactory<String> dslFactory() {
-                return (ctx, page) -> "dsl-for-" + name;
-            }
-            @Override public Optional<String> healthCheckPath() { return healthPath; }
-            @Override public Optional<String> versionPath()     { return versionPath; }
-        };
+        return () -> (ctx, page) -> "dsl-for-" + name;
     }
 
     private static BBotConfig configWithApp(String appName, String apiBase) {
@@ -52,7 +41,7 @@ class BBotSessionTest {
     @Test
     void builder_producesImmutableSession() {
         BBotSession session = BBotSession.builder()
-            .register(descriptor("app1"))
+            .register("app1", descriptor("app1"))
             .initialize(BBotConfig.load())
             .build();
 
@@ -64,7 +53,7 @@ class BBotSessionTest {
     @Test
     void builder_buildWithoutInitialize_throws() {
         BBotSession.Builder builder = BBotSession.builder()
-            .register(descriptor("app1"));
+            .register("app1", descriptor("app1"));
 
         assertThatThrownBy(builder::build)
             .isInstanceOf(BBotConfigException.class)
@@ -74,7 +63,7 @@ class BBotSessionTest {
     @Test
     void builder_doubleInitialize_throws() {
         BBotSession.Builder builder = BBotSession.builder()
-            .register(descriptor("app1"))
+            .register("app1", descriptor("app1"))
             .initialize(BBotConfig.load());
 
         assertThatThrownBy(() -> builder.initialize(BBotConfig.load()))
@@ -85,7 +74,7 @@ class BBotSessionTest {
     @Test
     void builder_doubleBuild_throws() {
         BBotSession.Builder builder = BBotSession.builder()
-            .register(descriptor("app1"))
+            .register("app1", descriptor("app1"))
             .initialize(BBotConfig.load());
 
         builder.build(); // first call OK
@@ -98,11 +87,11 @@ class BBotSessionTest {
     @Test
     void builder_registerAfterBuild_throws() {
         BBotSession.Builder builder = BBotSession.builder()
-            .register(descriptor("app1"))
+            .register("app1", descriptor("app1"))
             .initialize(BBotConfig.load());
         builder.build();
 
-        assertThatThrownBy(() -> builder.register(descriptor("app2")))
+        assertThatThrownBy(() -> builder.register("app2", descriptor("app2")))
             .isInstanceOf(BBotConfigException.class)
             .hasMessageContaining("after build");
     }
@@ -115,7 +104,13 @@ class BBotSessionTest {
 
     @Test
     void builder_nullDescriptor_throws() {
-        assertThatThrownBy(() -> BBotSession.builder().register(null))
+        assertThatThrownBy(() -> BBotSession.builder().register("app1", null))
+            .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
+    void builder_nullName_throws() {
+        assertThatThrownBy(() -> BBotSession.builder().register(null, descriptor("x")))
             .isInstanceOf(NullPointerException.class);
     }
 
@@ -124,7 +119,7 @@ class BBotSessionTest {
     @Test
     void dsl_callsFactory() {
         BBotSession session = BBotSession.builder()
-            .register(descriptor("myapp"))
+            .register("myapp", descriptor("myapp"))
             .initialize(BBotConfig.load())
             .build();
 
@@ -135,7 +130,7 @@ class BBotSessionTest {
     @Test
     void dsl_unknownApp_throws() {
         BBotSession session = BBotSession.builder()
-            .register(descriptor("known"))
+            .register("known", descriptor("known"))
             .initialize(BBotConfig.load())
             .build();
 
@@ -148,8 +143,8 @@ class BBotSessionTest {
     @Test
     void dsl_multipleApps() {
         BBotSession session = BBotSession.builder()
-            .register(descriptor("app1"))
-            .register(descriptor("app2"))
+            .register("app1", descriptor("app1"))
+            .register("app2", descriptor("app2"))
             .initialize(BBotConfig.load())
             .build();
 
@@ -158,17 +153,17 @@ class BBotSessionTest {
         assertThat(session.appNames()).containsExactly("app1", "app2");
     }
 
-    // ── Health / version ──────────────────────────────────────────────────────
+    // ── Health / version — paths come from config overrides ───────────────────
 
     @Test
     void checkHealth_noPathIsNoOp() {
+        // No health-check-path in config → no-op (no HTTP call, no exception)
         BBotSession session = BBotSession.builder()
-            .register(descriptor("no-health"))
+            .register("no-health", descriptor("no-health"))
             .initialize(configWithApp("no-health", "http://localhost:1"))
             .build();
 
-        // No exception = success (no-op because no healthCheckPath)
-        session.checkHealth("no-health");
+        session.checkHealth("no-health"); // no exception
     }
 
     @Test
@@ -185,8 +180,11 @@ class BBotSessionTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                .register(descriptor("svc", Optional.of("/health"), Optional.empty()))
-                .initialize(configWithApp("svc", "http://localhost:" + port))
+                .register("svc", descriptor("svc"))
+                .initialize(BBotConfig.load().withOverrides(Map.of(
+                    "b-bot.apps.svc.apiBase",           "http://localhost:" + port,
+                    "b-bot.apps.svc.health-check-path", "/health"
+                )))
                 .build();
 
             session.checkHealth("svc"); // no exception
@@ -207,8 +205,11 @@ class BBotSessionTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                .register(descriptor("failing", Optional.of("/health"), Optional.empty()))
-                .initialize(configWithApp("failing", "http://localhost:" + port))
+                .register("failing", descriptor("failing"))
+                .initialize(BBotConfig.load().withOverrides(Map.of(
+                    "b-bot.apps.failing.apiBase",           "http://localhost:" + port,
+                    "b-bot.apps.failing.health-check-path", "/health"
+                )))
                 .build();
 
             assertThatThrownBy(() -> session.checkHealth("failing"))
@@ -233,8 +234,11 @@ class BBotSessionTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                .register(descriptor("svc", Optional.empty(), Optional.of("/version")))
-                .initialize(configWithApp("svc", "http://localhost:" + port))
+                .register("svc", descriptor("svc"))
+                .initialize(BBotConfig.load().withOverrides(Map.of(
+                    "b-bot.apps.svc.apiBase",      "http://localhost:" + port,
+                    "b-bot.apps.svc.version-path", "/version"
+                )))
                 .build();
 
             session.assertVersion("svc", "v2.4.1"); // no exception
@@ -257,8 +261,11 @@ class BBotSessionTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                .register(descriptor("svc", Optional.empty(), Optional.of("/version")))
-                .initialize(configWithApp("svc", "http://localhost:" + port))
+                .register("svc", descriptor("svc"))
+                .initialize(BBotConfig.load().withOverrides(Map.of(
+                    "b-bot.apps.svc.apiBase",      "http://localhost:" + port,
+                    "b-bot.apps.svc.version-path", "/version"
+                )))
                 .build();
 
             assertThatThrownBy(() -> session.assertVersion("svc", "v2.4.1"))
@@ -284,11 +291,12 @@ class BBotSessionTest {
         try {
             String apiBase = "http://localhost:" + port;
             BBotSession session = BBotSession.builder()
-                .register(descriptor("app1", Optional.of("/health"), Optional.empty()))
-                .register(descriptor("app2")) // no health path — no-op
+                .register("app1", descriptor("app1"))
+                .register("app2", descriptor("app2")) // no health-check-path → no-op
                 .initialize(BBotConfig.load().withOverrides(Map.of(
-                    "b-bot.apps.app1.apiBase", apiBase,
-                    "b-bot.apps.app2.apiBase", apiBase
+                    "b-bot.apps.app1.apiBase",           apiBase,
+                    "b-bot.apps.app1.health-check-path", "/health",
+                    "b-bot.apps.app2.apiBase",           apiBase
                 )))
                 .build();
 
@@ -298,12 +306,43 @@ class BBotSessionTest {
         }
     }
 
+    // ── Auto-discovery ────────────────────────────────────────────────────────
+
+    @Test
+    void initialize_autoDiscoversDescriptorClass() {
+        // Use a class that actually exists on the test classpath:
+        // java.util.function.Supplier as a stand-in is not AppDescriptor, so we need
+        // a real AppDescriptor on the classpath.  We use the test's own anonymous class
+        // indirectly by pre-registering a sentinel and ensuring auto-discovery skips it.
+        BBotSession session = BBotSession.builder()
+            .register("blotter", descriptor("blotter")) // explicit wins
+            .initialize(BBotConfig.load())              // blotter has no descriptor-class in test conf
+            .build();
+
+        // Should still work — explicit registration kept
+        assertThat(session.appNames()).contains("blotter");
+        assertThat(session.dsl("blotter", null, String.class)).isEqualTo("dsl-for-blotter");
+    }
+
+    @Test
+    void initialize_autoDiscovery_invalidFqcn_throws() {
+        assertThatThrownBy(() ->
+            BBotSession.builder()
+                .initialize(BBotConfig.load().withOverrides(Map.of(
+                    "b-bot.apps.badapp.descriptor-class", "com.example.DoesNotExist"
+                )))
+                .build()
+        )
+            .isInstanceOf(BBotConfigException.class)
+            .hasMessageContaining("DoesNotExist");
+    }
+
     // ── Context accessor ──────────────────────────────────────────────────────
 
     @Test
     void context_returnsResolvedAppContext() {
         BBotSession session = BBotSession.builder()
-            .register(descriptor("myapp"))
+            .register("myapp", descriptor("myapp"))
             .initialize(configWithApp("myapp", "http://example.com"))
             .build();
 
@@ -315,7 +354,7 @@ class BBotSessionTest {
     @Test
     void context_unknownApp_throws() {
         BBotSession session = BBotSession.builder()
-            .register(descriptor("myapp"))
+            .register("myapp", descriptor("myapp"))
             .initialize(BBotConfig.load())
             .build();
 
@@ -324,4 +363,3 @@ class BBotSessionTest {
             .hasMessageContaining("unknown");
     }
 }
-

@@ -4,7 +4,7 @@ import com.microsoft.playwright.Page;
 
 /**
  * Creates the DSL for one tested component, given its resolved runtime context
- * and (for {@link ComponentType#WEB_APP} components) the current scenario's Playwright page.
+ * and (for browser-based components) the current scenario's Playwright page.
  *
  * <p>{@code Page} is per-scenario (created in {@code @Before});
  * {@link AppContext} is per-environment (resolved once in {@code @BeforeAll}).

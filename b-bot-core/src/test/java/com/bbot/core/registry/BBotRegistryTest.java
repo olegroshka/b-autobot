@@ -9,8 +9,6 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -25,20 +23,9 @@ class BBotRegistryTest {
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    /** Minimal descriptor — only dslFactory() required. */
     private static AppDescriptor<String> descriptor(String name) {
-        return descriptor(name, null, null);
-    }
-
-    private static AppDescriptor<String> descriptor(String name, String healthPath, String versionPath) {
-        return new AppDescriptor<>() {
-            @Override public String name() { return name; }
-            @Override public Set<ComponentType> componentTypes() { return Set.of(ComponentType.REST_API); }
-            @Override public DslFactory<String> dslFactory() {
-                return (ctx, page) -> "dsl-for-" + name;
-            }
-            @Override public Optional<String> healthCheckPath() { return Optional.ofNullable(healthPath); }
-            @Override public Optional<String> versionPath()     { return Optional.ofNullable(versionPath); }
-        };
+        return () -> (ctx, page) -> "dsl-for-" + name;
     }
 
     private static BBotConfig configWithApp(String appName, String apiBase) {
@@ -49,7 +36,7 @@ class BBotRegistryTest {
 
     private static BBotSession sessionFor(String name) {
         return BBotSession.builder()
-                .register(descriptor(name))
+                .register(name, descriptor(name))
                 .initialize(BBotConfig.load())
                 .build();
     }
@@ -94,8 +81,9 @@ class BBotRegistryTest {
 
     @Test
     void checkHealthNoOpWhenNoPath() {
+        // No health-check-path in config → no-op
         BBotSession session = BBotSession.builder()
-                .register(descriptor("no-health"))
+                .register("no-health", descriptor("no-health"))
                 .initialize(configWithApp("no-health", "http://localhost:1"))
                 .build();
         BBotRegistry.setSession(session);
@@ -120,8 +108,11 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("svc", "/health", null))
-                    .initialize(configWithApp("svc", "http://localhost:" + port))
+                    .register("svc", descriptor("svc"))
+                    .initialize(BBotConfig.load().withOverrides(Map.of(
+                        "b-bot.apps.svc.apiBase",           "http://localhost:" + port,
+                        "b-bot.apps.svc.health-check-path", "/health"
+                    )))
                     .build();
             BBotRegistry.setSession(session);
 
@@ -145,8 +136,11 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("failing-svc", "/health", null))
-                    .initialize(configWithApp("failing-svc", "http://localhost:" + port))
+                    .register("failing-svc", descriptor("failing-svc"))
+                    .initialize(BBotConfig.load().withOverrides(Map.of(
+                        "b-bot.apps.failing-svc.apiBase",           "http://localhost:" + port,
+                        "b-bot.apps.failing-svc.health-check-path", "/health"
+                    )))
                     .build();
             BBotRegistry.setSession(session);
 
@@ -172,8 +166,11 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("versioned-svc", null, "/version"))
-                    .initialize(configWithApp("versioned-svc", "http://localhost:" + port))
+                    .register("versioned-svc", descriptor("versioned-svc"))
+                    .initialize(BBotConfig.load().withOverrides(Map.of(
+                        "b-bot.apps.versioned-svc.apiBase",      "http://localhost:" + port,
+                        "b-bot.apps.versioned-svc.version-path", "/version"
+                    )))
                     .build();
             BBotRegistry.setSession(session);
 
@@ -197,8 +194,11 @@ class BBotRegistryTest {
 
         try {
             BBotSession session = BBotSession.builder()
-                    .register(descriptor("versioned-svc", null, "/version"))
-                    .initialize(configWithApp("versioned-svc", "http://localhost:" + port))
+                    .register("versioned-svc", descriptor("versioned-svc"))
+                    .initialize(BBotConfig.load().withOverrides(Map.of(
+                        "b-bot.apps.versioned-svc.apiBase",      "http://localhost:" + port,
+                        "b-bot.apps.versioned-svc.version-path", "/version"
+                    )))
                     .build();
             BBotRegistry.setSession(session);
 

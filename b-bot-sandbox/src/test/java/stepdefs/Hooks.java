@@ -5,9 +5,6 @@ import com.bbot.core.config.BBotConfig;
 import com.bbot.core.registry.BBotRegistry;
 import com.bbot.core.registry.BBotSession;
 import com.bbot.core.rest.HttpClientFactory;
-import descriptors.BlotterAppDescriptor;
-import descriptors.ConfigServiceDescriptor;
-import descriptors.DeploymentDescriptor;
 import io.cucumber.java.After;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
@@ -57,11 +54,8 @@ public class Hooks {
                 "b-bot.apps.deployment.apiBase",      MockDeploymentServer.getBaseUrl()
             ));
 
-        // 3. Build BBotSession and register it with BBotRegistry.
+        // 3. Build BBotSession — auto-discovers descriptor classes from config.
         BBotSession session = BBotSession.builder()
-                .register(new BlotterAppDescriptor())
-                .register(new ConfigServiceDescriptor())
-                .register(new DeploymentDescriptor())
                 .initialize(cfg)
                 .build();
         BBotRegistry.setSession(session);

@@ -105,9 +105,10 @@ it never knows about `BlotterDsl` or `MockBlotterServer`.
 Three concepts drive the entire design:
 
 ```
-AppDescriptor  — declares what a component IS (name, type, DSL factory, health path, version path)
+AppDescriptor  — supplies only a DslFactory; app name, health/version paths live in HOCON config
 AppContext      — what the framework KNOWS about a component at runtime (URLs, users, timeouts)
-BBotRegistry   — the central directory: holds all descriptors, resolves contexts from config
+BBotSession    — immutable session: holds descriptors + contexts; auto-discovers from config
+BBotRegistry   — thin static facade over BBotSession (@Deprecated statics; prefer BBotSession directly)
 ```
 
 HOCON provides URLs and settings per environment, keyed by component name under `b-bot.apps.*`.
@@ -132,11 +133,11 @@ b-autobot/                             ← parent POM (aggregator, no sources)
 │       │   ├── TickingCellHelper.java
 │       │   ├── NumericComparator.java
 │       │   ├── registry/
-│       │   │   ├── AppDescriptor.java    ← interface: self-description of a tested component
-│       │   │   ├── ComponentType.java    ← enum: WEB_APP, REST_API
+│       │   │   ├── AppDescriptor.java    ← @FunctionalInterface: supplies only dslFactory()
 │       │   │   ├── AppContext.java       ← value: resolved URLs + users + timeouts per app
 │       │   │   ├── DslFactory.java       ← functional interface: (AppContext, Page) -> D
-│       │   │   └── BBotRegistry.java     ← central directory; initialized once at @BeforeAll
+│       │   │   ├── BBotSession.java      ← immutable session; auto-discovers descriptor-class from config
+│       │   │   └── BBotRegistry.java     ← @Deprecated static facade over BBotSession
 │       │   └── config/
 │       │       └── BBotConfig.java       ← HOCON loader; runtime override support
 │       └── resources/
@@ -181,19 +182,6 @@ b-autobot/                             ← parent POM (aggregator, no sources)
 
 ### Core API — Full Interface Definitions
 
-#### `ComponentType.java`
-
-```java
-package com.bbot.core.registry;
-
-public enum ComponentType {
-    /** Has a browser-navigable UI; DSL will receive a live Playwright Page. */
-    WEB_APP,
-    /** Has a REST API base URL; DSL uses JDK HttpClient or Playwright request(). */
-    REST_API
-}
-```
-
 #### `DslFactory.java`
 
 ```java
@@ -224,46 +212,27 @@ public interface DslFactory<D> {
 ```java
 package com.bbot.core.registry;
 
-import java.util.Optional;
-import java.util.Set;
-
 /**
- * Self-description of a tested component registered with BBotRegistry.
+ * Supplies only a DslFactory. All other app metadata lives in HOCON config:
  *
- * Implementations live in the consuming module (sandbox or real regression project).
- * Core never imports any concrete AppDescriptor — the dependency always flows inward.
+ *   b-bot.apps.blotter {
+ *     descriptor-class  = "descriptors.BlotterAppDescriptor"
+ *     health-check-path = "/api/health"
+ *     version-path      = "/api/version"   // optional
+ *     webUrl  = "http://..."
+ *     apiBase = "http://..."
+ *   }
  *
- * Config key convention: name() must match the HOCON key at b-bot.apps.{name}.*
+ * BBotSession.Builder.initialize(cfg) reads descriptor-class, instantiates the
+ * descriptor via a public no-arg constructor, and registers it automatically.
  *
  * @param <D> the DSL type this descriptor produces
  */
+@FunctionalInterface
 public interface AppDescriptor<D> {
-
-    /**
-     * Logical name — used as HOCON config key and step-definition reference.
-     * Examples: "blotter", "config-service", "deployment"
-     */
-    String name();
-
-    /** What kind of component this is. A hybrid app declares both. */
-    Set<ComponentType> componentTypes();
 
     /** Factory that constructs a fresh DSL instance for each scenario. */
     DslFactory<D> dslFactory();
-
-    /**
-     * Optional REST path for a liveness check.
-     * GET {apiBase}{path} must return 2xx.
-     * Enables: "Given the blotter app is healthy"
-     */
-    default Optional<String> healthCheckPath() { return Optional.empty(); }
-
-    /**
-     * Optional REST path for version discovery.
-     * GET {apiBase}{path} must return JSON containing a "version" string field.
-     * Enables: "Given the blotter service is running at version v2.4.1"
-     */
-    default Optional<String> versionPath() { return Optional.empty(); }
 }
 ```
 
@@ -594,6 +563,20 @@ public final class BBotConfig {
         return Collections.unmodifiableMap(result);
     }
 
+    // ── App-descriptor discovery (M14) ────────────────────────────────────────
+
+    /** All configured app names under b-bot.apps. */
+    public Set<String> getAppNames() { ... }
+
+    /** b-bot.apps.{name}.descriptor-class FQCN, or empty if not set. */
+    public Optional<String> getAppDescriptorClass(String appName) { ... }
+
+    /** b-bot.apps.{name}.health-check-path, or empty if not set. */
+    public Optional<String> getAppHealthCheckPath(String appName) { ... }
+
+    /** b-bot.apps.{name}.version-path, or empty if not set. */
+    public Optional<String> getAppVersionPath(String appName) { ... }
+
     /** Raw HOCON access for anything not covered by the typed accessors. */
     public Config raw() { return cfg; }
 }
@@ -649,13 +632,19 @@ b-bot {
   apps {
     blotter {
       # webUrl and apiBase: injected at runtime — see sandbox Hooks.java
+      descriptor-class  = "descriptors.BlotterAppDescriptor"
+      health-check-path = "/api/health"
       users { trader = doej, admin = smithj }
     }
     config-service {
       # apiBase: injected at runtime
+      descriptor-class  = "descriptors.ConfigServiceDescriptor"
+      health-check-path = "/api/config"
     }
     deployment {
       # webUrl and apiBase: injected at runtime
+      descriptor-class  = "descriptors.DeploymentDescriptor"
+      health-check-path = "/api/deployments"
     }
   }
 }
@@ -732,27 +721,16 @@ b-bot {
 ```java
 package descriptors;
 
-import com.bbot.core.registry.*;
+import com.bbot.core.registry.AppDescriptor;
+import com.bbot.core.registry.DslFactory;
 import utils.BlotterDsl;
-import java.util.Optional;
-import java.util.Set;
 
-/** Descriptor for the PT-Blotter — a hybrid WEB_APP + REST_API component. */
+/** Supplies only the DSL factory. App name, health path, URLs declared in HOCON. */
 public final class BlotterAppDescriptor implements AppDescriptor<BlotterDsl> {
 
-    @Override public String name() { return "blotter"; }
-
-    @Override public Set<ComponentType> componentTypes() {
-        return Set.of(ComponentType.WEB_APP, ComponentType.REST_API);
-    }
-
     @Override public DslFactory<BlotterDsl> dslFactory() {
-        // AppContext carries webUrl, apiBase, users — all from config or runtime overrides.
         return (ctx, page) -> new BlotterDsl(page, ctx);
     }
-
-    @Override public Optional<String> healthCheckPath() { return Optional.of("/api/health"); }
-    @Override public Optional<String> versionPath()     { return Optional.of("/api/version"); }
 }
 ```
 
@@ -761,26 +739,15 @@ public final class BlotterAppDescriptor implements AppDescriptor<BlotterDsl> {
 ```java
 package descriptors;
 
-import com.bbot.core.registry.*;
+import com.bbot.core.registry.AppDescriptor;
+import com.bbot.core.registry.DslFactory;
 import utils.ConfigServiceDsl;
-import java.util.Optional;
-import java.util.Set;
 
+/** REST-only descriptor — page is ignored. App name + health path in HOCON. */
 public final class ConfigServiceDescriptor implements AppDescriptor<ConfigServiceDsl> {
-
-    @Override public String name() { return "config-service"; }
-
-    @Override public Set<ComponentType> componentTypes() {
-        return Set.of(ComponentType.REST_API);  // no browser interaction in regression tests
-    }
 
     @Override public DslFactory<ConfigServiceDsl> dslFactory() {
         return (ctx, page) -> new ConfigServiceDsl(ctx.getApiBaseUrl());
-        // page intentionally ignored — REST-only descriptor
-    }
-
-    @Override public Optional<String> healthCheckPath() {
-        return Optional.of("/api/config");  // 200 array = service alive
     }
 }
 ```
@@ -790,25 +757,15 @@ public final class ConfigServiceDescriptor implements AppDescriptor<ConfigServic
 ```java
 package descriptors;
 
-import com.bbot.core.registry.*;
+import com.bbot.core.registry.AppDescriptor;
+import com.bbot.core.registry.DslFactory;
 import utils.DeploymentDsl;
-import java.util.Optional;
-import java.util.Set;
 
+/** Supplies only the DSL factory. App name, health path, URLs declared in HOCON. */
 public final class DeploymentDescriptor implements AppDescriptor<DeploymentDsl> {
-
-    @Override public String name() { return "deployment"; }
-
-    @Override public Set<ComponentType> componentTypes() {
-        return Set.of(ComponentType.WEB_APP, ComponentType.REST_API);
-    }
 
     @Override public DslFactory<DeploymentDsl> dslFactory() {
         return (ctx, page) -> new DeploymentDsl(page, ctx.getApiBaseUrl());
-    }
-
-    @Override public Optional<String> healthCheckPath() {
-        return Optional.of("/api/deployments");
     }
 }
 ```
@@ -889,11 +846,13 @@ public class Hooks {
                 "b-bot.apps.deployment.apiBase",       MockDeploymentServer.getBaseUrl()
             ));
 
-        // 3. Register descriptors + resolve AppContexts.
-        BBotRegistry.register(new BlotterAppDescriptor());
-        BBotRegistry.register(new ConfigServiceDescriptor());
-        BBotRegistry.register(new DeploymentDescriptor());
-        BBotRegistry.initialize(cfg);
+        // 3. Build session — descriptor-class in application.conf drives auto-discovery.
+        //    No explicit .register() calls needed; BBotSession.Builder.initialize() reads
+        //    b-bot.apps.*.descriptor-class and instantiates each via Class.forName().
+        BBotSession session = BBotSession.builder()
+                .initialize(cfg)
+                .build();
+        BBotRegistry.setSession(session);
 
         // 4. Launch Playwright browser.
         PlaywrightManager.initBrowser();
@@ -908,7 +867,8 @@ public class Hooks {
     @AfterAll
     public static void shutdownBrowser() {
         PlaywrightManager.closeBrowser();
-        BBotRegistry.reset();
+        HttpClientFactory.shutdown();
+        BBotRegistry.clearSession();
         MockBlotterServer.stop();
         MockDeploymentServer.stop();
         MockConfigServer.stop();
@@ -993,22 +953,32 @@ Scenario: Credit RFQ stack is live at expected versions
 ```java
 // pt-blotter-regression-template/src/test/java/stepdefs/Hooks.java
 // Zero mock servers — all URLs come from application-{env}.conf
+// Zero .register() calls — descriptor-class in HOCON drives auto-discovery
 public class Hooks {
 
+    private static PlaywrightManager browser;
+
     @BeforeAll
-    public static void setup() {
+    public static void launchBrowser() {
         BBotConfig cfg = BBotConfig.load();   // picks up application-{env}.conf automatically
-        BBotRegistry.register(new BlotterDescriptor());
-        // Add more AppDescriptors here for additional apps under test
-        BBotRegistry.initialize(cfg);
-        PlaywrightManager.initBrowser();
+
+        // BBotSession.Builder.initialize() reads b-bot.apps.*.descriptor-class
+        // and instantiates each descriptor via Class.forName() — no .register() needed.
+        BBotSession session = BBotSession.builder()
+                .initialize(cfg)
+                .build();
+        BBotRegistry.setSession(session);
+
+        browser = new PlaywrightManager(cfg);
+        browser.initBrowser();
     }
 
-    @Before  public void openContext()   { PlaywrightManager.initContext(); }
-    @After   public void closeContext()  { PlaywrightManager.closeContext(); }
-    @AfterAll public static void teardown() {
-        PlaywrightManager.closeBrowser();
-        BBotRegistry.reset();
+    @Before  public void openFreshContext() { browser.initContext(); }
+    @After   public void closeContext()     { browser.closeContext(); }
+    @AfterAll public static void shutdownBrowser() {
+        browser.closeBrowser();
+        HttpClientFactory.shutdown();
+        BBotRegistry.clearSession();
     }
 }
 ```
@@ -1041,9 +1011,9 @@ has stabilised across at least two real consumer projects.
 | Config expressiveness | Low (flat) | High (HOCON, hierarchical, typed) | High (plain Java) |
 | Multi-env support | Manual copy/paste | First-class (`include` + override) | First-class (`@env` tag) |
 | Secret injection | Manual env-var reading | Native `${?B_BOT_VAR}` syntax | Team's choice |
-| App decoupling | Partial (URL injection only) | Full (descriptor owns type + factory + health) | Full |
-| Generic health/version checks | No | Yes — via descriptor metadata | Yes |
-| New consumer boilerplate | Medium | Low (3 descriptors + 8-line Hooks) | Very low (1 annotation) |
+| App decoupling | Partial (URL injection only) | Full (descriptor is a factory; health/version paths in HOCON) | Full |
+| Generic health/version checks | No | Yes — via HOCON `health-check-path` / `version-path` | Yes |
+| New consumer boilerplate | Medium | Very low (descriptor per app + zero-line Hooks; HOCON drives auto-discovery) | Very low (1 annotation) |
 | Step defs reference apps by | Class name | Logical string name ("blotter") | Logical string name |
 | Extensibility | Low | Medium (new descriptor = new app) | High (SPI plugins) |
 | New dependencies in core | None | `typesafe:config` (180 KB, MIT) | None |

@@ -12,7 +12,10 @@ import org.slf4j.LoggerFactory;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Typesafe Config (HOCON) wrapper with layered environment support and
@@ -207,6 +210,70 @@ public final class BBotConfig {
      */
     public TestDataConfig getTestData() {
         return new TestDataConfig(cfg);
+    }
+
+    /**
+     * Returns the set of all configured app names under {@code b-bot.apps}.
+     * The iteration order matches the HOCON declaration order.
+     */
+    public Set<String> getAppNames() {
+        String key = "b-bot.apps";
+        if (!cfg.hasPath(key)) return Set.of();
+        return Collections.unmodifiableSet(new LinkedHashSet<>(cfg.getConfig(key).root().keySet()));
+    }
+
+    /**
+     * Returns the {@code descriptor-class} FQCN for the named app, or empty if not configured.
+     * Used by {@link com.bbot.core.registry.BBotSession.Builder#initialize} for auto-discovery.
+     *
+     * <p>Config key: {@code b-bot.apps.{name}.descriptor-class}
+     *
+     * <p>Example HOCON:
+     * <pre>{@code
+     * b-bot.apps.blotter {
+     *   descriptor-class = "descriptors.BlotterAppDescriptor"
+     * }
+     * }</pre>
+     */
+    public Optional<String> getAppDescriptorClass(String appName) {
+        String key = "b-bot.apps." + appName + ".descriptor-class";
+        return cfg.hasPath(key) ? Optional.of(cfg.getString(key)) : Optional.empty();
+    }
+
+    /**
+     * Returns the health-check REST path for the named app, or empty if not configured.
+     * {@code GET {apiBase}{path}} must return 2xx for the app to be considered healthy.
+     *
+     * <p>Config key: {@code b-bot.apps.{name}.health-check-path}
+     *
+     * <p>Example HOCON:
+     * <pre>{@code
+     * b-bot.apps.blotter {
+     *   health-check-path = "/api/health"
+     * }
+     * }</pre>
+     */
+    public Optional<String> getAppHealthCheckPath(String appName) {
+        String key = "b-bot.apps." + appName + ".health-check-path";
+        return cfg.hasPath(key) ? Optional.of(cfg.getString(key)) : Optional.empty();
+    }
+
+    /**
+     * Returns the version-discovery REST path for the named app, or empty if not configured.
+     * {@code GET {apiBase}{path}} must return JSON containing a {@code "version"} string field.
+     *
+     * <p>Config key: {@code b-bot.apps.{name}.version-path}
+     *
+     * <p>Example HOCON:
+     * <pre>{@code
+     * b-bot.apps.blotter {
+     *   version-path = "/api/version"
+     * }
+     * }</pre>
+     */
+    public Optional<String> getAppVersionPath(String appName) {
+        String key = "b-bot.apps." + appName + ".version-path";
+        return cfg.hasPath(key) ? Optional.of(cfg.getString(key)) : Optional.empty();
     }
 
     /** Raw HOCON access for anything not covered by the typed accessors. */

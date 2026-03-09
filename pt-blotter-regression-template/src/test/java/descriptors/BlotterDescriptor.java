@@ -1,59 +1,31 @@
 package descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
-import com.bbot.core.registry.ComponentType;
 import com.bbot.core.registry.DslFactory;
 import utils.PtBlotterDsl;
-
-import java.util.Optional;
-import java.util.Set;
 
 /**
  * {@link AppDescriptor} for the PT-Blotter application.
  *
+ * <p>Supplies only the DSL factory. All environment-specific config lives in HOCON:
+ * <pre>{@code
+ * b-bot.apps.blotter {
+ *   descriptor-class  = "descriptors.BlotterDescriptor"
+ *   health-check-path = "/api/inquiries"
+ *   webUrl            = "http://..."
+ *   apiBase           = "http://..."
+ * }
+ * }</pre>
+ *
  * <h2>Template customisation points</h2>
  * <ul>
- *   <li>Change {@link #name()} to match the key used in your
- *       {@code application-{env}.conf} ({@code b-bot.apps.<name>.*}).</li>
  *   <li>Change the generic type and DSL class to your own DSL implementation.</li>
- *   <li>Set {@link #healthCheckPath()} to whichever endpoint returns 2xx when
- *       the service is alive. Leave {@link Optional#empty()} to skip health checks.</li>
- *   <li>Set {@link #versionPath()} if you want
- *       {@link com.bbot.core.registry.BBotRegistry#assertVersion} to verify the
- *       deployed build. Leave {@link Optional#empty()} to skip version assertions.</li>
- *   <li>Declare {@link ComponentType#REST_API} only if your DSL makes HTTP calls
- *       (so the registry knows to validate the {@code apiBase} URL from config).</li>
+ *   <li>Move the {@code descriptor-class} key in HOCON if you rename this class or its package.</li>
  * </ul>
- *
- * <p>URLs are resolved at initialisation time from the active environment config
- * -- no hardcoded host names or ports in this class.
  */
 public final class BlotterDescriptor implements AppDescriptor<PtBlotterDsl> {
 
-    /** Must match the key under {@code b-bot.apps} in your conf files. */
-    @Override public String name() { return "blotter"; }
-
-    @Override public Set<ComponentType> componentTypes() {
-        return Set.of(ComponentType.WEB_APP, ComponentType.REST_API);
-    }
-
     @Override public DslFactory<PtBlotterDsl> dslFactory() {
         return (ctx, page) -> new PtBlotterDsl(page, ctx);
-    }
-
-    /**
-     * GET /api/inquiries returns the list of all inquiries → 200 = blotter alive.
-     * The mock WireMock server stubs this endpoint with a static response.
-     */
-    @Override public Optional<String> healthCheckPath() {
-        return Optional.of("/api/inquiries");
-    }
-
-    /**
-     * Version evidence comes from the Deployment Dashboard (see DeploymentSteps),
-     * not from a per-service /version endpoint. Leave empty for the blotter.
-     */
-    @Override public Optional<String> versionPath() {
-        return Optional.empty();
     }
 }

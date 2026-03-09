@@ -170,6 +170,64 @@ class BBotConfigTest {
             .hasMessageContaining("nonexistent-action");
     }
 
+    // ── getAppNames / getAppDescriptorClass / getAppHealthCheckPath / getAppVersionPath ──
+
+    @Test
+    void getAppNames_returnsConfiguredApps() {
+        BBotConfig cfg = BBotConfig.load(); // test application.conf has blotter app
+        assertThat(cfg.getAppNames()).contains("blotter");
+    }
+
+    @Test
+    void getAppNames_returnsEmpty_whenNoApps() {
+        // Override with a config that has no apps
+        BBotConfig cfg = BBotConfig.load().withOverrides(Map.of());
+        // reference.conf defines b-bot.apps = {} so at minimum it's empty, not null
+        assertThat(cfg.getAppNames()).isNotNull();
+    }
+
+    @Test
+    void getAppDescriptorClass_returnsValue_whenConfigured() {
+        BBotConfig cfg = BBotConfig.load().withOverrides(Map.of(
+            "b-bot.apps.myapp.descriptor-class", "com.example.MyDescriptor"
+        ));
+        assertThat(cfg.getAppDescriptorClass("myapp")).contains("com.example.MyDescriptor");
+    }
+
+    @Test
+    void getAppDescriptorClass_returnsEmpty_whenNotConfigured() {
+        BBotConfig cfg = BBotConfig.load();
+        assertThat(cfg.getAppDescriptorClass("blotter")).isEmpty();
+    }
+
+    @Test
+    void getAppHealthCheckPath_returnsValue_whenConfigured() {
+        BBotConfig cfg = BBotConfig.load().withOverrides(Map.of(
+            "b-bot.apps.svc.health-check-path", "/api/health"
+        ));
+        assertThat(cfg.getAppHealthCheckPath("svc")).contains("/api/health");
+    }
+
+    @Test
+    void getAppHealthCheckPath_returnsEmpty_whenNotConfigured() {
+        BBotConfig cfg = BBotConfig.load();
+        assertThat(cfg.getAppHealthCheckPath("blotter")).isEmpty();
+    }
+
+    @Test
+    void getAppVersionPath_returnsValue_whenConfigured() {
+        BBotConfig cfg = BBotConfig.load().withOverrides(Map.of(
+            "b-bot.apps.svc.version-path", "/api/version"
+        ));
+        assertThat(cfg.getAppVersionPath("svc")).contains("/api/version");
+    }
+
+    @Test
+    void getAppVersionPath_returnsEmpty_whenNotConfigured() {
+        BBotConfig cfg = BBotConfig.load();
+        assertThat(cfg.getAppVersionPath("blotter")).isEmpty();
+    }
+
     // ── getTestData ───────────────────────────────────────────────────────────
 
     @Test

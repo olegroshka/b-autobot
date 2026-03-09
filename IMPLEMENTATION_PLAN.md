@@ -16,6 +16,7 @@
 | **M11** | ✅ COMPLETE | Instance-based architecture — BBotSession, PicoContainer DI, deprecated statics |
 | **M12** | ✅ COMPLETE | CI + docs + Javadoc — `.github/workflows/ci.yml`, Javadoc JAR (0 warnings), MD sync |
 | **M13** | ✅ COMPLETE | Enterprise SSO / MFA authentication — see [`SSO_AUTH_PLAN.md`](SSO_AUTH_PLAN.md) |
+| **M14** | ✅ COMPLETE | `AppDescriptor` refactor: `@FunctionalInterface` with only `dslFactory()`; `ComponentType` deleted; health/version paths moved to HOCON config; `BBotSession.Builder.initialize()` auto-discovers via `Class.forName()`; zero `.register()` calls in `Hooks.java` |
 
 ### Resolved in M8e
 All `new AssertionError(...)` replaced with typed `BBotException` across all core classes.
@@ -126,7 +127,7 @@ G9.1  RestProbe has GET/POST/PUT/DELETE/PATCH — all unit tested
 G9.2  grep "HttpClient.new" b-bot-core/src/main/ → exactly 1 creation site
 G9.3  AuthStrategy + RetryPolicy unit tested
 G9.4  mvn verify -pl b-bot-sandbox → 66/66
-G9.5  mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat → 24/24
+G9.5  mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat → 25/25
 ```
 
 ---
@@ -194,7 +195,9 @@ public final class BBotSession {
     // All internal helpers (requireDescriptor, requireContext, httpGetStatus, httpGetBody, configMs)
 
     public static final class Builder {
-        // register(AppDescriptor), initialize(BBotConfig) → BBotSession
+        // register(String name, AppDescriptor<?>)  — explicit (optional; auto-discovery preferred)
+        // initialize(BBotConfig)                   — stores config + auto-discovers descriptor-class entries
+        // build()                                  → BBotSession
     }
 }
 ```
@@ -311,7 +314,7 @@ mvn verify -pl b-bot-sandbox   # 66/66 tests pass (G11.3)
 
 **Quality gate 11d:**
 ```bash
-mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat   # 24/24 (G11.4)
+mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat   # 25/25 (G11.4)
 ```
 
 ---
@@ -368,7 +371,7 @@ mvn verify -pl pt-blotter-regression-template   # 24/24 (G11.4)
 G11.1  BBotSession is immutable after build — fields are final, no mutators
 G11.2  grep "@Deprecated" b-bot-core/src/main/ → ≥ 8 deprecated methods
 G11.3  mvn verify -pl b-bot-sandbox → 66/66
-G11.4  mvn verify -pl pt-blotter-regression-template → 24/24
+G11.4  mvn verify -pl pt-blotter-regression-template → 25/25
 ```
 
 ---
@@ -422,5 +425,5 @@ M8e → M8f → M9 → M10 → M11 → M12
 5. **M11 optional** — static API works fine for single-suite JVMs
 6. **M12 last** — documentation reflects the final state
 
-**Invariant:** 66/66 sandbox + 24/24 template tests pass after every sub-step.
+**Invariant:** 66/66 sandbox + 25/25 template tests pass after every sub-step.
 

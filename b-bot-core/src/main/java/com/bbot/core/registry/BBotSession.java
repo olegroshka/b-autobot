@@ -22,12 +22,29 @@ import java.util.Objects;
  * Immutable session object that holds the resolved state of all registered
  * {@link AppDescriptor}s and their {@link AppContext}s.
  *
- * <p>Created via the {@link Builder}: register descriptors, call
- * {@link Builder#initialize(BBotConfig)}, then {@link Builder#build()}.
- * Once built, the session is fully immutable (G11.1).
+ * <p>Created via the {@link Builder}: call {@link Builder#initialize(BBotConfig)},
+ * then {@link Builder#build()}.  Descriptors are auto-discovered from config
+ * (apps declaring {@code descriptor-class} in HOCON) — no explicit {@code register()}
+ * call is needed in {@code Hooks.java}.
  *
- * <p>Instance methods provide all domain operations (health checks, version
- * assertions, DSL creation). Access via {@link BBotRegistry#session()}.
+ * <p>Health-check and version paths are read from config rather than from the
+ * descriptor, keeping all environment-specific data in HOCON:
+ * <pre>{@code
+ * b-bot.apps.blotter {
+ *   descriptor-class  = "descriptors.BlotterAppDescriptor"
+ *   health-check-path = "/api/health"
+ *   version-path      = "/api/version"
+ * }
+ * }</pre>
+ *
+ * <p>Typical {@code Hooks.java}:
+ * <pre>{@code
+ * BBotConfig cfg = BBotConfig.load();             // picks up application-{env}.conf
+ * BBotSession session = BBotSession.builder()
+ *     .initialize(cfg)                            // auto-discovers all descriptor-class entries
+ *     .build();
+ * BBotRegistry.setSession(session);
+ * }</pre>
  *
  * @see BBotRegistry#session()
  */
@@ -54,7 +71,7 @@ public final class BBotSession {
         return config;
     }
 
-    /** Returns the set of registered app names. */
+    /** Returns the set of registered app names (auto-discovered + explicit). */
     public java.util.Set<String> appNames() {
         return descriptors.keySet();
     }
@@ -79,12 +96,11 @@ public final class BBotSession {
 
     /**
      * Asserts the named app's health endpoint returns 2xx.
-     * No-op if the descriptor declares no {@link AppDescriptor#healthCheckPath}.
+     * No-op if {@code b-bot.apps.{name}.health-check-path} is not configured.
      */
     public void checkHealth(String appName) {
-        AppDescriptor<?> desc = requireDescriptor(appName);
         AppContext ctx = requireContext(appName);
-        desc.healthCheckPath().ifPresent(path -> {
+        config.getAppHealthCheckPath(appName).ifPresent(path -> {
             String url = ctx.getApiBaseUrl() + path;
             int status = httpGetStatus(url);
             if (status < 200 || status >= 300) {
@@ -99,12 +115,11 @@ public final class BBotSession {
 
     /**
      * Asserts the named app's version endpoint returns JSON containing the expected version.
-     * No-op if the descriptor declares no {@link AppDescriptor#versionPath}.
+     * No-op if {@code b-bot.apps.{name}.version-path} is not configured.
      */
     public void assertVersion(String appName, String expectedVersion) {
-        AppDescriptor<?> desc = requireDescriptor(appName);
         AppContext ctx = requireContext(appName);
-        desc.versionPath().ifPresent(path -> {
+        config.getAppVersionPath(appName).ifPresent(path -> {
             String body = httpGetBody(ctx.getApiBaseUrl() + path);
             if (!body.contains("\"" + expectedVersion + "\"")) {
                 throw new BBotHealthCheckException(
@@ -116,7 +131,7 @@ public final class BBotSession {
         });
     }
 
-    /** Checks health of all registered apps that declare a health-check path. */
+    /** Checks health of all registered apps that have a health-check path in config. */
     public void checkAllHealth() {
         descriptors.keySet().forEach(this::checkHealth);
     }
@@ -189,11 +204,17 @@ public final class BBotSession {
     /**
      * Fluent builder for {@link BBotSession}.
      *
-     * <p>Usage:
+     * <h2>Config-driven usage (recommended)</h2>
      * <pre>{@code
      * BBotSession session = BBotSession.builder()
-     *     .register(new BlotterAppDescriptor())
-     *     .register(new ConfigServiceDescriptor())
+     *     .initialize(BBotConfig.load())   // auto-discovers descriptor-class entries
+     *     .build();
+     * }</pre>
+     *
+     * <h2>Explicit registration (for tests or dynamic descriptors)</h2>
+     * <pre>{@code
+     * BBotSession session = BBotSession.builder()
+     *     .register("blotter", new BlotterAppDescriptor())
      *     .initialize(BBotConfig.load())
      *     .build();
      * }</pre>
@@ -206,19 +227,30 @@ public final class BBotSession {
 
         private Builder() {}
 
-        /** Registers an app descriptor. */
-        public Builder register(AppDescriptor<?> descriptor) {
+        /**
+         * Explicitly registers an app descriptor under the given name.
+         *
+         * <p>Explicit registrations take priority — if the same app name also has a
+         * {@code descriptor-class} in config, the explicitly registered instance wins.
+         */
+        public Builder register(String name, AppDescriptor<?> descriptor) {
+            Objects.requireNonNull(name, "name must not be null");
             Objects.requireNonNull(descriptor, "descriptor must not be null");
             if (built) throw new BBotConfigException(
-                "BBotSession.Builder: cannot register after build()", descriptor.name());
-            descriptors.put(descriptor.name(), descriptor);
-            LOG.info("BBotSession.Builder: registered '{}'", descriptor.name());
+                "BBotSession.Builder: cannot register after build()", name);
+            descriptors.put(name, descriptor);
+            LOG.info("BBotSession.Builder: registered '{}'", name);
             return this;
         }
 
         /**
-         * Resolves {@link AppContext}s for every registered descriptor.
-         * Must be called exactly once before {@link #build()}.
+         * Stores the config and auto-discovers descriptors from apps that declare
+         * {@code descriptor-class} in HOCON. Must be called exactly once before {@link #build()}.
+         *
+         * <p>Auto-discovery instantiates each descriptor class via a public no-arg constructor.
+         * Explicitly registered apps (via {@link #register}) take priority.
+         *
+         * @throws BBotConfigException if a declared {@code descriptor-class} cannot be instantiated
          */
         public Builder initialize(BBotConfig cfg) {
             Objects.requireNonNull(cfg, "config must not be null");
@@ -227,6 +259,29 @@ public final class BBotSession {
             if (built) throw new BBotConfigException(
                 "BBotSession.Builder: cannot initialize after build()", "");
             this.config = cfg;
+
+            // Auto-discover descriptors from config (apps with descriptor-class)
+            for (String appName : cfg.getAppNames()) {
+                if (descriptors.containsKey(appName)) {
+                    LOG.debug("BBotSession.Builder: '{}' already registered — skipping config auto-discovery", appName);
+                    continue;
+                }
+                cfg.getAppDescriptorClass(appName).ifPresent(fqcn -> {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        AppDescriptor<?> desc = (AppDescriptor<?>) Class.forName(fqcn)
+                            .getDeclaredConstructor()
+                            .newInstance();
+                        descriptors.put(appName, desc);
+                        LOG.info("BBotSession.Builder: auto-discovered '{}' → {}", appName, fqcn);
+                    } catch (Exception e) {
+                        throw new BBotConfigException(
+                            "Failed to instantiate descriptor '" + fqcn + "' for app '" + appName +
+                            "': " + e.getMessage(),
+                            "b-bot.apps." + appName + ".descriptor-class");
+                    }
+                });
+            }
             return this;
         }
 
@@ -251,4 +306,3 @@ public final class BBotSession {
         }
     }
 }
-

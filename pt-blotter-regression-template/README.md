@@ -45,7 +45,7 @@ The scenarios demonstrate twelve observable aspects of the system:
 pt-blotter-regression-template/
 ├── src/test/java/
 │   ├── descriptors/
-│   │   ├── BlotterDescriptor.java        ← AppDescriptor: name, DSL factory, health path
+│   │   ├── BlotterDescriptor.java        ← AppDescriptor: DSL factory (name/health path in HOCON)
 │   │   ├── ConfigServiceDescriptor.java  ← REST-only descriptor for config service
 │   │   └── DeploymentDescriptor.java     ← Hybrid descriptor for deployment dashboard
 │   ├── utils/
@@ -95,7 +95,7 @@ The script starts all three servers in the background and waits for them to be r
 
 ```bash
 mvn verify -pl pt-blotter-regression-template -Db-bot.env=mockuat
-# → 24/24 scenarios pass
+# → 25/25 scenarios pass
 ```
 
 ### Step 3 — Stop the environment
@@ -177,9 +177,22 @@ cp -r pt-blotter-regression-template my-app-regression
 ### 2. Add your app descriptor
 
 Edit `descriptors/BlotterDescriptor.java`:
-- Change `name()` to match your app's key in config (e.g. `"my-trading-app"`)
-- Change the DSL type and factory
-- Set `healthCheckPath()` to a real liveness endpoint
+- Change the generic type and DSL class to your own implementation
+- Implement `dslFactory()` — the only method on the `@FunctionalInterface`
+- Rename the class if you wish (just keep the FQCN in HOCON in sync)
+
+The descriptor no longer declares the app name, health-check path, or component type —
+those all live in HOCON config:
+
+```hocon
+b-bot.apps.my-trading-app {
+  descriptor-class  = "descriptors.BlotterDescriptor"   # FQCN of your descriptor
+  health-check-path = "/api/health"                     # omit to skip health checks
+}
+```
+
+`BBotSession.Builder.initialize(cfg)` reads `descriptor-class` and instantiates your
+descriptor automatically — no `.register()` call needed in `Hooks.java`.
 
 ### 3. Build your DSL
 
@@ -193,6 +206,8 @@ Edit `utils/PtBlotterDsl.java`:
 Create `src/test/resources/application-uat.conf`:
 ```hocon
 b-bot.apps.my-trading-app {
+  descriptor-class  = "descriptors.BlotterDescriptor"
+  health-check-path = "/api/health"
   webUrl  = "https://uat-blotter.firm.com/"
   apiBase = "https://uat-api.firm.com"
   users   { trader = jsmith, admin = aadmin }
