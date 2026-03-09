@@ -228,6 +228,23 @@ class BBotConfigTest {
         assertThat(cfg.getAppVersionPath("blotter")).isEmpty();
     }
 
+    // ── getAppActionPath ──────────────────────────────────────────────────────
+
+    @Test
+    void getAppActionPath_present() {
+        BBotConfig cfg = BBotConfig.load(); // blotter.api-actions.list-inquiries.path is in test conf
+        assertThat(cfg.getAppActionPath("blotter", "list-inquiries")).isEqualTo("/api/inquiries");
+    }
+
+    @Test
+    void getAppActionPath_absent_throws() {
+        BBotConfig cfg = BBotConfig.load();
+        assertThatThrownBy(() -> cfg.getAppActionPath("blotter", "nonexistent-action"))
+            .isInstanceOf(BBotConfigException.class)
+            .hasMessageContaining("nonexistent-action")
+            .hasMessageContaining("blotter");
+    }
+
     // ── getTestData ───────────────────────────────────────────────────────────
 
     @Test

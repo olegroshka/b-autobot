@@ -77,6 +77,37 @@ class AppContextTest {
     }
 
     @Test
+    void getActionPath_resolvesFromConfig() {
+        // blotter.api-actions.list-inquiries.path is declared in the test application.conf
+        BBotConfig cfg = BBotConfig.load();
+        AppContext ctx = AppContext.fromConfig("blotter", cfg);
+        assertThat(ctx.getActionPath("list-inquiries")).isEqualTo("/api/inquiries");
+    }
+
+    @Test
+    void getActionPath_absent_throws() {
+        BBotConfig cfg = BBotConfig.load();
+        AppContext ctx = AppContext.fromConfig("blotter", cfg);
+        assertThatThrownBy(() -> ctx.getActionPath("nonexistent-action"))
+            .isInstanceOf(com.bbot.core.exception.BBotConfigException.class)
+            .hasMessageContaining("nonexistent-action");
+    }
+
+    @Test
+    void getTestData_returnsNullWhenNoParser() {
+        BBotConfig cfg = BBotConfig.load();
+        AppContext ctx = AppContext.fromConfig("blotter", cfg);  // parsedTestData = null
+        assertThat(ctx.getTestData(String.class)).isNull();
+    }
+
+    @Test
+    void getTestData_returnsValueWhenSet() {
+        BBotConfig cfg = BBotConfig.load();
+        AppContext ctx = AppContext.fromConfig("blotter", cfg, "my-parsed-data");
+        assertThat(ctx.getTestData(String.class)).isEqualTo("my-parsed-data");
+    }
+
+    @Test
     void getOtherAppApiBase_readsFromConfig() {
         BBotConfig cfg = BBotConfig.load().withOverrides(Map.of(
             "b-bot.apps.blotter.webUrl",          "http://localhost:9001/blotter/",

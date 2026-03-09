@@ -75,12 +75,39 @@ public final class TestDataConfig {
         Map<String, String> result = new LinkedHashMap<>();
         root.entrySet().stream()
             .filter(e -> !e.getKey().startsWith("bond-lists")
+                      && !e.getKey().startsWith("bonds")
                       && !e.getKey().startsWith("templates")
                       && !e.getKey().startsWith("portfolios")
                       && !e.getKey().startsWith("service-versions")
                       && !e.getKey().startsWith("users"))
             .forEach(e -> result.put(e.getKey(), e.getValue().unwrapped().toString()));
         return Collections.unmodifiableMap(result);
+    }
+
+    // ── Bond catalogue ────────────────────────────────────────────────────────
+
+    /**
+     * Returns the bond with the given catalogue ID from {@code b-bot.test-data.bonds}.
+     *
+     * <p>Example: {@code getBond("UST-2Y")} returns the {@link Bond} record with
+     * {@code id="UST-2Y", isin="US912828YJ02", ...}.
+     *
+     * @throws BBotConfigException if the bond ID is not in the catalogue
+     */
+    public Bond getBond(String bondId) {
+        String path = ROOT + ".bonds." + bondId;
+        if (!cfg.hasPath(path))
+            throw new BBotConfigException(
+                "Bond '" + bondId + "' not found in b-bot.test-data.bonds. " +
+                "Add it to the bonds catalogue in your application-{env}.conf.", path);
+        Config b = cfg.getConfig(path);
+        return new Bond(
+            bondId,
+            b.getString("isin"),
+            b.hasPath("description") ? b.getString("description") : "",
+            b.hasPath("maturity")    ? b.getString("maturity")    : "",
+            b.hasPath("coupon")      ? b.getDouble("coupon")      : 0.0
+        );
     }
 
     // ── Bond lists ────────────────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 package com.bbot.core.registry;
 
 import com.bbot.core.config.BBotConfig;
+import com.bbot.core.data.TestDataParser;
 import com.bbot.core.exception.BBotConfigException;
 import com.bbot.core.exception.BBotHealthCheckException;
 import com.sun.net.httpserver.HttpServer;
@@ -304,6 +305,34 @@ class BBotSessionTest {
         } finally {
             server.stop(0);
         }
+    }
+
+    // ── TestDataParser ────────────────────────────────────────────────────────
+
+    @Test
+    void build_invokesTestDataParser() {
+        AppDescriptor<String> desc = new AppDescriptor<String>() {
+            @Override public DslFactory<String> dslFactory() { return (ctx, page) -> "dsl"; }
+            @Override public TestDataParser<?> testDataParser() { return cfg -> "parsed-data"; }
+        };
+
+        BBotSession session = BBotSession.builder()
+            .register("app1", desc)
+            .initialize(BBotConfig.load())
+            .build();
+
+        assertThat(session.context("app1").getTestData(String.class)).isEqualTo("parsed-data");
+    }
+
+    @Test
+    void build_skipsNullParser() {
+        // Default AppDescriptor returns null from testDataParser() → parsedTestData stays null
+        BBotSession session = BBotSession.builder()
+            .register("app1", descriptor("app1"))
+            .initialize(BBotConfig.load())
+            .build();
+
+        assertThat(session.context("app1").getTestData(String.class)).isNull();
     }
 
     // ── Auto-discovery ────────────────────────────────────────────────────────

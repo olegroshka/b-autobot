@@ -1,5 +1,7 @@
 package com.bbot.core.registry;
 
+import com.bbot.core.data.TestDataParser;
+
 /**
  * Self-description of a tested application registered with {@link BBotSession.Builder}.
  *
@@ -38,4 +40,17 @@ public interface AppDescriptor<D> {
      * is {@code null} for REST-only descriptors.
      */
     DslFactory<D> dslFactory();
+
+    /**
+     * Returns a parser for this app's domain-specific test data, or {@code null} if
+     * the app has no test data.
+     *
+     * <p>When non-null, the parser is called once during {@link BBotSession.Builder#build()}
+     * with the full resolved HOCON config. The result is stored in the app's
+     * {@link AppContext} and retrieved via {@link AppContext#getTestData(Class)}.
+     *
+     * <p>The default implementation returns {@code null} — apps with no domain-specific
+     * test data need not override this method.
+     */
+    default TestDataParser<?> testDataParser() { return null; }
 }

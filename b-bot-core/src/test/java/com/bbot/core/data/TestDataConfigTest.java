@@ -48,12 +48,33 @@ class TestDataConfigTest {
         // Should NOT contain reserved sub-blocks
         assertThat(globals.keySet().stream()
                 .noneMatch(k -> k.startsWith("bond-lists")
+                        || k.startsWith("bonds")
                         || k.startsWith("templates")
                         || k.startsWith("portfolios")
                         || k.startsWith("service-versions")
                         || k.startsWith("users")))
-            .as("Globals should exclude bond-lists, templates, portfolios, service-versions, users")
+            .as("Globals should exclude bond-lists, bonds, templates, portfolios, service-versions, users")
             .isTrue();
+    }
+
+    // ── Bond catalogue ────────────────────────────────────────────────────────
+
+    @Test
+    void getBond_present() {
+        Bond bond = testData.getBond("UST-2Y");
+        assertThat(bond.id()).isEqualTo("UST-2Y");
+        assertThat(bond.isin()).isEqualTo("US912828YJ02");
+        assertThat(bond.description()).isEqualTo("UST 4.25% 2034");
+        assertThat(bond.maturity()).isEqualTo("2034-11-15");
+        assertThat(bond.coupon()).isEqualTo(4.250);
+    }
+
+    @Test
+    void getBond_absent_throws() {
+        assertThatThrownBy(() -> testData.getBond("NONEXISTENT-BOND"))
+            .isInstanceOf(BBotConfigException.class)
+            .hasMessageContaining("NONEXISTENT-BOND")
+            .hasMessageContaining("not found");
     }
 
     // ── Bond lists ────────────────────────────────────────────────────────────

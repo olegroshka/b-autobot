@@ -151,6 +151,32 @@ public final class BBotConfig {
 
 
     /**
+     * Returns the {@code path} field of the named api-action for the given app.
+     *
+     * <p>Config key: {@code b-bot.apps.{appName}.api-actions.{actionName}.path}
+     *
+     * <p>Example HOCON:
+     * <pre>{@code
+     * b-bot.apps.deployment {
+     *   api-actions {
+     *     list-deployments { method = "GET", path = "/api/deployments" }
+     *   }
+     * }
+     * }</pre>
+     *
+     * @throws com.bbot.core.exception.BBotConfigException if the action or its path is absent
+     */
+    public String getAppActionPath(String appName, String actionName) {
+        String key = "b-bot.apps." + appName + ".api-actions." + actionName + ".path";
+        if (!cfg.hasPath(key))
+            throw new BBotConfigException(
+                "API action '" + actionName + "' not found for app '" + appName + "'. " +
+                "Declare it under:  b-bot.apps." + appName + ".api-actions." + actionName + " { method=..., path=... }",
+                key);
+        return cfg.getString(key);
+    }
+
+    /**
      * Looks up a named API action from any app's {@code api-actions} block.
      *
      * <p>Actions are declared under {@code b-bot.apps.{appName}.api-actions.{actionName}}.

@@ -298,8 +298,14 @@ public final class BBotSession {
             built = true;
 
             Map<String, AppContext> contexts = new LinkedHashMap<>();
-            descriptors.forEach((name, desc) ->
-                contexts.put(name, AppContext.fromConfig(name, config)));
+            descriptors.forEach((name, desc) -> {
+                Object parsed = null;
+                if (desc.testDataParser() != null) {
+                    parsed = desc.testDataParser().parse(config.raw());
+                    LOG.debug("BBotSession.build: test data parsed for '{}'", name);
+                }
+                contexts.put(name, AppContext.fromConfig(name, config, parsed));
+            });
 
             LOG.info("BBotSession built — {} app(s): {}", contexts.size(), contexts.keySet());
             return new BBotSession(descriptors, contexts, config);
