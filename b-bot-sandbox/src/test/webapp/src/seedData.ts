@@ -40,7 +40,7 @@ export function buildSeedInquiries(): Inquiry[] {
       twPrice:  pc('US912828YJ02'), twSpread:  makeSpreadCell(45.5, 47.0),
       cpPrice:  pc('US912828YJ02'), cpSpread:  makeSpreadCell(45.0, 47.5),
       cbbPrice: pc('US912828YJ02'), cbbSpread: makeSpreadCell(45.2, 46.8),
-      pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+      pricingAction: null, price: null, spread: null, quotedPrice: null, quotedSpread: null,
     },
     {
       id: 'INQ-002', ptId: PT1, ptLineId: `${PT1}_2`,
@@ -50,7 +50,7 @@ export function buildSeedInquiries(): Inquiry[] {
       twPrice:  pc('XS2346573523'), twSpread:  makeSpreadCell(120.0, 122.0),
       cpPrice:  pc('XS2346573523'), cpSpread:  makeSpreadCell(119.5, 122.5),
       cbbPrice: pc('XS2346573523'), cbbSpread: makeSpreadCell(120.2, 121.8),
-      pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+      pricingAction: null, price: null, spread: null, quotedPrice: null, quotedSpread: null,
     },
     {
       id: 'INQ-003', ptId: PT1, ptLineId: `${PT1}_3`,
@@ -60,7 +60,7 @@ export function buildSeedInquiries(): Inquiry[] {
       twPrice:  pc('US38141GXZ20'), twSpread:  makeSpreadCell(95.0, 97.0),
       cpPrice:  pc('US38141GXZ20'), cpSpread:  makeSpreadCell(94.5, 97.5),
       cbbPrice: pc('US38141GXZ20'), cbbSpread: makeSpreadCell(95.2, 96.8),
-      pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+      pricingAction: null, price: null, spread: null, quotedPrice: null, quotedSpread: null,
     },
     // ── Portfolio 2 ────────────────────────────────────────────────────────────
     {
@@ -71,7 +71,7 @@ export function buildSeedInquiries(): Inquiry[] {
       twPrice:  pc('GB0031348658'), twSpread:  makeSpreadCell(32.0, 34.0),
       cpPrice:  pc('GB0031348658'), cpSpread:  makeSpreadCell(31.5, 34.5),
       cbbPrice: pc('GB0031348658'), cbbSpread: makeSpreadCell(32.2, 33.8),
-      pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+      pricingAction: null, price: null, spread: null, quotedPrice: null, quotedSpread: null,
     },
     {
       id: 'INQ-005', ptId: PT2, ptLineId: `${PT2}_2`,
@@ -81,7 +81,7 @@ export function buildSeedInquiries(): Inquiry[] {
       twPrice:  pc('FR0014004L86'), twSpread:  makeSpreadCell(55.0, 57.0),
       cpPrice:  pc('FR0014004L86'), cpSpread:  makeSpreadCell(54.5, 57.5),
       cbbPrice: pc('FR0014004L86'), cbbSpread: makeSpreadCell(55.2, 56.8),
-      pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+      pricingAction: null, price: null, spread: null, quotedPrice: null, quotedSpread: null,
     },
   ]
 }

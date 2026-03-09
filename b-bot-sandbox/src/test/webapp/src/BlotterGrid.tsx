@@ -197,9 +197,9 @@ const COLUMN_DEFS: (ColDef<Inquiry> | ColGroupDef<Inquiry>)[] = [
   {
     headerName: 'Sent',
     children: [
-      { colId: 'sentPrice',  headerName: 'Sent Price',  field: 'sentPrice',  width: 95,
+      { colId: 'quotedPrice',  headerName: 'Quoted Price',  field: 'quotedPrice',  width: 95,
         valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(4) : '' },
-      { colId: 'sentSpread', headerName: 'Sent Spread', field: 'sentSpread', width: 95,
+      { colId: 'quotedSpread', headerName: 'Quoted Spread', field: 'quotedSpread', width: 95,
         valueFormatter: (p) => p.value != null ? (p.value as number).toFixed(2) : '' },
     ],
   },
@@ -261,7 +261,7 @@ export default function BlotterGrid({ onGridReady: onGridReadyProp, onSelectionC
             cpSpread:    r.cpSpread     ?? '',
             cbbPrice:    r.cbbPrice     ?? '',
             cbbSpread:   r.cbbSpread    ?? '',
-            pricingAction: null, price: null, spread: null, sentPrice: null, sentSpread: null,
+            pricingAction: null, price: null, spread: null, quotedPrice: null, quotedSpread: null,
           } as Inquiry))
         if (toAdd.length > 0) {
           event.api.applyTransaction({ add: toAdd })

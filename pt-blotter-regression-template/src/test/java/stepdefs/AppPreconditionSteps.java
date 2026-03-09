@@ -1,4 +1,4 @@
-package stepdefs;
+package com.bbot.template.stepdefs;
 
 import io.cucumber.java.en.Given;
 

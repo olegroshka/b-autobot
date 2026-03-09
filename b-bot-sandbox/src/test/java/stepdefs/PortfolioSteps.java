@@ -1,4 +1,4 @@
-package stepdefs;
+package com.bbot.sandbox.stepdefs;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,8 +12,8 @@ import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import model.Trade;
-import model.TradePortfolio;
+import com.bbot.sandbox.model.Trade;
+import com.bbot.sandbox.model.TradePortfolio;
 import com.bbot.core.GridHarness;
 import com.bbot.core.NumericComparator;
 
@@ -33,7 +33,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <h2>Hybrid Data Pattern</h2>
  * <ol>
  *   <li>Use Playwright's {@link APIRequestContext} ({@code page.request()}) to POST a
- *       {@link TradePortfolio} to {@link utils.MockBlotterServer MockBlotterServer}.</li>
+ *       {@link TradePortfolio} to {@link com.bbot.sandbox.utils.MockBlotterServer MockBlotterServer}.</li>
  *   <li>Capture the server-assigned {@code portfolio_id} and the full response
  *       as a {@link JsonNode} for later field lookups.</li>
  *   <li>Render an AG Grid blotter page in the same Playwright {@link Page} via

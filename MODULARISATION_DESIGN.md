@@ -216,7 +216,7 @@ package com.bbot.core.registry;
  * Supplies only a DslFactory. All other app metadata lives in HOCON config:
  *
  *   b-bot.apps.blotter {
- *     descriptor-class  = "descriptors.BlotterAppDescriptor"
+ *     descriptor-class  = "com.bbot.sandbox.descriptors.BlotterAppDescriptor"
  *     health-check-path = "/api/health"
  *     version-path      = "/api/version"   // optional
  *     webUrl  = "http://..."
@@ -632,18 +632,18 @@ b-bot {
   apps {
     blotter {
       # webUrl and apiBase: injected at runtime — see sandbox Hooks.java
-      descriptor-class  = "descriptors.BlotterAppDescriptor"
+      descriptor-class  = "com.bbot.sandbox.descriptors.BlotterAppDescriptor"
       health-check-path = "/api/health"
       users { trader = doej, admin = smithj }
     }
     config-service {
       # apiBase: injected at runtime
-      descriptor-class  = "descriptors.ConfigServiceDescriptor"
+      descriptor-class  = "com.bbot.sandbox.descriptors.ConfigServiceDescriptor"
       health-check-path = "/api/config"
     }
     deployment {
       # webUrl and apiBase: injected at runtime
-      descriptor-class  = "descriptors.DeploymentDescriptor"
+      descriptor-class  = "com.bbot.sandbox.descriptors.DeploymentDescriptor"
       health-check-path = "/api/deployments"
     }
   }
@@ -719,11 +719,11 @@ b-bot {
 #### `BlotterAppDescriptor.java`
 
 ```java
-package descriptors;
+package com.bbot.sandbox.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.BlotterDsl;
+import com.bbot.sandbox.utils.BlotterDsl;
 
 /** Supplies only the DSL factory. App name, health path, URLs declared in HOCON. */
 public final class BlotterAppDescriptor implements AppDescriptor<BlotterDsl> {
@@ -737,11 +737,11 @@ public final class BlotterAppDescriptor implements AppDescriptor<BlotterDsl> {
 #### `ConfigServiceDescriptor.java`
 
 ```java
-package descriptors;
+package com.bbot.sandbox.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.ConfigServiceDsl;
+import com.bbot.sandbox.utils.ConfigServiceDsl;
 
 /** REST-only descriptor — page is ignored. App name + health path in HOCON. */
 public final class ConfigServiceDescriptor implements AppDescriptor<ConfigServiceDsl> {
@@ -755,11 +755,11 @@ public final class ConfigServiceDescriptor implements AppDescriptor<ConfigServic
 #### `DeploymentDescriptor.java`
 
 ```java
-package descriptors;
+package com.bbot.sandbox.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.DeploymentDsl;
+import com.bbot.sandbox.utils.DeploymentDsl;
 
 /** Supplies only the DSL factory. App name, health path, URLs declared in HOCON. */
 public final class DeploymentDescriptor implements AppDescriptor<DeploymentDsl> {
@@ -1073,7 +1073,7 @@ No milestone is "done" until all its quality gates are green and a clean git com
 
 5. Rename `b-autobot` → `b-bot-sandbox` in `pom.xml`; add `<dependency>` on `b-bot-core`
 
-6. Fix all sandbox imports: `utils.PlaywrightManager` → `com.bbot.core.PlaywrightManager` etc.
+6. Fix all sandbox imports and package declarations: `package stepdefs;` → `package com.bbot.sandbox.stepdefs;` etc.; `utils.PlaywrightManager` → `com.bbot.core.PlaywrightManager` etc.
 
 7. Add placeholder `reference.conf` to `b-bot-core/src/main/resources/` (content from M2; empty `b-bot {}` block is fine for now)
 
@@ -1374,7 +1374,7 @@ when BlotterDevServer is running.
    ```bash
    # Terminal 1 — start mock blotter server
    mvn exec:java -pl b-bot-sandbox \
-       -Dexec.mainClass=utils.BlotterDevServer \
+       -Dexec.mainClass=com.bbot.sandbox.utils.BlotterDevServer \
        -Dexec.classpathScope=test
 
    # Terminal 2 — run template smoke

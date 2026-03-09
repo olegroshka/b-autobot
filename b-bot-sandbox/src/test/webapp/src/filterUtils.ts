@@ -18,7 +18,7 @@ const LABEL_TO_COL: Record<string, string> = {
 // ── Columns eligible for double-click auto-filter ────────────────────────────
 //
 // Must be non-editable and not tick frequently.
-// Excludes: all ref-price columns, price, spread, pricingAction, sentPrice/Spread,
+// Excludes: all ref-price columns, price, spread, pricingAction, quotedPrice/Spread,
 // coupon (numeric), notional (numeric), ptLineId (derived).
 //
 export const DOUBLE_CLICK_FILTER_COLS = new Set([

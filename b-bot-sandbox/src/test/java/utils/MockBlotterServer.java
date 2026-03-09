@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.sandbox.utils;
 
 import com.github.tomakehurst.wiremock.WireMockServer;
 import com.github.tomakehurst.wiremock.core.WireMockConfiguration;

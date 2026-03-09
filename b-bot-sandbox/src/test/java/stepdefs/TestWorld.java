@@ -1,4 +1,4 @@
-package stepdefs;
+package com.bbot.sandbox.stepdefs;
 
 import com.bbot.core.PlaywrightManager;
 import com.bbot.core.registry.BBotRegistry;

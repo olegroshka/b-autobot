@@ -1,9 +1,9 @@
-package stepdefs;
+package com.bbot.template.stepdefs;
 
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
-import utils.DeploymentDsl;
+import com.bbot.template.utils.DeploymentDsl;
 
 /**
  * Step definitions for Deployment Dashboard scenarios.

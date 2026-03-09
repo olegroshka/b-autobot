@@ -1,4 +1,4 @@
-package runners;
+package com.bbot.template.runners;
 
 import org.junit.platform.suite.api.ConfigurationParameter;
 import org.junit.platform.suite.api.IncludeEngines;
@@ -14,7 +14,7 @@ import static io.cucumber.junit.platform.engine.Constants.PLUGIN_PROPERTY_NAME;
 @Suite
 @IncludeEngines("cucumber")
 @SelectClasspathResource("features")
-@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "stepdefs")
+@ConfigurationParameter(key = GLUE_PROPERTY_NAME, value = "com.bbot.template.stepdefs")
 @ConfigurationParameter(
         key = PLUGIN_PROPERTY_NAME,
         value = "pretty, html:target/cucumber-reports/report.html, " +

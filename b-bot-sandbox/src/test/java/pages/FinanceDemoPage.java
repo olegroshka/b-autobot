@@ -1,4 +1,4 @@
-package pages;
+package com.bbot.sandbox.pages;
 
 import com.microsoft.playwright.Locator;
 import com.microsoft.playwright.Page;
@@ -15,7 +15,7 @@ import static com.microsoft.playwright.assertions.PlaywrightAssertions.assertTha
  * {@code [row-index='N'] [col-id='col']} selectors, never nth-child.
  *
  * <p>All JavaScript is delegated to {@code window.agGridProbes} which is injected
- * into every page via {@link utils.PlaywrightManager#initContext()}.
+ * into every page via {@link com.bbot.core.PlaywrightManager#initContext()}.
  */
 public class FinanceDemoPage {
 
@@ -100,7 +100,7 @@ public class FinanceDemoPage {
 
     /**
      * Reads a cell's text content after scrolling it into view.
-     * Use {@link utils.TickingCellHelper} when you need to wait for a value change.
+     * Use {@link com.bbot.core.TickingCellHelper} when you need to wait for a value change.
      */
     public String getCellText(String colId, int rowIndex) {
         Locator cell = getCell(colId, rowIndex);

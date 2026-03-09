@@ -1,7 +1,7 @@
-package stepdefs;
+package com.bbot.template.stepdefs;
 
 import io.cucumber.java.en.Then;
-import utils.ConfigServiceDsl;
+import com.bbot.template.utils.ConfigServiceDsl;
 
 /**
  * Step definitions for Config Service scenarios.

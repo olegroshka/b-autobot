@@ -1,8 +1,8 @@
-package descriptors;
+package com.bbot.sandbox.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.DeploymentDsl;
+import com.bbot.sandbox.utils.DeploymentDsl;
 
 /**
  * Descriptor for the Deployment Dashboard — hybrid web + REST.

@@ -53,6 +53,9 @@ public final class SsoAuthManager {
     private static final Logger LOG = LoggerFactory.getLogger(SsoAuthManager.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** Timeout in seconds for each OAuth2 token HTTP request. */
+    static final int OAUTH_REQUEST_TIMEOUT_SECONDS = 30;
+
     private SsoAuthManager() {}
 
     /**
@@ -222,7 +225,7 @@ public final class SsoAuthManager {
                     .uri(URI.create(config.tokenUrl()))
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(formBody))
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(OAUTH_REQUEST_TIMEOUT_SECONDS))
                     .build();
 
             HttpResponse<String> resp = client

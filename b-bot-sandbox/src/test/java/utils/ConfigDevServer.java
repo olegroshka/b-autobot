@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.sandbox.utils;
 
 /**
  * Standalone launcher that starts the in-memory Config Service on a fixed port

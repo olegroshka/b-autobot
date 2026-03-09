@@ -1,11 +1,11 @@
-package stepdefs;
+package com.bbot.sandbox.stepdefs;
 
 import com.bbot.core.data.TestDataConfig;
 import com.microsoft.playwright.APIResponse;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import utils.BlotterDsl;
+import com.bbot.sandbox.utils.BlotterDsl;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -23,7 +23,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  *   <li>M2 — ticking cell assertions (shared with FinanceDemoSteps for flash)</li>
  *   <li>M3 — REST inquiry ingestion</li>
  *   <li>M4 — Toolbar: ref source / ref side / markup ± / units / APPLY</li>
- *   <li>M5 — SEND: status → QUOTED, sentPrice/sentSpread snapshot</li>
+ *   <li>M5 — SEND: status → QUOTED, quotedPrice/quotedSpread snapshot</li>
  *   <li>M6 — multi-row APPLY / SEND</li>
  *   <li>M7 — end-to-end DSL re-quote scenario (no new steps needed)</li>
  * </ul>

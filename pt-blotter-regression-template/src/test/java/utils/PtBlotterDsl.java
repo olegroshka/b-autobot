@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.template.utils;
 
 import com.bbot.core.TickingCellHelper;
 import com.bbot.core.registry.AppContext;

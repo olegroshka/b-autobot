@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.sandbox.utils;
 
 import com.microsoft.playwright.*;
 import com.microsoft.playwright.options.AriaRole;

@@ -11,7 +11,7 @@ import java.time.Duration;
  * <p>Provides two clean creation strategies:
  * <ul>
  *   <li>{@link #shared()} — returns a lazily-created, thread-safe singleton
- *       with a default 10 s connect timeout. Suitable for most REST operations.</li>
+ *       with a default {@value #DEFAULT_CONNECT_TIMEOUT_SECONDS} s connect timeout. Suitable for most REST operations.</li>
  *   <li>{@link #withTimeout(Duration)} — creates a dedicated client with a
  *       custom connect timeout. Use for health checks or other calls that need
  *       different timing.</li>
@@ -23,15 +23,18 @@ import java.time.Duration;
 @SuppressWarnings("unused")
 public final class HttpClientFactory {
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(10);
+    /** Default connect timeout in seconds for the shared {@link HttpClient} instance. */
+    static final int DEFAULT_CONNECT_TIMEOUT_SECONDS = 10;
+
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(DEFAULT_CONNECT_TIMEOUT_SECONDS);
 
     private static volatile HttpClient INSTANCE;
 
     private HttpClientFactory() {}
 
     /**
-     * Returns a shared {@link HttpClient} instance with a default 10 s connect
-     * timeout. The instance is created lazily (double-checked locking) and
+     * Returns a shared {@link HttpClient} instance with a default
+     * {@value #DEFAULT_CONNECT_TIMEOUT_SECONDS} s connect timeout. The instance is created lazily (double-checked locking) and
      * reused for the lifetime of the JVM.
      */
     public static HttpClient shared() {
@@ -64,7 +67,7 @@ public final class HttpClientFactory {
     /**
      * Creates a new {@link HttpClient} with the connect timeout resolved from
      * the given config ({@code b-bot.timeouts.apiResponse}), falling back to
-     * 10 s if the key is absent.
+     * {@value #DEFAULT_CONNECT_TIMEOUT_SECONDS} s if the key is absent.
      *
      * @param config the active configuration
      * @return a new {@link HttpClient} instance

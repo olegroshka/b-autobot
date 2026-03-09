@@ -1,11 +1,11 @@
-package stepdefs;
+package com.bbot.template.stepdefs;
 
 import com.bbot.core.data.TestDataConfig;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import utils.PtBlotterDsl;
+import com.bbot.template.utils.PtBlotterDsl;
 
 import java.time.Duration;
 

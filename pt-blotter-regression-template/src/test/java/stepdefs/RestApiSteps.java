@@ -1,4 +1,4 @@
-package stepdefs;
+package com.bbot.template.stepdefs;
 
 import com.bbot.core.data.ApiAction;
 import com.bbot.core.data.Portfolio;

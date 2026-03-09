@@ -1,8 +1,8 @@
-package descriptors;
+package com.bbot.template.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.DeploymentDsl;
+import com.bbot.template.utils.DeploymentDsl;
 
 /**
  * {@link AppDescriptor} for the Deployment Dashboard.
@@ -11,7 +11,7 @@ import utils.DeploymentDsl;
  * All environment-specific config lives in HOCON:
  * <pre>{@code
  * b-bot.apps.deployment {
- *   descriptor-class  = "descriptors.DeploymentDescriptor"
+ *   descriptor-class  = "com.bbot.template.descriptors.DeploymentDescriptor"
  *   health-check-path = "/api/deployments"
  *   webUrl            = "http://..."
  *   apiBase           = "http://..."

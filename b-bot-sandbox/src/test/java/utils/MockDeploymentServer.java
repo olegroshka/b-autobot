@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.sandbox.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -39,6 +39,20 @@ public final class MockDeploymentServer {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    // ── Seed service ports ─────────────────────────────────────────────────────
+    private static final int PORT_CREDIT_RFQ_BLOTTER    = 8080;
+    private static final int PORT_CREDIT_PT_PRICER       = 8082;
+    private static final int PORT_CREDIT_PT_NEG_ENGINE   = 8083;
+    private static final int PORT_CREDIT_RISK_ENGINE     = 9090;
+    private static final int PORT_MARKET_DATA_GATEWAY    = 7070;
+    private static final int PORT_TRADE_BOOKING_SERVICE  = 8090;
+    private static final int PORT_POSITION_AGGREGATOR    = 9091;
+    private static final int PORT_RATE_CURVE_BUILDER     = 7071;
+    private static final int PORT_COLLATERAL_MANAGER     = 9092;
+    private static final int PORT_P_AND_L_CALCULATOR     = 9093;
+    private static final int PORT_REGULATORY_REPORTING   = 9094;
+    private static final int PORT_LIMIT_MONITOR          = 9095;
+
     /**
      * Store keyed by service name.  {@link LinkedHashMap} preserves insertion
      * order so the GET-all response is stable across runs.
@@ -56,22 +70,22 @@ public final class MockDeploymentServer {
         STORE.clear();
 
         // ── Credit Trading — Systems Under Test ─────────────────────────────
-        put("credit-rfq-blotter",    "RUNNING", "v2.4.1", "UAT", "uat-app-01",  8080, "Credit Trading Tech",  "2026-03-05T14:30:00Z", "build-4821", "5d 2h");
-        put("credit-pt-pricer",      "RUNNING", "v1.8.3", "UAT", "uat-app-02",  8082, "Credit Trading Tech",  "2026-03-04T09:15:00Z", "build-3907", "6d 17h");
-        put("credit-pt-neg-engine",  "RUNNING", "v3.1.0", "UAT", "uat-app-03",  8083, "Credit Trading Tech",  "2026-03-06T11:45:00Z", "build-5210", "19h 15m");
+        put("credit-rfq-blotter",    "RUNNING", "v2.4.1", "UAT", "uat-app-01",  PORT_CREDIT_RFQ_BLOTTER,   "Credit Trading Tech",  "2026-03-05T14:30:00Z", "build-4821", "5d 2h");
+        put("credit-pt-pricer",      "RUNNING", "v1.8.3", "UAT", "uat-app-02",  PORT_CREDIT_PT_PRICER,      "Credit Trading Tech",  "2026-03-04T09:15:00Z", "build-3907", "6d 17h");
+        put("credit-pt-neg-engine",  "RUNNING", "v3.1.0", "UAT", "uat-app-03",  PORT_CREDIT_PT_NEG_ENGINE,  "Credit Trading Tech",  "2026-03-06T11:45:00Z", "build-5210", "19h 15m");
 
         // ── Supporting infrastructure ────────────────────────────────────────
-        put("credit-risk-engine",    "RUNNING", "v2.0.5", "UAT", "uat-risk-01", 9090, "Risk Technology",      "2026-03-01T08:00:00Z", "build-2341", "6d 8h");
-        put("market-data-gateway",   "RUNNING", "v4.2.1", "UAT", "uat-mkt-01",  7070, "Market Data",          "2026-02-28T16:20:00Z", "build-6102", "7d 0h");
-        put("trade-booking-service", "RUNNING", "v1.5.2", "UAT", "uat-book-01", 8090, "Operations Tech",      "2026-03-03T12:00:00Z", "build-1893", "4d 4h");
-        put("position-aggregator",   "RUNNING", "v2.3.4", "UAT", "uat-risk-02", 9091, "Risk Technology",      "2026-03-02T10:30:00Z", "build-2987", "4d 18h");
-        put("rate-curve-builder",    "RUNNING", "v3.0.1", "UAT", "uat-mkt-02",  7071, "Market Data",          "2026-03-05T08:00:00Z", "build-6050", "5d 8h");
-        put("collateral-manager",    "RUNNING", "v2.8.0", "UAT", "uat-coll-01", 9092, "Treasury Tech",        "2026-02-27T14:00:00Z", "build-4401", "8d 2h");
-        put("p-and-l-calculator",    "RUNNING", "v2.1.7", "UAT", "uat-pnl-01",  9093, "Finance Tech",         "2026-03-04T15:45:00Z", "build-3512", "2d 11h");
+        put("credit-risk-engine",    "RUNNING", "v2.0.5", "UAT", "uat-risk-01", PORT_CREDIT_RISK_ENGINE,    "Risk Technology",      "2026-03-01T08:00:00Z", "build-2341", "6d 8h");
+        put("market-data-gateway",   "RUNNING", "v4.2.1", "UAT", "uat-mkt-01",  PORT_MARKET_DATA_GATEWAY,   "Market Data",          "2026-02-28T16:20:00Z", "build-6102", "7d 0h");
+        put("trade-booking-service", "RUNNING", "v1.5.2", "UAT", "uat-book-01", PORT_TRADE_BOOKING_SERVICE, "Operations Tech",      "2026-03-03T12:00:00Z", "build-1893", "4d 4h");
+        put("position-aggregator",   "RUNNING", "v2.3.4", "UAT", "uat-risk-02", PORT_POSITION_AGGREGATOR,   "Risk Technology",      "2026-03-02T10:30:00Z", "build-2987", "4d 18h");
+        put("rate-curve-builder",    "RUNNING", "v3.0.1", "UAT", "uat-mkt-02",  PORT_RATE_CURVE_BUILDER,    "Market Data",          "2026-03-05T08:00:00Z", "build-6050", "5d 8h");
+        put("collateral-manager",    "RUNNING", "v2.8.0", "UAT", "uat-coll-01", PORT_COLLATERAL_MANAGER,    "Treasury Tech",        "2026-02-27T14:00:00Z", "build-4401", "8d 2h");
+        put("p-and-l-calculator",    "RUNNING", "v2.1.7", "UAT", "uat-pnl-01",  PORT_P_AND_L_CALCULATOR,    "Finance Tech",         "2026-03-04T15:45:00Z", "build-3512", "2d 11h");
 
         // ── Unhealthy — realistic UAT noise ─────────────────────────────────
-        put("regulatory-reporting",  "STOPPED", "v1.1.0", "UAT", "uat-reg-01",  9094, "Compliance Tech",      "2026-02-20T09:00:00Z", "build-1201", "-");
-        put("limit-monitor",         "FAILED",  "v1.9.2", "UAT", "uat-risk-03", 9095, "Risk Technology",      "2026-03-06T06:00:00Z", "build-3001", "-");
+        put("regulatory-reporting",  "STOPPED", "v1.1.0", "UAT", "uat-reg-01",  PORT_REGULATORY_REPORTING,  "Compliance Tech",      "2026-02-20T09:00:00Z", "build-1201", "-");
+        put("limit-monitor",         "FAILED",  "v1.9.2", "UAT", "uat-risk-03", PORT_LIMIT_MONITOR,         "Risk Technology",      "2026-03-06T06:00:00Z", "build-3001", "-");
     }
 
     private static void put(String name, String status, String version, String env,

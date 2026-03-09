@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.sandbox.utils;
 
 import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;

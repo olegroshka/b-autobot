@@ -28,7 +28,7 @@ ION channel / REST API
   Presses APPLY  ──►  Price / Spread columns recalculated on row
         │
         ▼
-  Presses SEND   ──►  Row status → QUOTED, Sent Price / Sent Spread snapshot taken
+  Presses SEND   ──►  Row status → QUOTED, Quoted Price / Quoted Spread snapshot taken
         │
         │  Row stays fully editable — re-APPLY → re-SEND refreshes the snapshot.
         │
@@ -48,7 +48,7 @@ ION channel / REST API
 | Bloomberg CP+   | CP+ Price *(ticking, "bid / ask")*, CP+ Spread *(ticking, "bid / ask")*        |
 | Bloomberg CBBT  | CBBT Price *(ticking, "bid / ask")*, CBBT Spread *(ticking, "bid / ask")*      |
 | Applied values  | Pricing Action, Price, Spread                                                   |
-| Sent snapshot   | Sent Price, Sent Spread                                                         |
+| Sent snapshot   | Quoted Price, Quoted Spread                                                     |
 
 ---
 
@@ -181,7 +181,7 @@ reference prices until the row reaches DONE / MISSED (not cleared by SEND).
 | M2        | Ticking TW / CP+ / CBBT prices             | 3         | ✓ Done |
 | M3        | REST inquiry API                            | 2         | ✓ Done |
 | M4        | Toolbar APPLY (price + spread)              | 6         | ✓ Done |
-| M5        | SEND → QUOTED + sentPrice snapshot          | 3         | ✓ Done |
+| M5        | SEND → QUOTED + quotedPrice snapshot        | 3         | ✓ Done |
 | M6        | Multi-row APPLY / SEND                      | 3         | ✓ Done |
 | M7        | End-to-end DSL re-quote workflow            | 1         | ✓ Done |
 | M8        | RELEASE PT access control + workflow        | 5         | ✓ Done |
@@ -216,7 +216,7 @@ mvn verify -Dblotter.build.skip=false -Dcucumber.filter.tags="@m8"   # → 5/5
 
 AG Grid virtualises columns by default, removing off-screen column DOM nodes.
 Setting this to `true` keeps all columns in the DOM at all times so Playwright
-locators like `[col-id='sentPrice']` always resolve.
+locators like `[col-id='quotedPrice']` always resolve.
 
 ### RELEASE PT — permission-only gate
 

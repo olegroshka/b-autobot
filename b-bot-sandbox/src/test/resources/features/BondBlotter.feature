@@ -47,8 +47,8 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     And the grid should display column "cbbPrice"
     And the grid should display column "price"
     And the grid should display column "spread"
-    And the grid should display column "sentPrice"
-    And the grid should display column "sentSpread"
+    And the grid should display column "quotedPrice"
+    And the grid should display column "quotedSpread"
     And the grid should display column "status"
 
   @m1
@@ -166,16 +166,16 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
 
   @m5 @workflow
-  Scenario: SEND captures sentPrice snapshot
+  Scenario: SEND captures quotedPrice snapshot
     Given the PT-Blotter is open
     When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    Then the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @m5 @workflow
-  Scenario: Re-quote — SEND again after re-APPLY updates sentPrice
+  Scenario: Re-quote — SEND again after re-APPLY updates quotedPrice
     Given the PT-Blotter is open
     When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar ref source "TW" ref side "Mid" markup "0" units "c"
@@ -185,7 +185,7 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     And I press APPLY
     And I press SEND
     Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M6 — Multi-row APPLY / SEND
@@ -238,13 +238,13 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
     And I press APPLY
     And I press SEND
     Then the row with ISIN from "IGPT_1" field "ISIN1" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
+    And the "quotedPrice" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
     # Re-quote: change markup and re-SEND without selecting again
     When I set the toolbar ref source "CP+" ref side "Ask" markup "-0.25" units "c"
     And I press APPLY
     And I press SEND
     Then the row with ISIN from "IGPT_1" field "ISIN1" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
+    And the "quotedPrice" for ISIN from "IGPT_1" field "ISIN1" should be a numeric value
 
   # ──────────────────────────────────────────────────────────────────────────────
   # M8 — RELEASE PT access control + workflow

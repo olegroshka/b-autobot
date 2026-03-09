@@ -1,8 +1,8 @@
-package descriptors;
+package com.bbot.template.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.ConfigServiceDsl;
+import com.bbot.template.utils.ConfigServiceDsl;
 
 /**
  * {@link AppDescriptor} for the Config Service microservice.
@@ -11,7 +11,7 @@ import utils.ConfigServiceDsl;
  * All environment-specific config lives in HOCON:
  * <pre>{@code
  * b-bot.apps.config-service {
- *   descriptor-class  = "descriptors.ConfigServiceDescriptor"
+ *   descriptor-class  = "com.bbot.template.descriptors.ConfigServiceDescriptor"
  *   health-check-path = "/api/config"
  *   apiBase           = "http://..."
  * }

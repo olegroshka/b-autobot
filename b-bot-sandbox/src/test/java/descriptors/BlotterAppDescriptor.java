@@ -1,8 +1,8 @@
-package descriptors;
+package com.bbot.sandbox.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.BlotterDsl;
+import com.bbot.sandbox.utils.BlotterDsl;
 
 /**
  * Descriptor for the PT-Blotter — supplies only the DSL factory.

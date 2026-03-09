@@ -1,8 +1,8 @@
-package descriptors;
+package com.bbot.template.descriptors;
 
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
-import utils.PtBlotterDsl;
+import com.bbot.template.utils.PtBlotterDsl;
 
 /**
  * {@link AppDescriptor} for the PT-Blotter application.
@@ -10,7 +10,7 @@ import utils.PtBlotterDsl;
  * <p>Supplies only the DSL factory. All environment-specific config lives in HOCON:
  * <pre>{@code
  * b-bot.apps.blotter {
- *   descriptor-class  = "descriptors.BlotterDescriptor"
+ *   descriptor-class  = "com.bbot.template.descriptors.BlotterDescriptor"
  *   health-check-path = "/api/inquiries"
  *   webUrl            = "http://..."
  *   apiBase           = "http://..."

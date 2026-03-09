@@ -61,8 +61,8 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     When I press SEND
     Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
     And the row with ISIN from "HYPT_1" field "ISIN2" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
-    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 
   # ── 1. Environment health gate ───────────────────────────────────────────────
   # This scenario runs first. If ANY step fails, the mock UAT environment is not
@@ -98,7 +98,7 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     And the grid should display column "twPrice"
     And the grid should display column "price"
     And the grid should display column "spread"
-    And the grid should display column "sentPrice"
+    And the grid should display column "quotedPrice"
     And the grid should display column "status"
 
   @grid
@@ -135,14 +135,14 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     Then the "spread" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 
   @workflow
-  Scenario: SEND captures a sentPrice snapshot and moves the row to QUOTED
+  Scenario: SEND captures a quotedPrice snapshot and moves the row to QUOTED
     Given the PT-Blotter is open
     When I select the row with ISIN from "HYPT_1" field "ISIN1"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
     Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
-    And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
 
   @workflow
   Scenario: APPLY only affects selected rows — unselected row price stays blank

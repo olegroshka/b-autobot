@@ -37,7 +37,7 @@ export interface AppliedConfig {
  * The PriceSimulator ticks these strings at ~400 ms intervals.
  *
  * After APPLY, `appliedConfig` is set and the simulator re-derives `price`/`spread`
- * on every tick.  SEND captures sentPrice/sentSpread but does not clear the config.
+ * on every tick.  SEND captures quotedPrice/quotedSpread but does not clear the config.
  */
 export interface Inquiry {
   id:          string
@@ -66,8 +66,8 @@ export interface Inquiry {
   spread:        number | null   // cross-driven from price, or direct (units=bp)
 
   // Sent snapshot — captured on SEND; updated on each re-SEND
-  sentPrice:  number | null
-  sentSpread: number | null
+  quotedPrice:  number | null
+  quotedSpread: number | null
 
   // Applied markup config — set on APPLY; drives continuous price re-computation
   appliedConfig?: AppliedConfig

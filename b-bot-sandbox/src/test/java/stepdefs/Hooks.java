@@ -1,4 +1,4 @@
-package stepdefs;
+package com.bbot.sandbox.stepdefs;
 
 import com.bbot.core.PlaywrightManager;
 import com.bbot.core.config.BBotConfig;
@@ -9,9 +9,9 @@ import io.cucumber.java.After;
 import io.cucumber.java.AfterAll;
 import io.cucumber.java.Before;
 import io.cucumber.java.BeforeAll;
-import utils.MockBlotterServer;
-import utils.MockConfigServer;
-import utils.MockDeploymentServer;
+import com.bbot.sandbox.utils.MockBlotterServer;
+import com.bbot.sandbox.utils.MockConfigServer;
+import com.bbot.sandbox.utils.MockDeploymentServer;
 
 import java.util.Map;
 

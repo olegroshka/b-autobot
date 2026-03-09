@@ -18,7 +18,7 @@ import './App.css'
  *   - APPLY: reads toolbar settings, computes price (c) or spread (bp) for each
  *             selected row and pushes via synchronous applyTransaction.
  *   - SEND:  POSTs a quote for each selected row, then stamps status=QUOTED and
- *             captures the sentPrice/sentSpread snapshot.  Non-locking — the row
+ *             captures the quotedPrice/quotedSpread snapshot.  Non-locking — the row
  *             stays fully editable for re-quote (re-APPLY → re-SEND) cycles.
  */
 export default function App() {
@@ -125,9 +125,9 @@ export default function App() {
         api.applyTransaction({
           update: [{
             ...row,
-            status:     'QUOTED',
-            sentPrice:  row.price,
-            sentSpread: row.spread,
+            status:       'QUOTED',
+            quotedPrice:  row.price,
+            quotedSpread: row.spread,
           }],
         })
       } catch (err) {

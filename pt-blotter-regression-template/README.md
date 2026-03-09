@@ -29,7 +29,7 @@ The scenarios demonstrate twelve observable aspects of the system:
 | 2 | 1 | `@smoke` | PT-Blotter UI loads; AG Grid renders |
 | 3 | 2 | `@grid` | Column schema is intact; seed data is in PENDING status |
 | 4 | 1 | `@ticking` | Live price simulator is ticking at ~400 ms |
-| 5 | 4 | `@workflow` | APPLY → SEND pricing workflow; price/spread captured in sentPrice |
+| 5 | 4 | `@workflow` | APPLY → SEND pricing workflow; price/spread captured in quotedPrice |
 | 6 | 2 | `@access` | RELEASE PT respects isPTAdmin from the Config Service |
 | 7 | 3 | `@config-service` | Permission namespace present; role-based isPTAdmin checks |
 | 8 | 2 | `@deployment` | Service registry lists all critical services at correct versions |

@@ -42,8 +42,8 @@ Scenario: Full credit portfolio lifecycle — REST submission through to QUOTED
   When I press SEND
   Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
   And the row with ISIN from "HYPT_1" field "ISIN2" should have status "QUOTED"
-  And the "sentPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
-  And the "sentPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+  And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+  And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
 ```
 
 All data — ISINs, API paths, template bodies, service versions — is declared once

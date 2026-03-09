@@ -1,4 +1,4 @@
-package utils;
+package com.bbot.sandbox.utils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
@@ -42,6 +42,11 @@ public final class MockConfigServer {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    /** Maximum notional allowed for a single risk limit entry. */
+    private static final long RISK_MAX_NOTIONAL = 50_000_000L;
+    /** Fraction of max notional at which a risk alert is triggered. */
+    private static final double RISK_ALERT_THRESHOLD = 0.9;
+
     /** In-memory store: composite key → config object (JSON as Map). */
     private static final ConcurrentHashMap<String, Map<String, Object>> STORE =
             new ConcurrentHashMap<>();
@@ -68,7 +73,7 @@ public final class MockConfigServer {
                 Map.of("autoBook", false, "bookingDesk", "FIXED_INCOME"));
         // Risk limits
         put("credit.risk", "Limits", "default",
-                Map.of("maxNotional", 50_000_000, "alertThreshold", 0.9));
+                Map.of("maxNotional", RISK_MAX_NOTIONAL, "alertThreshold", RISK_ALERT_THRESHOLD));
         // Market data sources
         put("market.data", "Sources", "default",
                 Map.of("primary", "TW", "fallback", "CP+"));

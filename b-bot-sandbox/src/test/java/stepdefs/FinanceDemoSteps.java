@@ -1,9 +1,9 @@
-package stepdefs;
+package com.bbot.sandbox.stepdefs;
 
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import pages.FinanceDemoPage;
+import com.bbot.sandbox.pages.FinanceDemoPage;
 import com.bbot.core.TickingCellHelper;
 
 import java.time.Duration;

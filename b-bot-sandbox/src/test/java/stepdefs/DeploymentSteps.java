@@ -1,9 +1,9 @@
-package stepdefs;
+package com.bbot.sandbox.stepdefs;
 
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
 import io.cucumber.java.en.When;
-import utils.DeploymentDsl;
+import com.bbot.sandbox.utils.DeploymentDsl;
 
 import java.io.IOException;
 

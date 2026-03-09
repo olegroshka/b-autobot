@@ -23,7 +23,7 @@ import java.time.Instant;
  * <p>Acquires an access token from the configured OAuth2 token endpoint and
  * injects it as an {@code Authorization: Bearer} header on every outbound
  * HTTP request. The token is automatically refreshed when it is within
- * 60 seconds of expiry.
+ * {@value #TOKEN_REFRESH_MARGIN_SECONDS} seconds of expiry.
  *
  * <h2>Thread safety</h2>
  * This class is thread-safe. The {@link #refreshToken()} method is synchronized
@@ -47,7 +47,15 @@ public final class ClientCredentialsAuth implements AuthStrategy {
 
     private static final Logger LOG = LoggerFactory.getLogger(ClientCredentialsAuth.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    private static final Duration REFRESH_MARGIN = Duration.ofSeconds(60);
+
+    /** Seconds before token expiry at which a proactive refresh is triggered. */
+    static final int TOKEN_REFRESH_MARGIN_SECONDS = 60;
+    /** Timeout in seconds for each OAuth2 token HTTP request. */
+    static final int OAUTH_REQUEST_TIMEOUT_SECONDS = 30;
+    /** Default token lifetime in seconds when {@code expires_in} is absent from the response. */
+    static final int DEFAULT_TOKEN_EXPIRY_SECONDS = 3600;
+
+    private static final Duration REFRESH_MARGIN = Duration.ofSeconds(TOKEN_REFRESH_MARGIN_SECONDS);
 
     private final String tokenUrl;
     private final String clientId;
@@ -130,7 +138,7 @@ public final class ClientCredentialsAuth implements AuthStrategy {
                     .uri(URI.create(tokenUrl))
                     .header("Content-Type", "application/x-www-form-urlencoded")
                     .POST(HttpRequest.BodyPublishers.ofString(formBody))
-                    .timeout(Duration.ofSeconds(30))
+                    .timeout(Duration.ofSeconds(OAUTH_REQUEST_TIMEOUT_SECONDS))
                     .build();
 
             HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString());
@@ -164,7 +172,9 @@ public final class ClientCredentialsAuth implements AuthStrategy {
             this.accessToken = tokenNode.asText();
 
             // Parse expires_in (seconds) — default to 1 hour if not present
-            int expiresIn = root.has("expires_in") ? root.get("expires_in").asInt(3600) : 3600;
+            int expiresIn = root.has("expires_in")
+                    ? root.get("expires_in").asInt(DEFAULT_TOKEN_EXPIRY_SECONDS)
+                    : DEFAULT_TOKEN_EXPIRY_SECONDS;
             this.expiresAt = Instant.now().plusSeconds(expiresIn);
 
         } catch (BBotAuthException e) {

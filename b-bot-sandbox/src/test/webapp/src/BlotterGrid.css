@@ -13,8 +13,8 @@
 .blotter-grid .ag-cell[col-id="cbbSpread"],
 .blotter-grid .ag-cell[col-id="price"],
 .blotter-grid .ag-cell[col-id="spread"],
-.blotter-grid .ag-cell[col-id="sentPrice"],
-.blotter-grid .ag-cell[col-id="sentSpread"],
+.blotter-grid .ag-cell[col-id="quotedPrice"],
+.blotter-grid .ag-cell[col-id="quotedSpread"],
 .blotter-grid .ag-cell[col-id="coupon"],
 .blotter-grid .ag-cell[col-id="notional"] {
   font-family: 'Roboto Mono', 'Cascadia Code', 'Consolas', monospace;
