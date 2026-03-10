@@ -37,6 +37,9 @@ package com.bbot.core.data;
  *                    when not declared in HOCON
  * @param client      counterparty / client name displayed in the blotter Client column;
  *                    default {@code ""}
+ * @param bondId      catalogue ID of the bond this line was resolved from
+ *                    (e.g. {@code "UST-2Y"}); {@code null} when the line was declared
+ *                    inline without a {@code bond = } reference
  */
 public record PortfolioBond(
         String isin,
@@ -47,5 +50,6 @@ public record PortfolioBond(
         String maturity,
         double coupon,
         long   notional,
-        String client
+        String client,
+        String bondId
 ) {}

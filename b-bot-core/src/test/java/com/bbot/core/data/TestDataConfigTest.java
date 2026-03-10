@@ -208,5 +208,37 @@ class TestDataConfigTest {
         Portfolio portfolio = testData.getPortfolio("NO_DATE_PT");
         assertThat(portfolio.bonds().get("line-1").currency()).isEqualTo("GBP");
     }
+
+    @Test
+    void getPortfolio_resolvesBondCatalogueReference() {
+        Portfolio portfolio = testData.getPortfolio("CATALOGUE_PT");
+        assertThat(portfolio.bonds()).hasSize(2);
+
+        PortfolioBond line1 = portfolio.bonds().get("line-1");
+        // Instrument fields resolved from catalogue bond "UST-2Y"
+        assertThat(line1.bondId()).isEqualTo("UST-2Y");
+        assertThat(line1.isin()).isEqualTo("US912828YJ02");
+        assertThat(line1.description()).isEqualTo("UST 4.25% 2034");
+        assertThat(line1.maturity()).isEqualTo("2034-11-15");
+        assertThat(line1.coupon()).isEqualTo(4.250);
+        // Trading fields come from the portfolio line itself
+        assertThat(line1.quantity()).isEqualTo(2_000_000);
+        assertThat(line1.side()).isEqualTo("Buy");
+        assertThat(line1.currency()).isEqualTo("USD");
+        assertThat(line1.client()).isEqualTo("BLACKROCK");
+
+        PortfolioBond line2 = portfolio.bonds().get("line-2");
+        assertThat(line2.bondId()).isEqualTo("EUR-HY-XS23");
+        assertThat(line2.isin()).isEqualTo("XS2346573523");
+        assertThat(line2.coupon()).isEqualTo(3.500);
+        assertThat(line2.client()).isEqualTo("PIMCO");
+    }
+
+    @Test
+    void getPortfolio_inlineBondHasNullBondId() {
+        // TEST_PT uses inline isin — bondId should be null
+        Portfolio portfolio = testData.getPortfolio("TEST_PT");
+        assertThat(portfolio.bonds().get("line-1").bondId()).isNull();
+    }
 }
 

@@ -229,17 +229,27 @@ public final class TestDataConfig {
             Config bc = pc.getConfig("bonds");
             bc.root().keySet().stream().sorted().forEach(key -> {
                 Config b = bc.getConfig(key);
-                long qty = b.getLong("quantity");
+                // Resolve instrument fields from the bond catalogue if a reference is declared.
+                String bondId  = b.hasPath("bond") ? b.getString("bond") : null;
+                Bond   ref     = bondId != null ? getBond(bondId) : null;
+
+                String isin    = b.hasPath("isin")        ? b.getString("isin")        : (ref != null ? ref.isin()        : "");
+                String desc    = b.hasPath("description") ? b.getString("description") : (ref != null ? ref.description() : "");
+                String mat     = b.hasPath("maturity")    ? b.getString("maturity")    : (ref != null ? ref.maturity()    : "");
+                double coupon  = b.hasPath("coupon")      ? b.getDouble("coupon")      : (ref != null ? ref.coupon()      : 0.0);
+                long   qty     = b.getLong("quantity");
+
                 bonds.put(key, new PortfolioBond(
-                    b.getString("isin"),
+                    isin,
                     qty,
                     b.getString("side"),
-                    b.hasPath("currency")    ? b.getString("currency")    : "USD",
-                    b.hasPath("description") ? b.getString("description") : "",
-                    b.hasPath("maturity")    ? b.getString("maturity")    : "",
-                    b.hasPath("coupon")      ? b.getDouble("coupon")      : 0.0,
-                    b.hasPath("notional")    ? b.getLong("notional")      : qty,
-                    b.hasPath("client")      ? b.getString("client")      : ""
+                    b.hasPath("currency") ? b.getString("currency") : "USD",
+                    desc,
+                    mat,
+                    coupon,
+                    b.hasPath("notional") ? b.getLong("notional") : qty,
+                    b.hasPath("client")   ? b.getString("client")  : "",
+                    bondId
                 ));
             });
         }
