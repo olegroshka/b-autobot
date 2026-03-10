@@ -77,7 +77,7 @@ public final class PtBlotterDsl {
      * Navigates to the blotter as the given user and waits for the grid to render.
      *
      * <p>The Config Service URL is appended as a query parameter so the React app
-     * can fetch the user's {@code isPTAdmin} flag on startup.
+     * can fetch the user's {@code isAlgoTrader} flag on startup.
      */
     public void openBlotter(String user) {
         String configUrl = ctx.getOtherAppApiBase("config-service");

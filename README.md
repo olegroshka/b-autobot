@@ -59,7 +59,7 @@ Scenario: Trader cannot access the RELEASE PT button
 
 @config-service
 Scenario: Admin has PT admin access
-  Then the user from role "admin" should have isPTAdmin "true" in config service
+  Then the user from role "admin" should have isAlgoTrader "true" in config service
 ```
 
 ---
@@ -147,7 +147,7 @@ b-autobot/
 | Industrial JS probes | Named probe modules in `b-bot-sandbox/src/test/js/` tested with Jest + jsdom |
 | WireMock mock server | Embedded, classpath-based file serving, dynamic port |
 | Config Service microservice | JDK `HttpServer` mock, in-memory CRUD, CORS headers |
-| Access-controlled UI | RELEASE PT button gated by `isPTAdmin` from Config Service |
+| Access-controlled UI | RELEASE PT button gated by `isAlgoTrader` from Config Service |
 | Deployment Dashboard | AG Grid service registry, 12 seeded services, filter |
 | Version-gated regression | `@precondition` scenario asserts deployed versions |
 | GitHub Actions CI | 3-job pipeline — core tests, 66-scenario sandbox, nightly 24-scenario template |

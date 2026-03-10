@@ -179,11 +179,11 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
 
   @config-service
   Scenario: Trader does not have PT admin access
-    Then the user from role "trader" should have isPTAdmin "false" in config service
+    Then the user from role "trader" should have isAlgoTrader "false" in config service
 
   @config-service
   Scenario: Admin has PT admin access
-    Then the user from role "admin" should have isPTAdmin "true" in config service
+    Then the user from role "admin" should have isAlgoTrader "true" in config service
 
   # ── 8. Deployment Dashboard ───────────────────────────────────────────────────
 

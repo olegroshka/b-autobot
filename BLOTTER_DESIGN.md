@@ -2,7 +2,7 @@
 
 Fixed income bond portfolio trading blotter for the b-autobot BDD regression suite.
 Built with **React 18 + AG Grid + Vite**, served by an embedded WireMock server, with
-a companion **Config Service** that gates access to privileged actions via `isPTAdmin`.
+a companion **Config Service** that gates access to privileged actions via `isAlgoTrader`.
 
 ---
 
@@ -32,7 +32,7 @@ ION channel / REST API
         │
         │  Row stays fully editable — re-APPLY → re-SEND refreshes the snapshot.
         │
-        ▼  (admin only — isPTAdmin = true, fetched from Config Service on startup)
+        ▼  (admin only — isAlgoTrader = true, fetched from Config Service on startup)
   Presses RELEASE PT ──►  Row status → RELEASED
 ```
 
@@ -135,23 +135,23 @@ Static files: `GET /config-service/**` → served from `src/test/resources/confi
 
 | Namespace          | Type          | Key       | Values                                              |
 |--------------------|---------------|-----------|-----------------------------------------------------|
-| `credit.pt.access` | `Permissions` | `doej`    | `{"isPTAdmin": false}`                              |
-| `credit.pt.access` | `Permissions` | `smithj`  | `{"isPTAdmin": true}`                               |
-| `credit.pt.access` | `Permissions` | `patelv`  | `{"isPTAdmin": false}`                              |
-| `credit.pt.access` | `Permissions` | `nguyenl` | `{"isPTAdmin": true}`                               |
+| `credit.pt.access` | `Permissions` | `doej`    | `{"isAlgoTrader": false}`                              |
+| `credit.pt.access` | `Permissions` | `smithj`  | `{"isAlgoTrader": true}`                               |
+| `credit.pt.access` | `Permissions` | `patelv`  | `{"isAlgoTrader": false}`                              |
+| `credit.pt.access` | `Permissions` | `nguyenl` | `{"isAlgoTrader": true}`                               |
 | `credit.booking`   | `Settings`    | `default` | `{"autoBook": false, "bookingDesk": "FIXED_INCOME"}`|
 | `credit.risk`      | `Limits`      | `default` | `{"maxNotional": 50000000, "alertThreshold": 0.9}` |
 | `market.data`      | `Sources`     | `default` | `{"primary": "TW", "fallback": "CP+"}`              |
 
 ### Blotter Integration
 
-The blotter fetches `isPTAdmin` on startup using URL parameters:
+The blotter fetches `isAlgoTrader` on startup using URL parameters:
 
 ```
 http://localhost:{wiremockPort}/blotter/?user=smithj&configUrl=http://localhost:{configPort}
 ```
 
-If `isPTAdmin` is `true`, the **RELEASE PT** button is enabled.
+If `isAlgoTrader` is `true`, the **RELEASE PT** button is enabled.
 Tests pass `?user=` and `?configUrl=` via `BlotterDsl.openBlotter(String user)`.
 
 ---

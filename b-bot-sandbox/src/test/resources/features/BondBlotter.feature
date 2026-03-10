@@ -253,12 +253,12 @@ Feature: PT-Blotter — Fixed Income Bond Portfolio Trading Blotter
   # ──────────────────────────────────────────────────────────────────────────────
 
   @m8 @access
-  Scenario: RELEASE PT button is not accessible when trader isPTAdmin flag is false
+  Scenario: RELEASE PT button is not accessible when trader isAlgoTrader flag is false
     Given the PT-Blotter is open as the trader
     Then the RELEASE PT button should be disabled
 
   @m8 @access
-  Scenario: RELEASE PT button is accessible when admin isPTAdmin flag is true
+  Scenario: RELEASE PT button is accessible when admin isAlgoTrader flag is true
     Given the PT-Blotter is open as the admin
     Then the RELEASE PT button should be enabled
 

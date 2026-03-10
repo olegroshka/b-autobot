@@ -38,25 +38,25 @@ Feature: Config Service — in-memory configuration store
   Scenario: Trader is not a PT admin by default
     Given the config service is running
     When I read config "credit.pt.access" / "Permissions" / user "trader"
-    Then the config value "isPTAdmin" should be "false"
+    Then the config value "isAlgoTrader" should be "false"
 
   @api
   Scenario: Admin is a PT admin by default
     Given the config service is running
     When I read config "credit.pt.access" / "Permissions" / user "admin"
-    Then the config value "isPTAdmin" should be "true"
+    Then the config value "isAlgoTrader" should be "true"
 
   @api
   Scenario: Second trader is not a PT admin by default
     Given the config service is running
     When I read config "credit.pt.access" / "Permissions" / user "trader2"
-    Then the config value "isPTAdmin" should be "false"
+    Then the config value "isAlgoTrader" should be "false"
 
   @api
   Scenario: Second admin is a PT admin by default
     Given the config service is running
     When I read config "credit.pt.access" / "Permissions" / user "admin2"
-    Then the config value "isPTAdmin" should be "true"
+    Then the config value "isAlgoTrader" should be "true"
 
   # ── Other namespaces ────────────────────────────────────────────────────────
 
@@ -86,19 +86,19 @@ Feature: Config Service — in-memory configuration store
   @api
   Scenario: Promote trader to PT admin and restore
     Given the config service is running
-    When I update config "credit.pt.access" / "Permissions" / user "trader" setting "isPTAdmin" to "true"
-    Then the config value "isPTAdmin" should be "true"
+    When I update config "credit.pt.access" / "Permissions" / user "trader" setting "isAlgoTrader" to "true"
+    Then the config value "isAlgoTrader" should be "true"
     # Reset — avoid polluting other tests
-    When I update config "credit.pt.access" / "Permissions" / user "trader" setting "isPTAdmin" to "false"
-    Then the config value "isPTAdmin" should be "false"
+    When I update config "credit.pt.access" / "Permissions" / user "trader" setting "isAlgoTrader" to "false"
+    Then the config value "isAlgoTrader" should be "false"
 
   # ── Create and delete entries ───────────────────────────────────────────────
 
   @api
   Scenario: Create a new user entry via PUT then delete it
     Given the config service is running
-    When I update config "credit.pt.access" / "Permissions" / "jonesb" setting "isPTAdmin" to "false"
-    Then the config value "isPTAdmin" should be "false"
+    When I update config "credit.pt.access" / "Permissions" / "jonesb" setting "isAlgoTrader" to "false"
+    Then the config value "isAlgoTrader" should be "false"
     When I delete config "credit.pt.access" / "Permissions" / "jonesb"
     Then the config entry should not exist
 

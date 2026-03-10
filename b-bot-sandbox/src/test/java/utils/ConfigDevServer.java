@@ -48,8 +48,8 @@ public final class ConfigDevServer {
         System.out.println("  └────────────────────────────────────────────────────────────┘");
         System.out.println();
         System.out.println("  ┌─ Seed namespaces ───────────────────────────────────────────┐");
-        System.out.println("  │  credit.pt.access / Permissions / trader      isPTAdmin=false │");
-        System.out.println("  │  credit.pt.access / Permissions / algo_trader isPTAdmin=true  │");
+        System.out.println("  │  credit.pt.access / Permissions / trader      isAlgoTrader=false │");
+        System.out.println("  │  credit.pt.access / Permissions / algo_trader isAlgoTrader=true  │");
         System.out.println("  │  credit.booking   / Settings    / default                     │");
         System.out.println("  │  credit.risk      / Limits      / default                     │");
         System.out.println("  │  market.data      / Sources     / default                     │");

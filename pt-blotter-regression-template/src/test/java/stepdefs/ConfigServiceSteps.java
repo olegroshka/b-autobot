@@ -24,16 +24,16 @@ public class ConfigServiceSteps {
         configService.assertNamespacePresent(namespace);
     }
 
-    @Then("the user {string} should have isPTAdmin {string} in config service")
+    @Then("the user {string} should have isAlgoTrader {string} in config service")
     public void userShouldHaveIsPTAdmin(String username, String expectedValue) {
         boolean expected = Boolean.parseBoolean(expectedValue);
-        configService.assertUserIsPTAdmin(username, expected);
+        configService.assertUserIsAlgoTrader(username, expected);
     }
 
-    @Then("the user from role {string} should have isPTAdmin {string} in config service")
+    @Then("the user from role {string} should have isAlgoTrader {string} in config service")
     public void userByRoleShouldHaveIsPTAdmin(String role, String expectedValue) {
         String username = world.session().getConfig().getTestData().getUser(role);
         boolean expected = Boolean.parseBoolean(expectedValue);
-        configService.assertUserIsPTAdmin(username, expected);
+        configService.assertUserIsAlgoTrader(username, expected);
     }
 }

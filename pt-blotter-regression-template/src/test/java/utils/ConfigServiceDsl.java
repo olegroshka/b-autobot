@@ -61,32 +61,32 @@ public final class ConfigServiceDsl {
     // ── Permissions ──────────────────────────────────────────────────────────
 
     /**
-     * Returns the {@code isPTAdmin} flag for the given username.
+     * Returns the {@code isAlgoTrader} flag for the given username.
      *
      * <p>GET /api/config/credit.pt.access/Permissions/{username} returns a JSON object.
      */
-    public boolean getUserIsPTAdmin(String username) {
+    public boolean getUserIsAlgoTrader(String username) {
         String path = configRoot + "/credit.pt.access/Permissions/" + username;
         String body = get(path);
         try {
             JsonNode node = MAPPER.readTree(body);
-            if (!node.has("isPTAdmin"))
+            if (!node.has("isAlgoTrader"))
                 throw new AssertionError(
-                        "Response for user '" + username + "' has no isPTAdmin field: " + body);
-            return node.get("isPTAdmin").asBoolean();
+                        "Response for user '" + username + "' has no isAlgoTrader field: " + body);
+            return node.get("isAlgoTrader").asBoolean();
         } catch (Exception e) {
             throw new AssertionError("Failed to parse response for user '" + username + "': " + body, e);
         }
     }
 
     /**
-     * Asserts that the user's {@code isPTAdmin} flag matches {@code expected}.
+     * Asserts that the user's {@code isAlgoTrader} flag matches {@code expected}.
      */
-    public void assertUserIsPTAdmin(String username, boolean expected) {
-        boolean actual = getUserIsPTAdmin(username);
+    public void assertUserIsAlgoTrader(String username, boolean expected) {
+        boolean actual = getUserIsAlgoTrader(username);
         if (actual != expected)
             throw new AssertionError(
-                    "isPTAdmin for '" + username + "': expected " + expected + " but was " + actual);
+                    "isAlgoTrader for '" + username + "': expected " + expected + " but was " + actual);
     }
 
     // ── Internal helpers ──────────────────────────────────────────────────────

@@ -26,7 +26,7 @@ export default function App() {
   const [selectedCount, setSelectedCount] = useState(0)
   const [filterText,    setFilterText]    = useState('')
   const [clock, setClock] = useState('')
-  const [isPTAdmin, setIsPTAdmin] = useState(false)
+  const [isAlgoTrader, setIsPTAdmin] = useState(false)
 
   // Read user and configUrl from URL params
   const searchParams = new URLSearchParams(window.location.search)
@@ -40,14 +40,14 @@ export default function App() {
     return () => clearInterval(id)
   }, [])
 
-  // Fetch isPTAdmin from config service on mount
+  // Fetch isAlgoTrader from config service on mount
   useEffect(() => {
     const url = `${configUrl}/api/config/credit.pt.access/Permissions/${user}`
     fetch(url)
       .then(r => r.ok ? r.json() : null)
-      .then((data: { isPTAdmin?: boolean } | null) => {
-        if (data && typeof data.isPTAdmin === 'boolean') {
-          setIsPTAdmin(data.isPTAdmin)
+      .then((data: { isAlgoTrader?: boolean } | null) => {
+        if (data && typeof data.isAlgoTrader === 'boolean') {
+          setIsPTAdmin(data.isAlgoTrader)
         }
       })
       .catch(() => { /* config service unavailable — default to non-admin */ })
@@ -177,7 +177,7 @@ export default function App() {
         onSend={handleSend}
         filterText={filterText}
         onFilterChange={handleFilterChange}
-        isReleasePtEnabled={isPTAdmin}
+        isReleasePtEnabled={isAlgoTrader}
         onReleasePt={handleReleasePt}
       />
 

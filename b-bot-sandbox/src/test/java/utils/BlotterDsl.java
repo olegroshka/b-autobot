@@ -48,7 +48,7 @@ public final class BlotterDsl {
 
     /**
      * Opens the blotter as the given user, passing {@code configUrl} so the app
-     * can fetch {@code isPTAdmin} from {@link MockConfigServer}.
+     * can fetch {@code isAlgoTrader} from {@link MockConfigServer}.
      *
      * @param user  e.g. {@code "trader"} or {@code "algo_trader"}
      */

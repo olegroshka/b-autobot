@@ -61,13 +61,13 @@ public final class MockConfigServer {
         STORE.clear();
         // Permissions — keyed by real user logins
         put("credit.pt.access", "Permissions", "doej",
-                Map.of("isPTAdmin", false));
+                Map.of("isAlgoTrader", false));
         put("credit.pt.access", "Permissions", "smithj",
-                Map.of("isPTAdmin", true));
+                Map.of("isAlgoTrader", true));
         put("credit.pt.access", "Permissions", "patelv",
-                Map.of("isPTAdmin", false));
+                Map.of("isAlgoTrader", false));
         put("credit.pt.access", "Permissions", "nguyenl",
-                Map.of("isPTAdmin", true));
+                Map.of("isAlgoTrader", true));
         // Booking settings
         put("credit.booking", "Settings", "default",
                 Map.of("autoBook", false, "bookingDesk", "FIXED_INCOME"));
