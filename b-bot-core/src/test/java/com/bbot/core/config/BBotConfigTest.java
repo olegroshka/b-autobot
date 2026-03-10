@@ -201,11 +201,22 @@ class BBotConfigTest {
     }
 
     @Test
-    void getAppHealthCheckPath_returnsValue_whenConfigured() {
+    void getAppHealthCheckPath_resolvesFromAction() {
         BBotConfig cfg = BBotConfig.load().withOverrides(Map.of(
-            "b-bot.apps.svc.health-check-path", "/api/health"
+            "b-bot.apps.svc.api-actions.health-check.method", "GET",
+            "b-bot.apps.svc.api-actions.health-check.path",   "/api/health",
+            "b-bot.apps.svc.health-check-action",             "health-check"
         ));
         assertThat(cfg.getAppHealthCheckPath("svc")).contains("/api/health");
+    }
+
+    @Test
+    void getAppHealthCheckPath_fallbackToLegacyPath() {
+        // health-check-path is still supported as a fallback for backward compat
+        BBotConfig cfg = BBotConfig.load().withOverrides(Map.of(
+            "b-bot.apps.svc.health-check-path", "/api/legacy-health"
+        ));
+        assertThat(cfg.getAppHealthCheckPath("svc")).contains("/api/legacy-health");
     }
 
     @Test

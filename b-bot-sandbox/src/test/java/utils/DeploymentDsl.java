@@ -1,5 +1,6 @@
 package com.bbot.sandbox.utils;
 
+import com.bbot.core.registry.AppContext;
 import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,12 +28,14 @@ public final class DeploymentDsl {
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final HttpClient   CLIENT = HttpClientFactory.shared();
 
-    private final Page   page;       // null = API-only mode
-    private final String apiBaseUrl;
+    private final Page       page;         // null = API-only mode
+    private final AppContext  ctx;
+    private final String      deploymentsPath; // resolved from api-actions
 
-    public DeploymentDsl(Page page, String apiBaseUrl) {
-        this.page       = page;
-        this.apiBaseUrl = apiBaseUrl;
+    public DeploymentDsl(Page page, AppContext ctx) {
+        this.page             = page;
+        this.ctx              = ctx;
+        this.deploymentsPath  = ctx.getActionPath("list-deployments");
     }
 
     // ── API assertions ────────────────────────────────────────────────────────
@@ -89,7 +92,7 @@ public final class DeploymentDsl {
      */
     public void openDashboard() {
         requirePage();
-        page.navigate(apiBaseUrl + "/deployment/");
+        page.navigate(ctx.getWebUrl());
         // Wait for at least one grid row to appear
         page.waitForSelector(".ag-center-cols-container [row-index='0']");
     }
@@ -143,9 +146,9 @@ public final class DeploymentDsl {
     // ── HTTP helpers ──────────────────────────────────────────────────────────
 
     private JsonNode getService(String name) throws IOException, InterruptedException {
-        String path = "/api/deployments/" + name;
+        String path = deploymentsPath + "/" + name;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(apiBaseUrl + path))
+                .uri(URI.create(ctx.getApiBaseUrl() + path))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode())
@@ -156,10 +159,10 @@ public final class DeploymentDsl {
 
     private JsonNode getAll() throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(apiBaseUrl + "/api/deployments"))
+                .uri(URI.create(ctx.getApiBaseUrl() + deploymentsPath))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
-        assertThat(resp.statusCode()).as("GET /api/deployments should return 200").isEqualTo(200);
+        assertThat(resp.statusCode()).as("GET " + deploymentsPath + " should return 200").isEqualTo(200);
         return MAPPER.readTree(resp.body());
     }
 

@@ -21,6 +21,6 @@ import com.bbot.template.utils.DeploymentDsl;
 public final class DeploymentDescriptor implements AppDescriptor<DeploymentDsl> {
 
     @Override public DslFactory<DeploymentDsl> dslFactory() {
-        return (ctx, page) -> new DeploymentDsl(ctx.getApiBaseUrl());
+        return (ctx, page) -> new DeploymentDsl(ctx);
     }
 }

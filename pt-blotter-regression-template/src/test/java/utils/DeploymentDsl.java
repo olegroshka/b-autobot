@@ -1,5 +1,6 @@
 package com.bbot.template.utils;
 
+import com.bbot.core.registry.AppContext;
 import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -37,9 +38,11 @@ public final class DeploymentDsl {
     private static final HttpClient CLIENT = HttpClientFactory.shared();
 
     private final String apiBase;
+    private final String deploymentsPath; // resolved from api-actions
 
-    public DeploymentDsl(String apiBase) {
-        this.apiBase = apiBase;
+    public DeploymentDsl(AppContext ctx) {
+        this.apiBase          = ctx.getApiBaseUrl();
+        this.deploymentsPath  = ctx.getActionPath("list-deployments");
     }
 
     // ── Registry queries ──────────────────────────────────────────────────────
@@ -90,7 +93,7 @@ public final class DeploymentDsl {
     private List<Map<String, Object>> fetchAll() {
         try {
             HttpRequest req = HttpRequest.newBuilder()
-                    .uri(URI.create(apiBase + "/api/deployments"))
+                    .uri(URI.create(apiBase + deploymentsPath))
                     .GET()
                     .build();
             HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());

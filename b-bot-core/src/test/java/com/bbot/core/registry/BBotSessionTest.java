@@ -158,7 +158,7 @@ class BBotSessionTest {
 
     @Test
     void checkHealth_noPathIsNoOp() {
-        // No health-check-path in config → no-op (no HTTP call, no exception)
+        // No health-check-action in config → no-op (no HTTP call, no exception)
         BBotSession session = BBotSession.builder()
             .register("no-health", descriptor("no-health"))
             .initialize(configWithApp("no-health", "http://localhost:1"))
@@ -183,8 +183,10 @@ class BBotSessionTest {
             BBotSession session = BBotSession.builder()
                 .register("svc", descriptor("svc"))
                 .initialize(BBotConfig.load().withOverrides(Map.of(
-                    "b-bot.apps.svc.apiBase",           "http://localhost:" + port,
-                    "b-bot.apps.svc.health-check-path", "/health"
+                    "b-bot.apps.svc.apiBase",                         "http://localhost:" + port,
+                    "b-bot.apps.svc.api-actions.health-check.method", "GET",
+                    "b-bot.apps.svc.api-actions.health-check.path",   "/health",
+                    "b-bot.apps.svc.health-check-action",             "health-check"
                 )))
                 .build();
 
@@ -208,8 +210,10 @@ class BBotSessionTest {
             BBotSession session = BBotSession.builder()
                 .register("failing", descriptor("failing"))
                 .initialize(BBotConfig.load().withOverrides(Map.of(
-                    "b-bot.apps.failing.apiBase",           "http://localhost:" + port,
-                    "b-bot.apps.failing.health-check-path", "/health"
+                    "b-bot.apps.failing.apiBase",                         "http://localhost:" + port,
+                    "b-bot.apps.failing.api-actions.health-check.method", "GET",
+                    "b-bot.apps.failing.api-actions.health-check.path",   "/health",
+                    "b-bot.apps.failing.health-check-action",             "health-check"
                 )))
                 .build();
 
@@ -293,11 +297,13 @@ class BBotSessionTest {
             String apiBase = "http://localhost:" + port;
             BBotSession session = BBotSession.builder()
                 .register("app1", descriptor("app1"))
-                .register("app2", descriptor("app2")) // no health-check-path → no-op
+                .register("app2", descriptor("app2")) // no health-check-action → no-op
                 .initialize(BBotConfig.load().withOverrides(Map.of(
-                    "b-bot.apps.app1.apiBase",           apiBase,
-                    "b-bot.apps.app1.health-check-path", "/health",
-                    "b-bot.apps.app2.apiBase",           apiBase
+                    "b-bot.apps.app1.apiBase",                         apiBase,
+                    "b-bot.apps.app1.api-actions.health-check.method", "GET",
+                    "b-bot.apps.app1.api-actions.health-check.path",   "/health",
+                    "b-bot.apps.app1.health-check-action",             "health-check",
+                    "b-bot.apps.app2.apiBase",                         apiBase
                 )))
                 .build();
 

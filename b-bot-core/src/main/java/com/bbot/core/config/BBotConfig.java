@@ -270,18 +270,28 @@ public final class BBotConfig {
      * Returns the health-check REST path for the named app, or empty if not configured.
      * {@code GET {apiBase}{path}} must return 2xx for the app to be considered healthy.
      *
-     * <p>Config key: {@code b-bot.apps.{name}.health-check-path}
+     * <p>Prefers {@code health-check-action}: resolves the named action's {@code path}
+     * from the app's {@code api-actions} block. Falls back to the legacy
+     * {@code health-check-path} key for backward compatibility.
      *
-     * <p>Example HOCON:
+     * <p>Preferred HOCON (action-based):
      * <pre>{@code
      * b-bot.apps.blotter {
-     *   health-check-path = "/api/health"
+     *   health-check-action = "list-inquiries"
+     *   api-actions {
+     *     list-inquiries { method = "GET", path = "/api/inquiries" }
+     *   }
      * }
      * }</pre>
      */
     public Optional<String> getAppHealthCheckPath(String appName) {
-        String key = "b-bot.apps." + appName + ".health-check-path";
-        return cfg.hasPath(key) ? Optional.of(cfg.getString(key)) : Optional.empty();
+        String actionKey = "b-bot.apps." + appName + ".health-check-action";
+        if (cfg.hasPath(actionKey)) {
+            String actionName = cfg.getString(actionKey);
+            return Optional.of(getAppActionPath(appName, actionName));
+        }
+        String pathKey = "b-bot.apps." + appName + ".health-check-path";
+        return cfg.hasPath(pathKey) ? Optional.of(cfg.getString(pathKey)) : Optional.empty();
     }
 
     /**

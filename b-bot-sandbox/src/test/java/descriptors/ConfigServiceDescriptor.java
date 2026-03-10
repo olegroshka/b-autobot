@@ -11,6 +11,6 @@ import com.bbot.sandbox.utils.ConfigServiceDsl;
 public final class ConfigServiceDescriptor implements AppDescriptor<ConfigServiceDsl> {
 
     @Override public DslFactory<ConfigServiceDsl> dslFactory() {
-        return (ctx, page) -> new ConfigServiceDsl(ctx.getApiBaseUrl());
+        return (ctx, page) -> new ConfigServiceDsl(ctx);
     }
 }

@@ -1,5 +1,6 @@
 package com.bbot.template.utils;
 
+import com.bbot.core.registry.AppContext;
 import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -26,9 +27,11 @@ public final class ConfigServiceDsl {
     private static final HttpClient   CLIENT = HttpClientFactory.shared();
 
     private final String apiBase;
+    private final String configRoot; // resolved from api-actions.list-config.path
 
-    public ConfigServiceDsl(String apiBase) {
-        this.apiBase = apiBase;
+    public ConfigServiceDsl(AppContext ctx) {
+        this.apiBase    = ctx.getApiBaseUrl();
+        this.configRoot = ctx.getActionPath("list-config");
     }
 
     // ── Namespace ─────────────────────────────────────────────────────────────
@@ -40,7 +43,7 @@ public final class ConfigServiceDsl {
      * Passes if {@code namespace} appears in that array.
      */
     public void assertNamespacePresent(String namespace) {
-        String body = get("/api/config");
+        String body = get(configRoot);
         try {
             JsonNode root = MAPPER.readTree(body);
             if (!root.isArray())
@@ -63,7 +66,7 @@ public final class ConfigServiceDsl {
      * <p>GET /api/config/credit.pt.access/Permissions/{username} returns a JSON object.
      */
     public boolean getUserIsPTAdmin(String username) {
-        String path = "/api/config/credit.pt.access/Permissions/" + username;
+        String path = configRoot + "/credit.pt.access/Permissions/" + username;
         String body = get(path);
         try {
             JsonNode node = MAPPER.readTree(body);

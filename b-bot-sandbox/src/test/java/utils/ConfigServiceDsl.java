@@ -1,5 +1,6 @@
 package com.bbot.sandbox.utils;
 
+import com.bbot.core.registry.AppContext;
 import com.bbot.core.rest.HttpClientFactory;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,27 +18,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  * DSL for the Config Service REST API.
  *
  * <p>Uses the shared JDK {@link HttpClient} from {@link HttpClientFactory} — zero
- * new test-scope dependencies. The base URL is injected at construction time via
- * {@link com.bbot.core.registry.AppContext#getApiBaseUrl()}.
+ * new test-scope dependencies. The API base URL and config root path are resolved
+ * from {@link AppContext} — no hardcoded paths.
  */
 public final class ConfigServiceDsl {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final HttpClient   CLIENT = HttpClientFactory.shared();
 
-    private final String baseUrl;
+    private final String apiBase;
+    private final String configRoot; // resolved from api-actions.list-config.path
 
-    public ConfigServiceDsl(String baseUrl) {
-        this.baseUrl = baseUrl;
+    public ConfigServiceDsl(AppContext ctx) {
+        this.apiBase    = ctx.getApiBaseUrl();
+        this.configRoot = ctx.getActionPath("list-config");
     }
 
     // ── Assertions ────────────────────────────────────────────────────────────
 
     /** Asserts that GET /api/config returns an array containing the given namespace. */
     public void assertNamespacePresent(String ns) throws IOException, InterruptedException {
-        String body = get("/api/config");
+        String body = get(configRoot);
         JsonNode arr = MAPPER.readTree(body);
-        assertThat(arr.isArray()).as("GET /api/config should return a JSON array").isTrue();
+        assertThat(arr.isArray()).as("GET " + configRoot + " should return a JSON array").isTrue();
         boolean found = false;
         for (JsonNode n : arr) { if (ns.equals(n.asText())) { found = true; break; } }
         assertThat(found).as("Namespace '%s' should be in the list", ns).isTrue();
@@ -48,7 +51,7 @@ public final class ConfigServiceDsl {
     /** GET /api/config/{ns}/{type}/{key} → JsonNode. */
     public JsonNode readConfig(String ns, String type, String key)
             throws IOException, InterruptedException {
-        String body = get("/api/config/" + ns + "/" + type + "/" + key);
+        String body = get(configRoot + "/" + ns + "/" + type + "/" + key);
         return MAPPER.readTree(body);
     }
 
@@ -72,9 +75,9 @@ public final class ConfigServiceDsl {
     public void updateConfig(String ns, String type, String key, String field, Object value)
             throws IOException, InterruptedException {
         // Read current entry (may not exist yet — treat 404 as empty object)
-        String path0 = "/api/config/" + ns + "/" + type + "/" + key;
+        String path0 = configRoot + "/" + ns + "/" + type + "/" + key;
         HttpRequest r0 = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path0)).GET().build();
+                .uri(URI.create(apiBase +path0)).GET().build();
         HttpResponse<String> r0resp = CLIENT.send(r0, HttpResponse.BodyHandlers.ofString());
         ObjectNode node = r0resp.statusCode() == 200
                 ? (ObjectNode) MAPPER.readTree(r0resp.body())
@@ -96,10 +99,10 @@ public final class ConfigServiceDsl {
         }
 
         // PUT the merged object
-        String path = "/api/config/" + ns + "/" + type + "/" + key;
+        String path = configRoot + "/" + ns + "/" + type + "/" + key;
         String body = MAPPER.writeValueAsString(node);
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path))
+                .uri(URI.create(apiBase +path))
                 .header("Content-Type", "application/json")
                 .PUT(HttpRequest.BodyPublishers.ofString(body))
                 .build();
@@ -109,7 +112,7 @@ public final class ConfigServiceDsl {
 
     /** GET /api/config/{ns} — asserts returned array contains the given type. */
     public void assertTypePresent(String ns, String type) throws IOException, InterruptedException {
-        String body = get("/api/config/" + ns);
+        String body = get(configRoot + "/" + ns);
         JsonNode arr = MAPPER.readTree(body);
         assertThat(arr.isArray()).as("GET /api/config/%s should return a JSON array", ns).isTrue();
         boolean found = false;
@@ -119,7 +122,7 @@ public final class ConfigServiceDsl {
 
     /** GET /api/config/{ns}/{type} — asserts returned object contains the given key. */
     public void assertKeyPresent(String ns, String type, String key) throws IOException, InterruptedException {
-        String body = get("/api/config/" + ns + "/" + type);
+        String body = get(configRoot + "/" + ns + "/" + type);
         JsonNode obj = MAPPER.readTree(body);
         assertThat(obj.has(key))
                 .as("Key '%s' should be present in %s/%s", key, ns, type)
@@ -128,9 +131,9 @@ public final class ConfigServiceDsl {
 
     /** DELETE /api/config/{ns}/{type}/{key} — asserts 200 + deleted:true. */
     public void deleteConfig(String ns, String type, String key) throws IOException, InterruptedException {
-        String path = "/api/config/" + ns + "/" + type + "/" + key;
+        String path = configRoot + "/" + ns + "/" + type + "/" + key;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path))
+                .uri(URI.create(apiBase +path))
                 .DELETE().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode()).as("DELETE config should return 200").isEqualTo(200);
@@ -142,9 +145,9 @@ public final class ConfigServiceDsl {
     /** GET /api/config/{ns}/{type}/{key} — asserts the server returns 404. */
     public void assertEntryNotFound(String ns, String type, String key)
             throws IOException, InterruptedException {
-        String path = "/api/config/" + ns + "/" + type + "/" + key;
+        String path = configRoot + "/" + ns + "/" + type + "/" + key;
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path))
+                .uri(URI.create(apiBase +path))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode())
@@ -156,7 +159,7 @@ public final class ConfigServiceDsl {
 
     private String get(String path) throws IOException, InterruptedException {
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path))
+                .uri(URI.create(apiBase +path))
                 .GET().build();
         HttpResponse<String> resp = CLIENT.send(req, HttpResponse.BodyHandlers.ofString());
         assertThat(resp.statusCode())
