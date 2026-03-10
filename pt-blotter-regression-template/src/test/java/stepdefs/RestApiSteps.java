@@ -7,6 +7,7 @@ import com.bbot.core.rest.ScenarioContext;
 import com.bbot.core.rest.JsonTemplateEngine;
 import com.bbot.core.rest.RestProbe;
 import com.bbot.core.rest.RestResponse;
+import com.bbot.template.data.BlotterTestData;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -61,10 +62,15 @@ public class RestApiSteps {
     private final ScenarioContext    scenarioContext;
 
     public RestApiSteps(TestWorld world) {
-        this.world          = world;
-        this.testData       = world.session().getConfig().getTestData();
-        this.scenarioContext = world.scenarioContext();
-        this.templateEngine = new JsonTemplateEngine(testData, scenarioContext);
+        this.world           = world;
+        this.testData        = world.session().getConfig().getTestData();
+        this.scenarioContext  = world.scenarioContext();
+        this.templateEngine  = new JsonTemplateEngine(testData, scenarioContext);
+    }
+
+    /** Typed blotter test data — parsed by {@link com.bbot.template.data.BlotterTestDataParser}. */
+    private BlotterTestData td() {
+        return world.session().context("blotter").getTestData(BlotterTestData.class);
     }
 
     // ── POST ──────────────────────────────────────────────────────────────────
@@ -296,7 +302,7 @@ public class RestApiSteps {
      */
     @Given("I submit all inquiries for portfolio {string}")
     public void submitAllInquiriesForPortfolio(String portfolioName) {
-        Portfolio portfolio = testData.getPortfolio(portfolioName);
+        Portfolio portfolio = td().portfolio(portfolioName);
         String apiBase = world.session().getConfig().getAppApiBase("blotter");
         RestProbe probe = RestProbe.of(apiBase, scenarioContext);
 

@@ -1,7 +1,9 @@
 package com.bbot.template.descriptors;
 
+import com.bbot.core.data.TestDataParser;
 import com.bbot.core.registry.AppDescriptor;
 import com.bbot.core.registry.DslFactory;
+import com.bbot.template.data.BlotterTestDataParser;
 import com.bbot.template.utils.PtBlotterDsl;
 
 /**
@@ -27,5 +29,9 @@ public final class BlotterDescriptor implements AppDescriptor<PtBlotterDsl> {
 
     @Override public DslFactory<PtBlotterDsl> dslFactory() {
         return (ctx, page) -> new PtBlotterDsl(page, ctx);
+    }
+
+    @Override public TestDataParser<?> testDataParser() {
+        return new BlotterTestDataParser();
     }
 }

@@ -1,6 +1,7 @@
 package com.bbot.template.stepdefs;
 
 import com.bbot.core.data.TestDataConfig;
+import com.bbot.template.data.BlotterTestData;
 import io.cucumber.java.en.And;
 import io.cucumber.java.en.Given;
 import io.cucumber.java.en.Then;
@@ -35,6 +36,11 @@ public class BlotterSteps {
 
     private TestDataConfig testData() {
         return world.session().getConfig().getTestData();
+    }
+
+    /** Typed blotter test data — parsed by {@link BlotterTestDataParser}. */
+    private BlotterTestData td() {
+        return world.session().context("blotter").getTestData(BlotterTestData.class);
     }
 
     // ── Navigation ────────────────────────────────────────────────────────────
