@@ -5,6 +5,8 @@ import com.bbot.core.data.Portfolio;
 import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.data.TestDataParser;
 import com.typesafe.config.Config;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -21,12 +23,21 @@ import java.util.Map;
  */
 public final class BlotterTestDataParser implements TestDataParser<BlotterTestData> {
 
+    private static final Logger LOG = LoggerFactory.getLogger(BlotterTestDataParser.class);
+
     @Override
     public BlotterTestData parse(Config rootConfig) {
         TestDataConfig tdc = new TestDataConfig(rootConfig);
 
+        Map<String, Bond> bonds = parseBonds(rootConfig, tdc);
+        if (bonds.isEmpty()) {
+            LOG.warn("BlotterTestDataParser: no bonds found in b-bot.test-data.bonds. " +
+                     "Add a bonds catalogue to application-{env}.conf for catalogue-direct " +
+                     "steps (ISIN of bond \"ID\") and portfolio bond-reference resolution.");
+        }
+
         return new BlotterTestData(
-            parseBonds(rootConfig, tdc),
+            bonds,
             parsePortfolios(rootConfig, tdc),
             parseStringBlock(rootConfig, "b-bot.test-data.service-versions"),
             parseStringBlock(rootConfig, "b-bot.test-data.users"),
