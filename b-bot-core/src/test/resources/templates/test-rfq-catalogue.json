@@ -1,0 +1,7 @@
+{
+  "isin":        "${bond.isin}",
+  "description": "${bond.description}",
+  "maturity":    "${bond.maturity}",
+  "coupon":      ${bond.coupon},
+  "settlementDate": "${settlement-date}"
+}

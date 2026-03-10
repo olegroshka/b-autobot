@@ -1,6 +1,7 @@
 package com.bbot.core.rest;
 
 import com.bbot.core.config.BBotConfig;
+import com.bbot.core.data.Bond;
 import com.bbot.core.exception.BBotConfigException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -94,6 +95,22 @@ class JsonTemplateEngineTest {
 
         assertThat(result).contains("INQ-CUSTOM");
         assertThat(result).doesNotContain("${inquiry_id}");
+    }
+
+    // ── renderWithBond ────────────────────────────────────────────────────────
+
+    @Test
+    void renderWithBond_substitutesAllCatalogueFields() {
+        Bond bond = new Bond("UST-2Y", "US912828YJ02", "UST 4.25% 2034", "2034-11-15", 4.250);
+
+        String result = engine.renderWithBond("test-rfq-catalogue", bond);
+
+        assertThat(result).contains("\"US912828YJ02\"");       // bond.isin
+        assertThat(result).contains("\"UST 4.25% 2034\"");     // bond.description
+        assertThat(result).contains("\"2034-11-15\"");         // bond.maturity
+        assertThat(result).contains("4.25");                   // bond.coupon
+        assertThat(result).contains("2026-03-21");             // ${settlement-date} global
+        assertThat(result).doesNotContain("${bond.");
     }
 
     // ── Missing template ──────────────────────────────────────────────────────

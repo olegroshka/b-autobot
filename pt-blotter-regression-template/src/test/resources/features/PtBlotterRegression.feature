@@ -46,23 +46,23 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
 
     # 2. Grid: open the blotter — both bonds are visible as PENDING inquiries
     And the PT-Blotter is open
-    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
-    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
+    Then the row with ISIN of bond "UST-2Y" should have status "PENDING"
+    And the row with ISIN of bond "EUR-HY-XS23" should have status "PENDING"
 
     # 3. Pricing: select both bonds, set TW Mid + 0 markup, press APPLY
-    When I select the row with ISIN from "HYPT_1" field "ISIN1"
-    And I select the row with ISIN from "HYPT_1" field "ISIN2"
+    When I select the row with ISIN of bond "UST-2Y"
+    And I select the row with ISIN of bond "EUR-HY-XS23"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
-    And the "price" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+    Then the "price" for ISIN of bond "UST-2Y" should be a numeric value
+    And the "price" for ISIN of bond "EUR-HY-XS23" should be a numeric value
 
     # 4. Quote: SEND — live prices are snapshotted; both inquiries move to QUOTED
     When I press SEND
-    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
-    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "QUOTED"
-    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
-    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+    Then the row with ISIN of bond "UST-2Y" should have status "QUOTED"
+    And the row with ISIN of bond "EUR-HY-XS23" should have status "QUOTED"
+    And the "quotedPrice" for ISIN of bond "UST-2Y" should be a numeric value
+    And the "quotedPrice" for ISIN of bond "EUR-HY-XS23" should be a numeric value
 
   # ── 1. Environment health gate ───────────────────────────────────────────────
   # This scenario runs first. If ANY step fails, the mock UAT environment is not
@@ -105,8 +105,8 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   Scenario: Blotter loads with seeded inquiries in PENDING status
     Given the PT-Blotter is open
     Then the grid should have at least 5 rows
-    And the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
-    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
+    And the row with ISIN of bond "UST-2Y" should have status "PENDING"
+    And the row with ISIN of bond "EUR-HY-XS23" should have status "PENDING"
 
   # ── 4. Live price feed ────────────────────────────────────────────────────────
 
@@ -121,36 +121,36 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   @workflow
   Scenario: APPLY with price units sets a numeric price from TW Mid reference
     Given the PT-Blotter is open
-    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    When I select the row with ISIN of bond "UST-2Y"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    Then the "price" for ISIN of bond "UST-2Y" should be a numeric value
 
   @workflow
   Scenario: APPLY with spread units sets a numeric spread from CP+ Bid reference
     Given the PT-Blotter is open
-    When I select the row with ISIN from "HYPT_1" field "ISIN2"
+    When I select the row with ISIN of bond "EUR-HY-XS23"
     And I set the toolbar source "CP+" side "Bid" markup "0" units "bp"
     And I press APPLY
-    Then the "spread" for ISIN from "HYPT_1" field "ISIN2" should be a numeric value
+    Then the "spread" for ISIN of bond "EUR-HY-XS23" should be a numeric value
 
   @workflow
   Scenario: SEND captures a quotedPrice snapshot and moves the row to QUOTED
     Given the PT-Blotter is open
-    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    When I select the row with ISIN of bond "UST-2Y"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
-    And the "quotedPrice" for ISIN from "HYPT_1" field "ISIN1" should be a numeric value
+    Then the row with ISIN of bond "UST-2Y" should have status "QUOTED"
+    And the "quotedPrice" for ISIN of bond "UST-2Y" should be a numeric value
 
   @workflow
   Scenario: APPLY only affects selected rows — unselected row price stays blank
     Given the PT-Blotter is open
-    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    When I select the row with ISIN of bond "UST-2Y"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
-    Then the "price" for ISIN from "HYPT_1" field "ISIN2" should be blank
+    Then the "price" for ISIN of bond "EUR-HY-XS23" should be blank
 
   # ── 6. Access control — RELEASE PT ───────────────────────────────────────────
   # User roles are declared in b-bot.test-data.users (application-mockuat.conf).
@@ -163,12 +163,12 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   @access
   Scenario: Admin can release a quoted row — status becomes RELEASED
     Given the PT-Blotter is open as the admin
-    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    When I select the row with ISIN of bond "UST-2Y"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
     And I press RELEASE PT
-    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "RELEASED"
+    Then the row with ISIN of bond "UST-2Y" should have status "RELEASED"
 
   # ── 7. Config Service ─────────────────────────────────────────────────────────
 
@@ -205,26 +205,26 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
 
   # ── 9. REST API contract — named actions from conf ───────────────────────────
   # All action names, paths, methods, and templates are declared in
-  # b-bot.test-data.api-actions (application-mockuat.conf).
-  # All ISINs come from bond-lists.  No paths or ISINs hardcoded in this section.
+  # b-bot.apps.blotter.api-actions (application-mockuat.conf).
+  # All ISINs come from the bonds catalogue.  No paths or ISINs hardcoded here.
 
   @rest-probe @api
-  Scenario: API contract -- submit RFQ for HYPT_1 bond and verify inquiry accepted
-    When I perform "submit-rfq" with bond list "HYPT_1"
+  Scenario: API contract -- submit RFQ for UST-2Y bond and verify inquiry accepted
+    When I perform "submit-rfq" with bond "UST-2Y"
     Then the response status should be 201
     And the response field "status" should be "PENDING"
     And the response field "inquiry_id" should not be empty
 
   @rest-probe @api
-  Scenario: API contract -- inquiry list seed matches HYPT_1 bond list in conf
+  Scenario: API contract -- inquiry list seed matches UST-2Y bond in catalogue
     When I perform "list-inquiries"
     Then the response status should be 200
     And the response field "$[0].status" should be "PENDING"
-    And the response field "$[0].isin" should equal bond "HYPT_1" field "ISIN1"
+    And the response field "$[0].isin" should equal the isin of bond "UST-2Y"
 
   @rest-probe @api
   Scenario: API contract -- submit RFQ, capture inquiry ID, quote via named actions
-    When I perform "submit-rfq" with bond list "HYPT_1"
+    When I perform "submit-rfq" with bond "UST-2Y"
     Then the response status should be 201
     And the response field "status" should be "PENDING"
     And I capture the response field "inquiry_id"
@@ -235,6 +235,7 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
   # ── 10. Dynamic portfolio submission ─────────────────────────────────────────
   # Portfolio structures (ISINs, quantities, PT IDs) declared in
   # b-bot.test-data.portfolios (application-mockuat.conf).
+  # Bond instrument data resolved from the bonds catalogue — no duplication.
 
   @rest-probe @api @portfolio
   Scenario: Portfolio submission -- all HYPT_1 bonds accepted and seed data intact in inquiry list
@@ -242,19 +243,19 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     When I perform "list-inquiries"
     Then the response status should be 200
     And the response field "$[0].status" should be "PENDING"
-    And the response field "$[0].isin" should equal bond "HYPT_1" field "ISIN1"
+    And the response field "$[0].isin" should equal the isin of bond "UST-2Y"
 
   @rest-probe @workflow @portfolio
   Scenario: Dynamic portfolio -- HYPT_1 bonds submitted via API, priced and quoted in blotter
     Given I submit all inquiries for portfolio "HYPT_1"
     And the PT-Blotter is open
-    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "PENDING"
-    And the row with ISIN from "HYPT_1" field "ISIN2" should have status "PENDING"
-    When I select the row with ISIN from "HYPT_1" field "ISIN1"
+    Then the row with ISIN of bond "UST-2Y" should have status "PENDING"
+    And the row with ISIN of bond "EUR-HY-XS23" should have status "PENDING"
+    When I select the row with ISIN of bond "UST-2Y"
     And I set the toolbar source "TW" side "Mid" markup "0" units "c"
     And I press APPLY
     And I press SEND
-    Then the row with ISIN from "HYPT_1" field "ISIN1" should have status "QUOTED"
+    Then the row with ISIN of bond "UST-2Y" should have status "QUOTED"
 
   # ── 11. PT cancel actions ─────────────────────────────────────────────────────
   # dealer-cancel and customer-cancel operate at PT level: all line items of the
@@ -282,5 +283,5 @@ Feature: PT-Blotter Mock UAT Regression — full stack integration demo
     Given I submit all inquiries for portfolio "CANCEL_BLOTTER_1"
     When I perform "dealer-cancel"
     And the PT-Blotter is open
-    Then the row with ISIN from "CANCEL_BLOTTER_1" field "ISIN1" should have status "DEALER_REJECT"
-    And the row with ISIN from "CANCEL_BLOTTER_1" field "ISIN2" should have status "DEALER_REJECT"
+    Then the row with ISIN of bond "EUR-HY-XS25" should have status "DEALER_REJECT"
+    And the row with ISIN of bond "DE-BUND-30" should have status "DEALER_REJECT"

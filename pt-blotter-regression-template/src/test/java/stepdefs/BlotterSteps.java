@@ -134,7 +134,7 @@ public class BlotterSteps {
     @Given("the PT-Blotter is open as the admin")
     public void ptBlotterIsOpenAsAdmin()  { blotter.openBlotter(testData().getUser("admin")); }
 
-    // ── Bond-list ISIN step variants ──────────────────────────────────────────
+    // ── Bond-list ISIN step variants (deprecated — use catalogue-direct steps below) ──
 
     @When("I select the row with ISIN from {string} field {string}")
     public void selectRowByBondRef(String bondList, String field) {
@@ -154,5 +154,29 @@ public class BlotterSteps {
     @Then("the {string} for ISIN from {string} field {string} should be blank")
     public void cellByBondRefShouldBeBlank(String colId, String bondList, String field) {
         blotter.assertCellBlank(colId, testData().resolveBondRef(bondList, field));
+    }
+
+    // ── Catalogue-direct ISIN step variants ──────────────────────────────────
+    // Resolve ISIN directly from the bonds catalogue by catalogue ID.
+    // Preferred over bond-list variants — no bond-lists block required in config.
+
+    @When("I select the row with ISIN of bond {string}")
+    public void selectRowByBondId(String bondId) {
+        blotter.selectRowByIsin(td().bond(bondId).isin());
+    }
+
+    @Then("the row with ISIN of bond {string} should have status {string}")
+    public void rowByBondIdShouldHaveStatus(String bondId, String status) {
+        blotter.assertRowStatus(td().bond(bondId).isin(), status);
+    }
+
+    @Then("the {string} for ISIN of bond {string} should be a numeric value")
+    public void cellByBondIdShouldBeNumeric(String colId, String bondId) {
+        blotter.assertCellNumeric(colId, td().bond(bondId).isin());
+    }
+
+    @Then("the {string} for ISIN of bond {string} should be blank")
+    public void cellByBondIdShouldBeBlank(String colId, String bondId) {
+        blotter.assertCellBlank(colId, td().bond(bondId).isin());
     }
 }

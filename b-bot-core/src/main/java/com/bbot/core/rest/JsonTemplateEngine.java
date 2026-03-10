@@ -1,5 +1,6 @@
 package com.bbot.core.rest;
 
+import com.bbot.core.data.Bond;
 import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.exception.BBotTemplateException;
 import org.slf4j.Logger;
@@ -70,6 +71,7 @@ public final class JsonTemplateEngine {
      *                     accessible as {@code ${bond.FIELD}} in the template
      * @return rendered JSON string, ready to use as an HTTP request body
      */
+    @SuppressWarnings("deprecation")
     public String render(String templateName, String bondListName) {
         LOG.debug("Rendering template '{}' with bond list '{}'", templateName, bondListName);
         String raw = load(testData.getTemplatePath(templateName));
@@ -84,6 +86,33 @@ public final class JsonTemplateEngine {
         LOG.debug("Rendering template '{}' (no bond list)", templateName);
         String raw = load(testData.getTemplatePath(templateName));
         return substitute(raw, Map.of(), testData.getAllGlobals());
+    }
+
+    /**
+     * Renders the named template substituting tokens from a single bond catalogue
+     * entry, global test-data, and current scenario state.
+     *
+     * <p>Bond fields are accessible in the template as {@code ${bond.isin}},
+     * {@code ${bond.description}}, {@code ${bond.maturity}}, {@code ${bond.coupon}},
+     * and {@code ${bond.id}}.  This is the catalogue-normalised alternative to
+     * {@link #render(String, String)} — use when the feature file references a
+     * bond by its catalogue ID rather than a legacy bond-list name.
+     *
+     * @param templateName registered template name (e.g. {@code "credit-rfq"})
+     * @param bond         bond record resolved from the catalogue
+     * @return rendered JSON string, ready to use as an HTTP request body
+     */
+    public String renderWithBond(String templateName, Bond bond) {
+        LOG.debug("Rendering template '{}' with bond '{}'", templateName, bond.id());
+        Map<String, String> tokens = new java.util.LinkedHashMap<>();
+        tokens.put("isin",        bond.isin());
+        tokens.put("description", bond.description());
+        tokens.put("maturity",    bond.maturity());
+        tokens.put("coupon",      String.valueOf(bond.coupon()));
+        tokens.put("id",          bond.id());
+        tokens.put("client",      "");
+        String raw = load(testData.getTemplatePath(templateName));
+        return substitute(raw, tokens, testData.getAllGlobals());
     }
 
     /**

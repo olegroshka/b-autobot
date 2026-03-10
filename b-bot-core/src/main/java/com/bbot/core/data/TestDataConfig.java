@@ -110,7 +110,7 @@ public final class TestDataConfig {
         );
     }
 
-    // ── Bond lists ────────────────────────────────────────────────────────────
+    // ── Bond lists (deprecated — use the bonds catalogue instead) ────────────
 
     /**
      * Returns all fields in the named bond list as an unmodifiable map.
@@ -119,7 +119,11 @@ public final class TestDataConfig {
      * {@code {ISIN1=XS2346573523, ISIN2=US912828YJ02}}.
      *
      * @throws AssertionError if the bond list does not exist
+     * @deprecated Use the {@code bonds} catalogue ({@link #getBond(String)}) instead.
+     *             Bond lists will be removed in a future milestone once all consumers
+     *             have migrated to catalogue-direct references.
      */
+    @Deprecated
     public Map<String, String> getBondList(String name) {
         String path = ROOT + ".bond-lists." + name;
         if (!cfg.hasPath(path))
@@ -136,7 +140,12 @@ public final class TestDataConfig {
      * Resolves a bond-list field reference: {@code resolveBondRef("HYPT_1", "ISIN1")} → actual ISIN.
      *
      * @throws AssertionError if the bond list or field does not exist
+     * @deprecated Use the {@code bonds} catalogue ({@link #getBond(String)}) instead.
+     *             Bond lists will be removed in a future milestone once all consumers
+     *             have migrated to catalogue-direct references.
      */
+    @Deprecated
+    @SuppressWarnings("deprecation")
     public String resolveBondRef(String bondListName, String fieldName) {
         Map<String, String> list = getBondList(bondListName);
         String value = list.get(fieldName);

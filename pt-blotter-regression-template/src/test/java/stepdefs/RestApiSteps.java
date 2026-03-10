@@ -1,6 +1,7 @@
 package com.bbot.template.stepdefs;
 
 import com.bbot.core.data.ApiAction;
+import com.bbot.core.data.Bond;
 import com.bbot.core.data.Portfolio;
 import com.bbot.core.data.TestDataConfig;
 import com.bbot.core.rest.ScenarioContext;
@@ -328,6 +329,49 @@ public class RestApiSteps {
             resp.assertStatus(201);
             resp.capture("inquiry_id", "inquiry_id_" + lineKey.replace("-", "_"));
         });
+    }
+
+    // ── Catalogue-direct bond steps ───────────────────────────────────────────
+
+    /**
+     * Renders the action's template using a single bond from the catalogue (no bond list).
+     * Bond fields are available in the template as {@code ${bond.isin}},
+     * {@code ${bond.description}}, {@code ${bond.maturity}}, {@code ${bond.coupon}}.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * When I perform "submit-rfq" with bond "UST-2Y"
+     * }</pre>
+     */
+    @When("I perform {string} with bond {string}")
+    public void performActionWithBond(String actionName, String bondId) {
+        ApiAction action = world.session().getConfig().getApiAction(actionName);
+        String apiBase = world.session().getConfig().getAppApiBase(action.app());
+        String path = resolveActionPath(action.path());
+        Bond bond = testData.getBond(bondId);
+        if ("GET".equalsIgnoreCase(action.method())) {
+            lastResponse = RestProbe.of(apiBase, scenarioContext).get(path);
+        } else {
+            String body = action.template() != null
+                    ? templateEngine.renderWithBond(action.template(), bond)
+                    : "{}";
+            lastResponse = RestProbe.of(apiBase, scenarioContext).post(path, body);
+        }
+    }
+
+    /**
+     * Asserts that the JSON field at {@code jsonPath} equals the ISIN of the
+     * bond identified by {@code bondId} in the catalogue.
+     *
+     * <p>Example:
+     * <pre>{@code
+     * Then the response field "$[0].isin" should equal the isin of bond "UST-2Y"
+     * }</pre>
+     */
+    @Then("the response field {string} should equal the isin of bond {string}")
+    public void responseFieldShouldEqualBondIsin(String jsonPath, String bondId) {
+        requireLastResponse("the response field ... should equal the isin of bond");
+        lastResponse.assertField(jsonPath, testData.getBond(bondId).isin());
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
