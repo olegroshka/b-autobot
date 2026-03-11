@@ -121,7 +121,6 @@ b-autobot/
 │           └── features/PtBlotterRegression.feature ← 25 runnable scenarios
 │
 ├── BLOTTER_DESIGN.md               # PT-Blotter design doc (milestones M0–M8)
-├── MODULARISATION_DESIGN.md        # Multi-module architecture design record
 ├── CLAUDE.md                       # AI assistant rules (AG Grid patterns, probe arch)
 └── pom.xml                         # Parent aggregator — version management for all modules
 ```
@@ -151,7 +150,7 @@ b-autobot/
 | Deployment Dashboard | AG Grid service registry, 12 seeded services, filter |
 | Version-gated regression | `@precondition` scenario asserts deployed versions |
 | GitHub Actions CI | 3-job pipeline — core tests, 66-scenario sandbox, nightly 24-scenario template |
-| Copy-adapt template | `pt-blotter-regression-template` — 24-scenario working demo; copy-adapt for real UAT systems |
+| Copy-adapt template | `pt-blotter-regression-template` — 25-scenario working demo; copy-adapt for real UAT systems |
 
 ---
 
@@ -324,8 +323,7 @@ any working directory (Maven reactor root or module directory).
 ## Authentication (Enterprise SSO / MFA)
 
 b-bot-core provides built-in support for enterprise SSO authentication, including
-environments with mandatory MFA (MS Authenticator, TOTP, hardware tokens). See
-[`SSO_AUTH_PLAN.md`](SSO_AUTH_PLAN.md) for the full design.
+environments with mandatory MFA (MS Authenticator, TOTP, hardware tokens).
 
 | Mode | Config Value | Use Case | Human Required? |
 |------|-------------|----------|-----------------|
